@@ -1,7 +1,8 @@
 # flowing-terrain
 This project is intended to document a simple algorithm for creating 3
 dimensional terrain maps and their likely watercourses.
-![islands](https://github.com/mrdunk/flowing-terrain/blob/master/assets/islands.png)
+Red lines here are where drainage indicates rivers will form:
+![islands](https://github.com/mrdunk/flowing-terrain/blob/master/assets/watershed.png)
 
 ## The problem:
 My previous experiments in creating maps for computer software models using
@@ -64,23 +65,23 @@ In this demonstration we set the outermost tile height to 0 (white) and put them
 in a sorted set called "open_set", sorted by height. These are the seed tiles
 where the algorithm starts.
 
-![diagram1](https://github.com/mrdunk/flowing-terrain/blob/master/assets/diagram1.png)
+![diagram1](https://github.com/mrdunk/flowing-terrain/blob/master/assets/diagram1.png =100x100)
 The algorithm picks the seed tile with the lowest height value from the open_set
 (using the tile's python object id() as a tie breaker) and assigns heights to
 any of it's neighbours not yet dealt with and assign to open_set.
 (Picked tile highlighted in red diagram1.)
 
-![diagram2](https://github.com/mrdunk/flowing-terrain/blob/master/assets/diagram2.png)
+![diagram2](https://github.com/mrdunk/flowing-terrain/blob/master/assets/diagram2.png =100x100)
 Next we pick the tile from the open_set with the next lowest height value, which
 here is another of the while edge tiles, and do the same again.
 Continue doing this until all the seed tiles are processed.
 
-![diagram3](https://github.com/mrdunk/flowing-terrain/blob/master/assets/diagram3.png)
-![diagram4](https://github.com/mrdunk/flowing-terrain/blob/master/assets/diagram4.png)
+![diagram3](https://github.com/mrdunk/flowing-terrain/blob/master/assets/diagram3.png =100x100)
+![diagram4](https://github.com/mrdunk/flowing-terrain/blob/master/assets/diagram4.png =100x100)
 Continue with the tile with the next lowest height value in the open_set
 (highlighted in red).
 
-![diagram5](https://github.com/mrdunk/flowing-terrain/blob/master/assets/diagram5.png)
+![diagram5](https://github.com/mrdunk/flowing-terrain/blob/master/assets/diagram5.png =100x100)
 Eventually all tiles will be processed and have heights set.
 
 ## The drainage algorithm:
@@ -90,3 +91,7 @@ Eventually all tiles will be processed and have heights set.
 At the end of this process every tile will have a drainage value equivalent to
 the number of tiles draining into it. Rivers can be assumed to exist in tiles
 with a higher value.
+
+![islands](https://github.com/mrdunk/flowing-terrain/blob/master/assets/lizard.png)
+![islands](https://github.com/mrdunk/flowing-terrain/blob/master/assets/lagoon.png)
+
