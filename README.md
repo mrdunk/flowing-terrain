@@ -73,11 +73,18 @@ The algorithm picks the seed tile with the lowest height value from the open_set
 any of it's neighbours not yet dealt with and assign to open_set.
 (Picked tile highlighted in red diagram1.)
 
+Heights are assigned to neighbours by taking the height of the original tile and
+adding some random value.
+
+
+
 ![diagram2](https://github.com/mrdunk/flowing-terrain/blob/master/assets/diagram2.png)
 
 Next we pick the tile from the open_set with the next lowest height value, which
 here is another of the while edge tiles, and do the same again.
 Continue doing this until all the seed tiles are processed.
+
+
 
 ![diagram3](https://github.com/mrdunk/flowing-terrain/blob/master/assets/diagram3.png)
 ![diagram4](https://github.com/mrdunk/flowing-terrain/blob/master/assets/diagram4.png)
@@ -85,9 +92,13 @@ Continue doing this until all the seed tiles are processed.
 Continue with the tile with the next lowest height value in the open_set
 (highlighted in red).
 
+
+
 ![diagram5](https://github.com/mrdunk/flowing-terrain/blob/master/assets/diagram5.png)
 
 Eventually all tiles will be processed and have heights set.
+
+
 
 ## The drainage algorithm:
 1. Put all tiles in an ordered set, ordered by height.
