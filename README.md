@@ -2,7 +2,8 @@
 This project is intended to document a simple algorithm for creating 3
 dimensional terrain maps and their likely watercourses.
 
-Red lines here are where it is calculated rivers will form:
+In the screenshots darker tiles indicate higher elevation.
+Red highlights show the drainage value; Areas with more red are where rivers will form.
 ![islands](https://github.com/mrdunk/flowing-terrain/blob/master/assets/watershed.png)
 
 ## The problem:
@@ -16,9 +17,9 @@ https://www.redblobgames.com/maps/terrain-from-noise/
 shows examples with many of these depressions filled as lakes.
 
 Treating these depressions as lakes and "flooding" them can work but is quite
-computationally expensive: For every pixel in the map you must "flood" outwards
-and see if you reach your desired sealevel before being hemmed in by higher
-points. Also, many little lakes might not be the style of terrain you are
+computationally expensive: For every pixel in the map you must do a trial "flood"
+outwards and see if you reach your desired sealevel before being hemmed in by
+higher points. Also, many little lakes might not be the style of terrain you are
 looking for.
 An alternative i also played with is raising the height whenever one of these
 "lakes" is detected. It can work but a bit messy to code and still
@@ -107,6 +108,15 @@ Eventually all tiles will be processed and have heights set.
 At the end of this process every tile will have a drainage value equivalent to
 the number of tiles draining into it. Rivers can be assumed to exist in tiles
 with a higher value.
+
+## Limitations:
+1. Since the heights algorithm requires seeding with the lowest points on the desired map and floods outwards from there, this method only lends it's self to generating whole maps. It is not possible to use this algorithm recursively.
+1. Terrain will be similar in style across the whole map. This style will largely be determined by the range used in the random increase in height when flooding the height algorithm.
+
+## Future work:
+1. Experiment with ways of generating recursive layers of detail so a low resolution map can be generated with the heights algorithm then more detail can be added to a particular section as required.
+1. Experiment with noise functions to vary the height increase when flooding the heights algorithm to provide different styles of scenery in different regions of the map.
+1. Experiment with different distribution patterns for the height increase when flooding the heights algorithm to give different unevenness patterns to the terrain.
 
 ## Some more screenshots:
 ![islands](https://github.com/mrdunk/flowing-terrain/blob/master/assets/lizard.png)

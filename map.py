@@ -36,8 +36,9 @@ WINDOW_SIZE = 1000
 TILE_SIZE = 6
 BORDER = 1
 TILE_COUNT = int(WINDOW_SIZE / TILE_SIZE)
-JITTER = 300000
+JITTER = 3
 
+geography = None
 tiled = False
 window = pyglet.window.Window(width=WINDOW_SIZE, height=WINDOW_SIZE, resizable=True)
 batch = pyglet.graphics.Batch()
@@ -153,41 +154,35 @@ class Geography:
                 self.enviroment.dampest = tile.dampness
 
     def get_neighbours(self, tile: Tile) -> List[Tile]:
-        neighbours = []
-
         if tile.x > 0:
             neighbour = self.get_tile(tile.x - 1, tile.y)
-            neighbours.append(neighbour)
+            yield neighbour
             if tile.y > 0:
                 neighbour = self.get_tile(tile.x - 1, tile.y - 1)
-                neighbours.append(neighbour)
+                yield neighbour
             if tile.y < TILE_COUNT - 1:
                 neighbour = self.get_tile(tile.x - 1, tile.y + 1)
-                neighbours.append(neighbour)
+                yield neighbour
         if tile.x < TILE_COUNT - 1:
             neighbour = self.get_tile(tile.x + 1, tile.y)
-            neighbours.append(neighbour)
+            yield neighbour
             if tile.y > 0:
                 neighbour = self.get_tile(tile.x + 1, tile.y - 1)
-                neighbours.append(neighbour)
+                yield neighbour
             if tile.y < TILE_COUNT - 1:
                 neighbour = self.get_tile(tile.x + 1, tile.y + 1)
-                neighbours.append(neighbour)
+                yield neighbour
         if tile.y > 0:
             neighbour = self.get_tile(tile.x, tile.y - 1)
-            neighbours.append(neighbour)
+            yield neighbour
         if tile.y < TILE_COUNT - 1:
             neighbour = self.get_tile(tile.x, tile.y + 1)
-            neighbours.append(neighbour)
-
-        return neighbours
+            yield neighbour
 
     def get_neighbours_filtered(self, tile: Tile) -> List[Tile]:
-        return_neighbours = []
         for neighbour in self.get_neighbours(tile):
             if neighbour.height < 0:
-                return_neighbours.append(neighbour)
-        return return_neighbours
+                yield neighbour
 
     def _starting_points(self):
         for x in range(TILE_COUNT):
@@ -233,8 +228,6 @@ def square(size: int, pos: Tuple[int, int], colour: Tuple[float, float, float]):
             )
 
 
-geography: Geography = Geography()
-
 @window.event
 def on_draw():
     global tiled
@@ -251,9 +244,10 @@ def on_draw():
     batch.draw()
     tiled = True
 
-    print(geography.enviroment.highest_point / geography.enviroment.sealevel)
-
 def main():
+    global geography
+    geography = Geography()
+
     print("OpenGL Context: {}".format(window.context.get_info().version))
     pyglet.gl.glClearColor(0.2, 0.3, 0.3, 1)
     pyglet.app.run()
