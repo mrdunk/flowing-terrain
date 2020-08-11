@@ -28,6 +28,7 @@ from pyglet.window import key
 from typing import Tuple, List, Any
 from sortedcontainers import SortedSet  # pip3 install sortedcontainers
 import random
+import math
 
 RED = (1, 0, 0)
 GREEN = (0, 1, 0)
@@ -37,7 +38,7 @@ WINDOW_SIZE = 1000
 TILE_SIZE = 6
 BORDER = 1
 TILE_COUNT = int(WINDOW_SIZE / TILE_SIZE)
-JITTER = 3
+JITTER = 1
 
 
 class Enviroment:
@@ -55,6 +56,7 @@ class Tile:
     highest_point: int = 0
     dampest: int = 100
     enviroment: Enviroment = None
+    lowest_neighbour = None
 
     def __init__(self, pos: Tuple[int, int], enviroment: Enviroment):
         self.x = pos[0]
@@ -68,10 +70,6 @@ class Tile:
     def get_colour(self) -> Tuple[int, int, int]:
         if self.height is None:
             return RED
-        elif self.height < self.enviroment.sealevel:
-            return (0.5 * float(self.height) / self.enviroment.highest_point,
-                    0.5 * float(self.height) / self.enviroment.highest_point,
-                    1.0 - float(self.height) / self.enviroment.highest_point)
         else:
             return (1.0 - float(self.height) / self.enviroment.highest_point,
                     1.0 - 0.8 * float(self.height) / self.enviroment.highest_point,
@@ -89,6 +87,7 @@ class Geography:
         self._starting_points()
         self.heights_algorithm()
         self.drainage_algorithm()
+        self.generate_mesh()
 
     def get_tile(self, x: int, y: int):
         tile = self.tiles[x][y]
@@ -101,7 +100,7 @@ class Geography:
         while self.open_set_sorted:
             height, tile = self.open_set_sorted.pop(0)
             for neighbour in self.get_neighbours_filtered(tile):
-                new_height = height + random.randint(1, JITTER)
+                new_height = height + random.uniform(0, JITTER)
                 neighbour.height = new_height
                 self.open_set_sorted.add((new_height, neighbour))
 
@@ -123,10 +122,11 @@ class Geography:
             lowest_neighbour = None
             for neighbour in self.get_neighbours(tile):
                 if neighbour.height < height:
-                    if lowest_neighbour is None or lowest_neighbour.height > neighbour.height:
+                    if lowest_neighbour is None or neighbour.height < lowest_neighbour.height:
                         lowest_neighbour = neighbour
             assert(lowest_neighbour)
             lowest_neighbour.dampness += tile.dampness
+            tile.lowest_neighbour = lowest_neighbour
 
             if tile.dampness > self.enviroment.dampest:
                 self.enviroment.dampest = tile.dampness
@@ -192,16 +192,28 @@ class Geography:
             if (start.height, start) not in self.open_set_sorted:
                 self.open_set_sorted.add((0, start))
 
-    def draw_mesh(self):
-        print("get_mesh")
+    def generate_mesh(self):
+        self.vertex_lists = []
+        self.batch = pyglet.graphics.Batch()
 
         def append_tile(vertex_strip, color_strip, tile):
             vertex_strip.append(tile.x * TILE_SIZE)
             vertex_strip.append(tile.y * TILE_SIZE)
-            vertex_strip.append(tile.height)
-            color_strip += tile.get_colour()
+            if tile.height >= self.enviroment.sealevel:
+                vertex_strip.append(tile.height)
+                color_strip += tile.get_colour()
+            else:
+                vertex_strip.append(self.enviroment.sealevel)
+                color_strip += BLUE
 
-        xyz_array = []
+        def append_river(vertex_strip, color_strip, tile):
+            vertex_strip.append(tile.x * TILE_SIZE)
+            vertex_strip.append(tile.y * TILE_SIZE)
+            vertex_strip.append(tile.height + 2)
+
+            hue = int(128 * tile.dampness / self.enviroment.dampest)
+            color_strip += (0, 0, 255, hue)
+
         for x in range(TILE_COUNT - 1):
             vertex_strip = []
             color_strip = []
@@ -217,10 +229,48 @@ class Geography:
                 append_tile(vertex_strip, color_strip, tile_low)
                 append_tile(vertex_strip, color_strip, tile_high)
             append_tile(vertex_strip, color_strip, tile_high)
-            pyglet.graphics.draw(int(len(vertex_strip) / 3),
-                    pyglet.gl.GL_QUAD_STRIP,
+
+            self.batch.add(
+                int(len(vertex_strip) / 3),
+                pyglet.gl.GL_QUAD_STRIP,
+                None,
+                ("v3f", vertex_strip),
+                ("c3f", color_strip),
+                )
+
+        # Sea surface.
+        #vertex_strip = [-WINDOW_SIZE, -WINDOW_SIZE, self.enviroment.sealevel,
+        #                -WINDOW_SIZE, -WINDOW_SIZE, self.enviroment.sealevel,
+        #                -WINDOW_SIZE, WINDOW_SIZE * 2, self.enviroment.sealevel,
+        #                WINDOW_SIZE * 2, -WINDOW_SIZE, self.enviroment.sealevel,
+        #                WINDOW_SIZE * 2, WINDOW_SIZE * 2, self.enviroment.sealevel,
+        #                WINDOW_SIZE * 2, WINDOW_SIZE * 2, self.enviroment.sealevel]
+        #color_strip = BLUE + BLUE + BLUE + BLUE + BLUE + BLUE
+        #self.batch.add(
+        #    int(len(vertex_strip) / 3),
+        #    pyglet.gl.GL_QUAD_STRIP,
+        #    None,
+        #    ("v3f", vertex_strip),
+        #    ("c3f", color_strip),
+        #    )
+
+        # Rivers
+        for x in range(TILE_COUNT):
+            for y in range(TILE_COUNT):
+                vertex_strip = []
+                color_strip = []
+                tile = self.get_tile(x, y)
+                if not tile.lowest_neighbour:
+                    continue
+                append_river(vertex_strip, color_strip, tile)
+                append_river(vertex_strip, color_strip, tile.lowest_neighbour)
+
+                self.batch.add(
+                    int(len(vertex_strip) / 3),
+                    pyglet.gl.GL_LINES,
+                    None,
                     ("v3f", vertex_strip),
-                    ("c3f", color_strip),
+                    ("c4f", color_strip),
                     )
 
 
@@ -233,35 +283,70 @@ class HelloWorldWindow(pyglet.window.Window):
 
         self.geography = Geography()
 
-        self.camera_height = (WINDOW_SIZE / 2)
+        self.camera_height = (WINDOW_SIZE / 4)
         self.camera_heading = 0
         self.angle = 0
+        self.keys = {}
+
+        pyglet.clock.schedule_interval(self.update, 1/60.0)
+        
+        pyglet.graphics.glEnable(pyglet.graphics.GL_DEPTH_TEST)
+        pyglet.graphics.glEnable(pyglet.gl.GL_BLEND)
+        pyglet.graphics.glBlendFunc(pyglet.gl.GL_SRC_ALPHA, pyglet.gl.GL_ONE_MINUS_SRC_ALPHA)
+
+        glClearColor(0.5, 0.69, 1.0, 1)
+        self.setup_fog()
+
+    def setup_fog(self):
+        """ Configure the OpenGL fog properties. """
+        # Enable fog. Fog "blends a fog color with each rasterized pixel fragment's
+        # post-texturing color."
+        glEnable(GL_FOG)
+        # Set the fog color.
+        glFogfv(GL_FOG_COLOR, (GLfloat * 4)(0.5, 0.69, 1.0, 1))
+        # Say we have no preference between rendering speed and quality.
+        glHint(GL_FOG_HINT, GL_DONT_CARE)
+        # Specify the equation used to compute the blending factor.
+        glFogi(GL_FOG_MODE, GL_LINEAR)
+        # How close and far away fog starts and ends. The closer the start and end,
+        # the denser the fog in the fog range.
+        glFogf(GL_FOG_START, 20.0)
+        glFogf(GL_FOG_END, WINDOW_SIZE / 2)
 
     def on_draw(self):
         self.clear()
 
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
-        gluPerspective(120, window.width / window.height, 0.01, 10000)
-        glTranslatef(-WINDOW_SIZE / 2, -WINDOW_SIZE / 2, -self.camera_height)
-        glRotatef(self.angle, 1, 0, 0)
-        glRotatef(self.camera_heading, 0, 1, 0)
-
         glMatrixMode(GL_MODELVIEW) 
         glLoadIdentity()
 
-        self.geography.draw_mesh()
+        gluPerspective(120, window.width / window.height, 1, 2000)
+        glRotatef(-self.angle, 1, 0, 0)
+        glRotatef(self.camera_heading, 0, 0, 1)
+        glTranslatef(-WINDOW_SIZE / 2, -WINDOW_SIZE / 2, -self.camera_height)
+
+        self.geography.batch.draw()
         self.label.draw()
 
     def on_key_press(self, symbol, modifiers):
-        if symbol == key.UP:
-            self.camera_height -= 10
-        if symbol == key.DOWN:
-            self.camera_height += 10
+        self.keys[symbol] = True
+
+    def on_key_release(self, symbol, modifiers):
+        del self.keys[symbol]
 
     def on_mouse_drag(self, x, y, dx, dy, buttons, modifiers):
-        #self.camera_heading += dx / 4
-        self.angle -= dy / 4
+        self.camera_heading += dx / 4
+        self.angle += dy / 4
+        self.angle = max(self.angle, 0)
+
+    def update(self, dt):
+        if key.UP in self.keys:
+            self.camera_height -= dt * 100
+            self.camera_height = max(self.camera_height, self.geography.enviroment.sealevel)
+        if key.DOWN in self.keys:
+            self.camera_height += dt * 100
+
 
 if __name__ == '__main__':
     window = HelloWorldWindow()
