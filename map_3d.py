@@ -38,7 +38,7 @@ WINDOW_SIZE = 1000
 TILE_SIZE = 6
 BORDER = 1
 TILE_COUNT = int(WINDOW_SIZE / TILE_SIZE)
-JITTER = 1
+JITTER = 3
 
 
 class Enviroment:
@@ -71,9 +71,13 @@ class Tile:
         if self.height is None:
             return RED
         else:
-            return (1.0 - float(self.height) / self.enviroment.highest_point,
-                    1.0 - 0.8 * float(self.height) / self.enviroment.highest_point,
-                    1.0 - float(self.height) / self.enviroment.highest_point)
+            #return (1.0 - float(self.height) / self.enviroment.highest_point,
+            #        1.0 - 0.8 * float(self.height) / self.enviroment.highest_point,
+            #        1.0 - float(self.height) / self.enviroment.highest_point)
+            height = self.height - self.enviroment.sealevel
+            highest = self.enviroment.highest_point - self.enviroment.sealevel
+            val = height / highest
+            return (val, val, val)
 
 
 class Geography:
@@ -193,84 +197,148 @@ class Geography:
                 self.open_set_sorted.add((0, start))
 
     def generate_mesh(self):
-        self.vertex_lists = []
         self.batch = pyglet.graphics.Batch()
 
-        def append_tile(vertex_strip, color_strip, tile):
-            vertex_strip.append(tile.x * TILE_SIZE)
-            vertex_strip.append(tile.y * TILE_SIZE)
-            if tile.height >= self.enviroment.sealevel:
-                vertex_strip.append(tile.height)
-                color_strip += tile.get_colour()
-            else:
-                vertex_strip.append(self.enviroment.sealevel)
-                color_strip += BLUE
+        def draw_tile(tile11):
+            def midpoint(*tiles):
+                x = 0
+                y = 0
+                height = 0.0
+                lowest_height = self.enviroment.highest_point + 1
+                go_low = False
+                for tile in tiles:
+                    x += tile.x
+                    y += tile.y
+                    height += tile.height
+                    if tile.height < lowest_height:
+                        lowest_height = tile.height
+                    if tile.lowest_neighbour in tiles:
+                        # A lowest neighbour is joined through this point so
+                        # we need to keep it lower than the draining tile.
+                        # For simplicities sake, make this point the same height
+                        # as the lowest connected tile.
+                        go_low = True
 
-        def append_river(vertex_strip, color_strip, tile):
-            vertex_strip.append(tile.x * TILE_SIZE)
-            vertex_strip.append(tile.y * TILE_SIZE)
-            vertex_strip.append(tile.height + 2)
+                height = height / len(tiles)
+                if go_low and height > lowest_height:
+                    height = lowest_height
+                return (TILE_SIZE * x / len(tiles),
+                        TILE_SIZE * y / len(tiles),
+                        height)
 
-            hue = int(128 * tile.dampness / self.enviroment.dampest)
-            color_strip += (0, 0, 255, hue)
+            def draw_river(a, mid, b):
+                a_vert = (a.x * TILE_SIZE, a.y * TILE_SIZE, a.height + 0.01)
+                b_vert = (b.x * TILE_SIZE, b.y * TILE_SIZE, b.height + 0.01)
+                mid_vert = (mid[0], mid[1], mid[2] + 0.01)
+                vertexes = a_vert + mid_vert
+                colors = BLUE * 2
+                self.batch.add(
+                        2,
+                        pyglet.gl.GL_LINES,
+                        None,
+                        ("v3f", vertexes),
+                        ("c3f", colors),
+                        )
+                vertexes = b_vert + mid_vert
+                colors = BLUE * 2
+                self.batch.add(
+                        2,
+                        pyglet.gl.GL_LINES,
+                        None,
+                        ("v3f", vertexes),
+                        ("c3f", colors),
+                        )
 
-        for x in range(TILE_COUNT - 1):
-            vertex_strip = []
-            color_strip = []
-            tile_low = None
-            tile_high = None
-            for y in range(TILE_COUNT):
-                #print(x, y)
-                tile_low = self.get_tile(x, y)
-                tile_high = self.get_tile(x + 1, y)
+            x = tile11.x
+            y = tile11.y
 
-                if not vertex_strip:
-                    append_tile(vertex_strip, color_strip, tile_low)
-                append_tile(vertex_strip, color_strip, tile_low)
-                append_tile(vertex_strip, color_strip, tile_high)
-            append_tile(vertex_strip, color_strip, tile_high)
+            tile00 = self.get_tile(x - 1, y - 1)
+            tile10 = self.get_tile(x, y - 1)
+            tile20 = self.get_tile(x + 1, y - 1)
+            tile01 = self.get_tile(x - 1, y)
+            #tile11 = tile11
+            tile21 = self.get_tile(x + 1, y)
+            tile02 = self.get_tile(x - 1, y + 1)
+            tile12 = self.get_tile(x, y + 1)
+            tile22 = self.get_tile(x + 1, y + 1)
 
-            self.batch.add(
-                int(len(vertex_strip) / 3),
-                pyglet.gl.GL_QUAD_STRIP,
-                None,
-                ("v3f", vertex_strip),
-                ("c3f", color_strip),
-                )
+            mid00 = midpoint(tile00, tile10, tile01, tile11)
+            mid10 = midpoint(tile10, tile11)
+            mid20 = midpoint(tile20, tile10, tile21, tile11)
+            mid01 = midpoint(tile01, tile11)
+            mid11 = midpoint(tile11, tile11)
+            mid21 = midpoint(tile21, tile11)
+            mid02 = midpoint(tile02, tile01, tile12, tile11)
+            mid12 = midpoint(tile12, tile11)
+            mid22 = midpoint(tile22, tile12, tile21, tile11)
+
+            vertexes = mid00 + mid10 + mid20 + mid01 + \
+                       mid11 + mid21 + mid02 + mid12 + mid22
+
+            colors = tile11.get_colour() * 9
+
+            indexes = [4, 0, 1, 4, 1, 2, 4, 2, 5, 4, 5, 8, 4, 8, 7, 4, 7, 6, 4, 6, 3, 4, 3, 0]
+
+            self.batch.add_indexed(int(len(vertexes) / 3),
+                                   pyglet.gl.GL_TRIANGLES,
+                                   None,
+                                   indexes,
+                                   ("v3f", vertexes),
+                                   ("c3f", colors))
+            if tile11.lowest_neighbour:
+                if tile00 == tile11.lowest_neighbour:
+                    draw_river(tile00, mid00, tile11)
+                elif tile01 == tile11.lowest_neighbour:
+                    draw_river(tile01, mid01, tile11)
+                elif tile02 == tile11.lowest_neighbour:
+                    draw_river(tile02, mid02, tile11)
+                elif tile10 == tile11.lowest_neighbour:
+                    draw_river(tile10, mid10, tile11)
+                elif tile12 == tile11.lowest_neighbour:
+                    draw_river(tile12, mid12, tile11)
+                elif tile20 == tile11.lowest_neighbour:
+                    draw_river(tile20, mid20, tile11)
+                elif tile21 == tile11.lowest_neighbour:
+                    draw_river(tile21, mid21, tile11)
+                elif tile22 == tile11.lowest_neighbour:
+                    draw_river(tile22, mid22, tile11)
+
+        # Land surface.
+        for x in range(1, TILE_COUNT - 1):
+            for y in range(1, TILE_COUNT - 1):
+                draw_tile(self.get_tile(x, y))
 
         # Sea surface.
-        #vertex_strip = [-WINDOW_SIZE, -WINDOW_SIZE, self.enviroment.sealevel,
-        #                -WINDOW_SIZE, -WINDOW_SIZE, self.enviroment.sealevel,
-        #                -WINDOW_SIZE, WINDOW_SIZE * 2, self.enviroment.sealevel,
-        #                WINDOW_SIZE * 2, -WINDOW_SIZE, self.enviroment.sealevel,
-        #                WINDOW_SIZE * 2, WINDOW_SIZE * 2, self.enviroment.sealevel,
-        #                WINDOW_SIZE * 2, WINDOW_SIZE * 2, self.enviroment.sealevel]
-        #color_strip = BLUE + BLUE + BLUE + BLUE + BLUE + BLUE
-        #self.batch.add(
-        #    int(len(vertex_strip) / 3),
-        #    pyglet.gl.GL_QUAD_STRIP,
-        #    None,
-        #    ("v3f", vertex_strip),
-        #    ("c3f", color_strip),
-        #    )
-
-        # Rivers
-        for x in range(TILE_COUNT):
-            for y in range(TILE_COUNT):
+        sea = True
+        if sea:
+            step_size = 8
+            for x in range(-TILE_COUNT, 2 * TILE_COUNT, step_size):
                 vertex_strip = []
                 color_strip = []
-                tile = self.get_tile(x, y)
-                if not tile.lowest_neighbour:
-                    continue
-                append_river(vertex_strip, color_strip, tile)
-                append_river(vertex_strip, color_strip, tile.lowest_neighbour)
+                tile_low = None
+                tile_high = None
+                for y in range(-TILE_COUNT, 2 * TILE_COUNT, step_size):
+                    if not vertex_strip:
+                        vertex_strip += [x * TILE_SIZE, y * TILE_SIZE, self.enviroment.sealevel]
+                        color_strip += BLUE
+                        #append_tile(vertex_strip, color_strip, tile_low)
+                    vertex_strip += [x * TILE_SIZE, y * TILE_SIZE, self.enviroment.sealevel]
+                    color_strip += BLUE
+                    vertex_strip += [(x + step_size) * TILE_SIZE,
+                                     (y + step_size) * TILE_SIZE,
+                                     self.enviroment.sealevel]
+                    color_strip += BLUE
+                vertex_strip += [(x + step_size) * TILE_SIZE,
+                                 (y + step_size) * TILE_SIZE,
+                                 self.enviroment.sealevel]
+                color_strip += BLUE
 
                 self.batch.add(
                     int(len(vertex_strip) / 3),
-                    pyglet.gl.GL_LINES,
+                    pyglet.gl.GL_QUAD_STRIP,
                     None,
                     ("v3f", vertex_strip),
-                    ("c4f", color_strip),
+                    ("c3f", color_strip),
                     )
 
 
@@ -287,6 +355,7 @@ class HelloWorldWindow(pyglet.window.Window):
         self.camera_heading = 0
         self.angle = 0
         self.keys = {}
+        self.wireframe = False
 
         pyglet.clock.schedule_interval(self.update, 1/60.0)
         
@@ -346,6 +415,13 @@ class HelloWorldWindow(pyglet.window.Window):
             self.camera_height = max(self.camera_height, self.geography.enviroment.sealevel)
         if key.DOWN in self.keys:
             self.camera_height += dt * 100
+        if key.SPACE in self.keys:
+            if self.wireframe:
+                glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
+                self.wireframe = False
+            else:
+                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
+                self.wireframe = True
 
 
 if __name__ == '__main__':
