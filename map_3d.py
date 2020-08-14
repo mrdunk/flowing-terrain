@@ -22,7 +22,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import pyglet
+import pyglet  # pip3 install pyglet
 from pyglet.gl import *
 from pyglet.window import key
 from typing import Tuple, List, Any
@@ -76,7 +76,7 @@ class Tile:
             #        1.0 - float(self.height) / self.enviroment.highest_point)
             height = self.height - self.enviroment.sealevel
             highest = self.enviroment.highest_point - self.enviroment.sealevel
-            val = height / highest
+            val = 1.0 - (height / highest)
             return (val, val, val)
 
 
@@ -231,7 +231,7 @@ class Geography:
                 b_vert = (b.x * TILE_SIZE, b.y * TILE_SIZE, b.height + 0.01)
                 mid_vert = (mid[0], mid[1], mid[2] + 0.01)
                 vertexes = a_vert + mid_vert
-                colors = BLUE * 2
+                colors = RED * 2
                 self.batch.add(
                         2,
                         pyglet.gl.GL_LINES,
@@ -240,7 +240,7 @@ class Geography:
                         ("c3f", colors),
                         )
                 vertexes = b_vert + mid_vert
-                colors = BLUE * 2
+                colors = RED * 2
                 self.batch.add(
                         2,
                         pyglet.gl.GL_LINES,
@@ -321,7 +321,6 @@ class Geography:
                     if not vertex_strip:
                         vertex_strip += [x * TILE_SIZE, y * TILE_SIZE, self.enviroment.sealevel]
                         color_strip += BLUE
-                        #append_tile(vertex_strip, color_strip, tile_low)
                     vertex_strip += [x * TILE_SIZE, y * TILE_SIZE, self.enviroment.sealevel]
                     color_strip += BLUE
                     vertex_strip += [(x + step_size) * TILE_SIZE,
@@ -351,10 +350,13 @@ class HelloWorldWindow(pyglet.window.Window):
 
         self.geography = Geography()
 
-        self.camera_height = (WINDOW_SIZE / 4)
+        self.camera_pos = {"x": WINDOW_SIZE / 2,
+                           "y": WINDOW_SIZE / 2,
+                           "z": WINDOW_SIZE / 4}
         self.camera_heading = 0
         self.angle = 0
         self.keys = {}
+        self.keys_debounce = {}
         self.wireframe = False
 
         pyglet.clock.schedule_interval(self.update, 1/60.0)
@@ -362,6 +364,8 @@ class HelloWorldWindow(pyglet.window.Window):
         pyglet.graphics.glEnable(pyglet.graphics.GL_DEPTH_TEST)
         pyglet.graphics.glEnable(pyglet.gl.GL_BLEND)
         pyglet.graphics.glBlendFunc(pyglet.gl.GL_SRC_ALPHA, pyglet.gl.GL_ONE_MINUS_SRC_ALPHA)
+
+        pyglet.gl.glLineWidth(2)
 
         glClearColor(0.5, 0.69, 1.0, 1)
         self.setup_fog()
@@ -393,13 +397,15 @@ class HelloWorldWindow(pyglet.window.Window):
         gluPerspective(120, window.width / window.height, 1, 2000)
         glRotatef(-self.angle, 1, 0, 0)
         glRotatef(self.camera_heading, 0, 0, 1)
-        glTranslatef(-WINDOW_SIZE / 2, -WINDOW_SIZE / 2, -self.camera_height)
+        glTranslatef(-self.camera_pos["x"],
+                     -self.camera_pos["y"],
+                     -self.camera_pos["z"])
 
         self.geography.batch.draw()
         self.label.draw()
 
     def on_key_press(self, symbol, modifiers):
-        self.keys[symbol] = True
+        self.keys[symbol] = modifiers
 
     def on_key_release(self, symbol, modifiers):
         del self.keys[symbol]
@@ -410,21 +416,67 @@ class HelloWorldWindow(pyglet.window.Window):
         self.angle = max(self.angle, 0)
 
     def update(self, dt):
-        if key.UP in self.keys:
-            self.camera_height -= dt * 100
-            self.camera_height = max(self.camera_height, self.geography.enviroment.sealevel)
-        if key.DOWN in self.keys:
-            self.camera_height += dt * 100
+        keys_debounce_to_clear = []
+        for key_debounce in self.keys_debounce:
+            self.keys_debounce[key_debounce] -= 1
+            if self.keys_debounce[key_debounce] < 1:
+                keys_debounce_to_clear.append(key_debounce)
+        for key_debounce in keys_debounce_to_clear:
+            del self.keys_debounce[key_debounce]
+
+        if key.UP in self.keys and self.keys[key.UP]:
+            # UP key with any modifier.
+            # Raise height.
+            self.camera_pos["z"] -= dt * 30
+            self.camera_pos["z"] = max(self.camera_pos["z"],
+                                       self.geography.enviroment.sealevel)
+        if key.DOWN in self.keys and self.keys[key.DOWN]:
+            # DOWN key with any modifier.
+            # Lower height.
+            self.camera_pos["z"] += dt * 30
+
+        if key.UP in self.keys and not self.keys[key.UP]:
+            # Unmodified UP key.
+            # Move forward.
+            heading = math.radians(self.camera_heading)
+            self.camera_pos["x"] += math.sin(heading) * dt * 30
+            self.camera_pos["y"] += math.cos(heading) * dt * 30
+        if key.DOWN in self.keys and not self.keys[key.DOWN]:
+            # Unmodified DOWN key.
+            # Move backwards.
+            heading = math.radians(self.camera_heading)
+            self.camera_pos["x"] -= math.sin(heading) * dt * 30
+            self.camera_pos["y"] -= math.cos(heading) * dt * 30
+        if key.LEFT in self.keys and not self.keys[key.LEFT]:
+            # Unmodified LEFT key.
+            # Pan left.
+            heading = math.radians(self.camera_heading + 90)
+            self.camera_pos["x"] -= math.sin(heading) * dt * 30
+            self.camera_pos["y"] -= math.cos(heading) * dt * 30
+        if key.RIGHT in self.keys and not self.keys[key.RIGHT]:
+            # Unmodified RIGHT key.
+            # Pan right.
+            heading = math.radians(self.camera_heading + 90)
+            self.camera_pos["x"] += math.sin(heading) * dt * 30
+            self.camera_pos["y"] += math.cos(heading) * dt * 30
+
         if key.SPACE in self.keys:
-            if self.wireframe:
-                glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
-                self.wireframe = False
-            else:
-                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
-                self.wireframe = True
+            # Switch between wireframe and normal view.
+            if key.SPACE not in self.keys_debounce:
+                self.keys_debounce[key.SPACE] = 10
+                if self.wireframe:
+                    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
+                    self.wireframe = False
+                else:
+                    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
+                    self.wireframe = True
 
 
 if __name__ == '__main__':
     window = HelloWorldWindow()
     print("OpenGL Context: {}".format(window.context.get_info().version))
+    print()
+    print("Mouse click and drag to look around.")
+    print("Cursor keys to move around.")
+    print("Cursor keys with [SHIFT] to change height.")
     pyglet.app.run()
