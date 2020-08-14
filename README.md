@@ -53,6 +53,10 @@ On my Ubuntu system the following installs these:
 # pip3 install pyglet --user
 ```
 
+You have a choice of a static 2D map: `map.py` or a 3D view: `map_3d.py`.
+(In the 3D view, use mouse to look around, cursor keys to move and [SHIFT] with
+ cursor keys to change height.)
+
 Disclaimer: I promised you "no lakes/basins/lowbits/etc" but in the code i
 deliberately lower a random number of points to create more interesting land.
 
@@ -119,6 +123,8 @@ with a higher value.
 1. Experiment with different distribution patterns for the height increase when flooding the heights algorithm to give different unevenness patterns to the terrain.
 
 ## Some more screenshots:
-![islands](https://github.com/mrdunk/flowing-terrain/blob/master/assets/lizard.png)
-![islands](https://github.com/mrdunk/flowing-terrain/blob/master/assets/lagoon.png)
-
+![lizard](https://github.com/mrdunk/flowing-terrain/blob/master/assets/lizard.png)
+![lagoon](https://github.com/mrdunk/flowing-terrain/blob/master/assets/lagoon.png)
+![3d_downhill_to_the_sea](https://github.com/mrdunk/flowing-terrain/blob/master/assets/3d_downhill_to_the_sea.png)
+![3d_mountain_top](https://github.com/mrdunk/flowing-terrain/blob/master/assets/3d_mountain_top.png)
+![3d_watersheds](https://github.com/mrdunk/flowing-terrain/blob/master/assets/3d_watersheds.png)
