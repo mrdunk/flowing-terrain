@@ -57,6 +57,10 @@ You have a choice of a static 2D map: `map.py` or a 3D view: `map_3d.py`.
 (In the 3D view, use mouse to look around, cursor keys to move and [SHIFT] with
  cursor keys to change height.)
 
+If you just want to understand how the algorithm works, i recommend looking at
+the `map.py` code.
+If you want to run the code and view the results, `map_3d.py` is more fun.
+
 Disclaimer: I promised you "no lakes/basins/lowbits/etc" but in the code i
 deliberately lower a random number of points to create more interesting land.
 

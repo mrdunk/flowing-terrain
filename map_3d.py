@@ -22,13 +22,22 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import pyglet  # pip3 install pyglet
-from pyglet.gl import *
-from pyglet.window import key
-from typing import Tuple, List, Any
-from sortedcontainers import SortedSet  # pip3 install sortedcontainers
+""" Proof of concept implementation of a procedural terrain generation
+algorithm which guarantees slopes will always flow downhill to the sea from any
+point above sea level.
+See https://github.com/mrdunk/flowing-terrain for more detail. """
+
+from typing import Tuple, List, Generator, Optional, Dict
 import random
 import math
+from sortedcontainers import SortedSet  # pip3 install sortedcontainers
+import pyglet  # pip3 install pyglet
+from pyglet.gl import (glClearColor, glEnable, glFogfv, GLfloat, glHint, glFogi,
+                       glFogf, glMatrixMode, glLoadIdentity, gluPerspective,
+                       glRotatef, glTranslatef, GL_FOG_HINT, GL_DONT_CARE,
+                       GL_FOG, GL_FOG_COLOR, GL_FOG_MODE, GL_LINEAR,
+                       GL_FOG_START, GL_FOG_END, GL_PROJECTION, GL_MODELVIEW)
+from pyglet.window import key
 
 RED = (1, 0, 0)
 GREEN = (0, 1, 0)
@@ -44,48 +53,50 @@ JITTER = 3
 class Enviroment:
     """ State to share across all tiles. """
     highest_point: int = 0
-    sealevel: int = 0
+    sealevel: float = 0
     dampest: int = 0
 
 
 class Tile:
+    """ A single landscape segment on the map. """
     pos: Tuple[int, int] = (-1, -1)
     height: int = -1
     dampness: int = 1
     sealevel: int = 0
     highest_point: int = 0
     dampest: int = 100
-    enviroment: Enviroment = None
     lowest_neighbour = None
 
-    def __init__(self, pos: Tuple[int, int], enviroment: Enviroment):
+    def __init__(self, pos: Tuple[int, int], enviroment: Enviroment) -> None:
         self.x = pos[0]
         self.y = pos[1]
         self.pos = pos
-        self.enviroment = enviroment
+        self.enviroment: Enviroment = enviroment
 
-    def __lt__(self, other):
+    def __lt__(self, other: "Tile") -> bool:
         return id(self) < id(other)
 
-    def get_colour(self) -> Tuple[int, int, int]:
+    def get_colour(self) -> Tuple[float, float, float]:
+        """ Return colour for this tile. """
         if self.height is None:
             return RED
-        else:
-            #return (1.0 - float(self.height) / self.enviroment.highest_point,
-            #        1.0 - 0.8 * float(self.height) / self.enviroment.highest_point,
-            #        1.0 - float(self.height) / self.enviroment.highest_point)
-            height = self.height - self.enviroment.sealevel
-            highest = self.enviroment.highest_point - self.enviroment.sealevel
-            val = 1.0 - (height / highest)
-            return (val, val, val)
+
+        #return (1.0 - float(self.height) / self.enviroment.highest_point,
+        #        1.0 - 0.8 * float(self.height) / self.enviroment.highest_point,
+        #        1.0 - float(self.height) / self.enviroment.highest_point)
+        height = self.height - self.enviroment.sealevel
+        highest = self.enviroment.highest_point - self.enviroment.sealevel
+        val = 1.0 - (height / highest)
+        return (val, val, val)
 
 
 class Geography:
-    tiles: List[List[Tile]] = []
+    """ Generate complete set of terrain data. """
+    tiles: List[List[Optional[Tile]]] = []
     open_set_sorted = SortedSet()
     enviroment = Enviroment()
 
-    def __init__(self):
+    def __init__(self) -> None:
         for _ in range(TILE_COUNT):
             self.tiles.append([None] * TILE_COUNT)
         self._starting_points()
@@ -93,14 +104,16 @@ class Geography:
         self.drainage_algorithm()
         self.generate_mesh()
 
-    def get_tile(self, x: int, y: int):
+    def get_tile(self, x: int, y: int) -> Tile:
+        """ Retrieve a tile at specified coordinates. """
         tile = self.tiles[x][y]
         if tile is None:
             tile = Tile((x, y), self.enviroment)
             self.tiles[x][y] = tile
         return tile
 
-    def heights_algorithm(self):
+    def heights_algorithm(self) -> None:
+        """ Populate all tiles with height data. Also set the sealevel. """
         while self.open_set_sorted:
             height, tile = self.open_set_sorted.pop(0)
             for neighbour in self.get_neighbours_filtered(tile):
@@ -112,7 +125,10 @@ class Geography:
                     self.enviroment.highest_point = new_height
         self.enviroment.sealevel = self.enviroment.highest_point / random.uniform(1.5, 4)
 
-    def drainage_algorithm(self):
+    def drainage_algorithm(self) -> None:
+        """ Calculate the number of uphill tiles draining into each tile on the
+        map. High tile.dampness values indicate a river runs through that tile.
+        """
         self.open_set_sorted.clear()
         for x in range(TILE_COUNT):
             for y in range(TILE_COUNT):
@@ -123,19 +139,20 @@ class Geography:
         self.enviroment.dampest = 0
         while self.open_set_sorted:
             height, tile = self.open_set_sorted.pop()
-            lowest_neighbour = None
+            lowest_neighbour: Optional[Tile] = None
             for neighbour in self.get_neighbours(tile):
                 if neighbour.height < height:
                     if lowest_neighbour is None or neighbour.height < lowest_neighbour.height:
                         lowest_neighbour = neighbour
-            assert(lowest_neighbour)
+            assert lowest_neighbour is not None
             lowest_neighbour.dampness += tile.dampness
             tile.lowest_neighbour = lowest_neighbour
 
             if tile.dampness > self.enviroment.dampest:
                 self.enviroment.dampest = tile.dampness
 
-    def get_neighbours(self, tile: Tile) -> List[Tile]:
+    def get_neighbours(self, tile: Tile) -> Generator[Tile, Tile, None]:
+        """ Get all tiles adjacent to the specified tile. """
         if tile.x > 0:
             neighbour = self.get_tile(tile.x - 1, tile.y)
             yield neighbour
@@ -161,12 +178,16 @@ class Geography:
             neighbour = self.get_tile(tile.x, tile.y + 1)
             yield neighbour
 
-    def get_neighbours_filtered(self, tile: Tile) -> List[Tile]:
+    def get_neighbours_filtered(self, tile: Tile) -> Generator[Tile, Tile, None]:
+        """ Get all tiles adjacent to the specified tile that have not had their
+        height populated yet. """
         for neighbour in self.get_neighbours(tile):
             if neighbour.height < 0:
                 yield neighbour
 
-    def _starting_points(self):
+    def _starting_points(self) -> None:
+        """ Set seed heights on map to start the height generation algorithm at.
+        """
         for x in range(TILE_COUNT):
             start = self.get_tile(x, 0)
             start.height = 0
@@ -196,11 +217,17 @@ class Geography:
             if (start.height, start) not in self.open_set_sorted:
                 self.open_set_sorted.add((0, start))
 
-    def generate_mesh(self):
+    def generate_mesh(self) -> None:
+        """ Generate 3D primitive data for displaying map and store in
+        self.batch ready for sending to GPU. """
         self.batch = pyglet.graphics.Batch()
 
-        def draw_tile(tile11):
-            def midpoint(*tiles):
+        def draw_tile(tile11: Tile) -> None:
+            """ Generate 3D primitive data for a single tile and store in
+            self.batch """
+
+            def midpoint(*tiles: Tile) -> Tuple[float, float, float]:
+                """ Get mid point between 2 tiles. """
                 x = 0
                 y = 0
                 height = 0.0
@@ -226,28 +253,26 @@ class Geography:
                         TILE_SIZE * y / len(tiles),
                         height)
 
-            def draw_river(a, mid, b):
+            def draw_river(a: Tile, mid: Tuple[float, float, float], b: Tile) -> None:
+                """ Draw rivers as straight lines between the 2 specified tiles.
+                """
                 a_vert = (a.x * TILE_SIZE, a.y * TILE_SIZE, a.height + 0.01)
                 b_vert = (b.x * TILE_SIZE, b.y * TILE_SIZE, b.height + 0.01)
                 mid_vert = (mid[0], mid[1], mid[2] + 0.01)
                 vertexes = a_vert + mid_vert
                 colors = RED * 2
-                self.batch.add(
-                        2,
-                        pyglet.gl.GL_LINES,
-                        None,
-                        ("v3f", vertexes),
-                        ("c3f", colors),
-                        )
+                self.batch.add(2,
+                               pyglet.gl.GL_LINES,
+                               None,
+                               ("v3f", vertexes),
+                               ("c3f", colors))
                 vertexes = b_vert + mid_vert
                 colors = RED * 2
-                self.batch.add(
-                        2,
-                        pyglet.gl.GL_LINES,
-                        None,
-                        ("v3f", vertexes),
-                        ("c3f", colors),
-                        )
+                self.batch.add(2,
+                               pyglet.gl.GL_LINES,
+                               None,
+                               ("v3f", vertexes),
+                               ("c3f", colors))
 
             x = tile11.x
             y = tile11.y
@@ -313,10 +338,8 @@ class Geography:
         if sea:
             step_size = 8
             for x in range(-TILE_COUNT, 2 * TILE_COUNT, step_size):
-                vertex_strip = []
-                color_strip = []
-                tile_low = None
-                tile_high = None
+                vertex_strip: List[float] = []
+                color_strip: List[float] = []
                 for y in range(-TILE_COUNT, 2 * TILE_COUNT, step_size):
                     if not vertex_strip:
                         vertex_strip += [x * TILE_SIZE, y * TILE_SIZE, self.enviroment.sealevel]
@@ -342,7 +365,8 @@ class Geography:
 
 
 class HelloWorldWindow(pyglet.window.Window):
-    def __init__(self):
+    """ Draw a pretty 3D map with basic UI of the flowing-terrain algorithm. """
+    def __init__(self) -> None:
         super(HelloWorldWindow, self).__init__(width=WINDOW_SIZE,
                                                height=WINDOW_SIZE,
                                                resizable=True)
@@ -353,14 +377,14 @@ class HelloWorldWindow(pyglet.window.Window):
         self.camera_pos = {"x": WINDOW_SIZE / 2,
                            "y": WINDOW_SIZE / 2,
                            "z": WINDOW_SIZE / 4}
-        self.camera_heading = 0
-        self.angle = 0
-        self.keys = {}
-        self.keys_debounce = {}
-        self.wireframe = False
+        self.camera_heading: float = 0
+        self.angle: float = 0
+        self.keys: Dict[int, List[int]] = {}
+        self.keys_debounce: Dict[int, int] = {}
+        self.wireframe: bool = False
 
         pyglet.clock.schedule_interval(self.update, 1/60.0)
-        
+
         pyglet.graphics.glEnable(pyglet.graphics.GL_DEPTH_TEST)
         pyglet.graphics.glEnable(pyglet.gl.GL_BLEND)
         pyglet.graphics.glBlendFunc(pyglet.gl.GL_SRC_ALPHA, pyglet.gl.GL_ONE_MINUS_SRC_ALPHA)
@@ -370,7 +394,8 @@ class HelloWorldWindow(pyglet.window.Window):
         glClearColor(0.5, 0.69, 1.0, 1)
         self.setup_fog()
 
-    def setup_fog(self):
+    @classmethod
+    def setup_fog(cls) -> None:
         """ Configure the OpenGL fog properties. """
         # Enable fog. Fog "blends a fog color with each rasterized pixel fragment's
         # post-texturing color."
@@ -386,12 +411,13 @@ class HelloWorldWindow(pyglet.window.Window):
         glFogf(GL_FOG_START, 20.0)
         glFogf(GL_FOG_END, WINDOW_SIZE / 2)
 
-    def on_draw(self):
+    def on_draw(self) -> None:
+        """ Pyglet callback to draw 3D scene. """
         self.clear()
 
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
-        glMatrixMode(GL_MODELVIEW) 
+        glMatrixMode(GL_MODELVIEW)
         glLoadIdentity()
 
         gluPerspective(120, window.width / window.height, 1, 2000)
@@ -404,18 +430,30 @@ class HelloWorldWindow(pyglet.window.Window):
         self.geography.batch.draw()
         self.label.draw()
 
-    def on_key_press(self, symbol, modifiers):
+    def on_key_press(self, symbol: int, modifiers: List[int]) -> None:
+        """ Pyglet callback on key press. """
         self.keys[symbol] = modifiers
 
-    def on_key_release(self, symbol, modifiers):
+    def on_key_release(self, symbol: int, modifiers: List[int]) -> None:
+        """ Pyglet callback on key release. """
         del self.keys[symbol]
 
-    def on_mouse_drag(self, x, y, dx, dy, buttons, modifiers):
+    def on_mouse_drag(self,
+                      x: int,
+                      y: int,
+                      dx: int,
+                      dy: int,
+                      buttons: List[int],
+                      modifiers: List[int]) -> None:
+        """ Pyglet callback on mouse drag. """
         self.camera_heading += dx / 4
         self.angle += dy / 4
         self.angle = max(self.angle, 0)
 
-    def update(self, dt):
+    def update(self, dt: int) -> None:
+        """ Called periodically to handle UI.
+        Scheduled by pyglet.clock.schedule_interval(...)
+        """
         keys_debounce_to_clear = []
         for key_debounce in self.keys_debounce:
             self.keys_debounce[key_debounce] -= 1

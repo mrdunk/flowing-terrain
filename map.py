@@ -22,11 +22,16 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import pyglet
-from pyglet.gl import *
-from typing import Tuple, List, Any
-from sortedcontainers import SortedSet  # pip3 install sortedcontainers
+""" Proof of concept implementation of a procedural terrain generation
+algorithm which guarantees slopes will always flow downhill to the sea from any
+point above sea level.
+See https://github.com/mrdunk/flowing-terrain for more detail. """
+
+from typing import Tuple, List, Optional, Generator
 import random
+import pyglet
+from pyglet.gl import GL_TRIANGLES
+from sortedcontainers import SortedSet  # pip3 install sortedcontainers
 
 RED = (1, 0, 0)
 GREEN = (0, 1, 0)
@@ -38,7 +43,7 @@ BORDER = 1
 TILE_COUNT = int(WINDOW_SIZE / TILE_SIZE)
 JITTER = 3
 
-geography = None
+geography: Optional["Geography"] = None
 tiled = False
 window = pyglet.window.Window(width=WINDOW_SIZE, height=WINDOW_SIZE, resizable=True)
 batch = pyglet.graphics.Batch()
@@ -46,29 +51,30 @@ batch = pyglet.graphics.Batch()
 class Enviroment:
     """ State to share across all tiles. """
     highest_point: int = 0
-    sealevel: int = 0
+    sealevel: float = 0
     dampest: int = 0
 
 
 class Tile:
+    """ A single landscape segment on the map. """
     pos: Tuple[int, int] = (-1, -1)
     height: int = -1
     dampness: int = 1
     sealevel: int = 0
     highest_point: int = 0
     dampest: int = 100
-    enviroment: Enviroment = None
 
     def __init__(self, pos: Tuple[int, int], enviroment: Enviroment):
         self.x = pos[0]
         self.y = pos[1]
         self.pos = pos
-        self.enviroment = enviroment
+        self.enviroment: Enviroment = enviroment
 
-    def __lt__(self, other):
+    def __lt__(self, other: "Tile") -> bool:
         return id(self) < id(other)
 
-    def draw(self):
+    def draw(self) -> None:
+        """ Draw this tile on the 2D map. """
         highlight = False
         if self.height >= self.enviroment.sealevel:
             self.highlight((10.0 * self.dampness / self.enviroment.dampest, 0, 0))
@@ -94,32 +100,36 @@ class Tile:
                    (self.x * TILE_SIZE, self.y * TILE_SIZE),
                    colour)
 
-    def highlight(self, colour: Tuple[float, float, float]):
+    def highlight(self, colour: Tuple[float, float, float]) -> None:
+        """ Highlight (outline in specified colour) this tile on the map. """
         square(TILE_SIZE,
                (self.x * TILE_SIZE, self.y * TILE_SIZE),
                colour)
 
 
 class Geography:
-    tiles: List[List[Tile]] = []
+    """ Generate complete set of terrain data. """
+    tiles: List[List[Optional[Tile]]] = []
     open_set_sorted = SortedSet()
     enviroment = Enviroment()
 
-    def __init__(self):
+    def __init__(self) -> None:
         for _ in range(TILE_COUNT):
             self.tiles.append([None] * TILE_COUNT)
         self._starting_points()
         self.heights_algorithm()
         self.drainage_algorithm()
 
-    def get_tile(self, x: int, y: int):
+    def get_tile(self, x: int, y: int) -> Tile:
+        """ Retrieve a tile at specified coordinates. """
         tile = self.tiles[x][y]
         if tile is None:
             tile = Tile((x, y), self.enviroment)
             self.tiles[x][y] = tile
         return tile
 
-    def heights_algorithm(self):
+    def heights_algorithm(self) -> None:
+        """ Populate all tiles with height data. Also set the sealevel. """
         while self.open_set_sorted:
             height, tile = self.open_set_sorted.pop(0)
             for neighbour in self.get_neighbours_filtered(tile):
@@ -131,7 +141,10 @@ class Geography:
                     self.enviroment.highest_point = new_height
         self.enviroment.sealevel = self.enviroment.highest_point / random.uniform(1.5, 4)
 
-    def drainage_algorithm(self):
+    def drainage_algorithm(self) -> None:
+        """ Calculate the number of uphill tiles draining into each tile on the
+        map. High tile.dampness values indicate a river runs through that tile.
+        """
         self.open_set_sorted.clear()
         for x in range(TILE_COUNT):
             for y in range(TILE_COUNT):
@@ -147,13 +160,14 @@ class Geography:
                 if neighbour.height < height:
                     if lowest_neighbour is None or lowest_neighbour.height > neighbour.height:
                         lowest_neighbour = neighbour
-            assert(lowest_neighbour)
+            assert lowest_neighbour
             lowest_neighbour.dampness += tile.dampness
 
             if tile.dampness > self.enviroment.dampest:
                 self.enviroment.dampest = tile.dampness
 
-    def get_neighbours(self, tile: Tile) -> List[Tile]:
+    def get_neighbours(self, tile: Tile) -> Generator[Tile, Tile, None]:
+        """ Get all tiles adjacent to the specified tile. """
         if tile.x > 0:
             neighbour = self.get_tile(tile.x - 1, tile.y)
             yield neighbour
@@ -179,12 +193,16 @@ class Geography:
             neighbour = self.get_tile(tile.x, tile.y + 1)
             yield neighbour
 
-    def get_neighbours_filtered(self, tile: Tile) -> List[Tile]:
+    def get_neighbours_filtered(self, tile: Tile) -> Generator[Tile, Tile, None]:
+        """ Get all tiles adjacent to the specified tile that have not had their
+        height populated yet. """
         for neighbour in self.get_neighbours(tile):
             if neighbour.height < 0:
                 yield neighbour
 
-    def _starting_points(self):
+    def _starting_points(self) -> None:
+        """ Set seed heights on map to start the height generation algorithm at.
+        """
         for x in range(TILE_COUNT):
             start = self.get_tile(x, 0)
             start.height = 0
@@ -216,20 +234,23 @@ class Geography:
 
 
 
-def square(size: int, pos: Tuple[int, int], colour: Tuple[float, float, float]):
-    batch.add_indexed(
-            4, GL_TRIANGLES, None, [0, 1, 2, 0, 2, 3],
-            ('v2f', (pos[1], pos[0],
-                     pos[1] + size, pos[0],
-                     pos[1] + size, pos[0] + size,
-                     pos[1], pos[0] + size),
-                     ),
-            ('c3f', colour + colour + colour + colour)
-            )
+def square(size: int,
+           pos: Tuple[int, int],
+           colour: Tuple[float, float, float]) -> None:
+    """ Draw a square to the screen. """
+    batch.add_indexed(4,
+                      GL_TRIANGLES, None, [0, 1, 2, 0, 2, 3],
+                      ('v2f', (pos[1], pos[0],
+                               pos[1] + size, pos[0],
+                               pos[1] + size, pos[0] + size,
+                               pos[1], pos[0] + size)),
+                      ('c3f', colour + colour + colour + colour)
+                      )
 
 
 @window.event
-def on_draw():
+def on_draw() -> None:
+    """ Pyglet callback which calls all code needed to draw map to screen. """
     global tiled
 
     if tiled:
@@ -244,7 +265,7 @@ def on_draw():
     batch.draw()
     tiled = True
 
-def main():
+def main() -> None:
     global geography
     geography = Geography()
 
