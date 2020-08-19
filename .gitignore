@@ -130,3 +130,6 @@ dmypy.json
 
 # vim
 *.swp
+
+# npm modules
+implementations/ts/node_modules/
