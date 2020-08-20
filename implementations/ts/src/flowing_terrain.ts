@@ -22,17 +22,16 @@
 # SOFTWARE.
 */
 
-const tile_count: number = 50;
-
 export interface Coordinate {
   x: number;
   y: number;
 }
 
 class Enviroment {
-    highest_point: number = 0;
-    sealevel: number = 0;
-    dampest: number = 0;
+  highest_point: number = 0;
+  sealevel: number = 0;
+  dampest: number = 0;
+  tile_count: number = 100;
 }
 
 export class Tile {
@@ -45,19 +44,22 @@ export class Tile {
     this.pos = pos;
     this.enviroment = enviroment;
   }
+
+  toString(): string {
+    return `x: ${this.pos.x} y: ${this.pos.y}, height: ${this.height}`;
+  }
 }
 
 export class Geography {
   tiles: Array<Array<Tile>> = [];
   enviroment: Enviroment = new Enviroment();
-
   open_set_sorted: SortedSet = new SortedSet([], this.compare_tiles);
 
   constructor() {
     // Populate tile array with un-configured Tile elements.
-    for(let y = 0; y < tile_count; y++) {
+    for(let y = 0; y < this.enviroment.tile_count; y++) {
       let row: Array<Tile> = [];
-      for(let x = 0; x < tile_count; x++) {
+      for(let x = 0; x < this.enviroment.tile_count; x++) {
         row.push(new Tile({x, y}, this.enviroment));
       }
       this.tiles.push(row);
@@ -80,48 +82,72 @@ export class Geography {
     return diff;
   }
 
+  // Set seed heights on map to start the height generation algorithm at.
   starting_points(): void {
-    // Set seed heights on map to start the height generation algorithm at.
-    for(let x = 0; x < tile_count; x++) {
+    for(let x = 0; x < this.enviroment.tile_count; x++) {
       let top = this.get_tile({x, y: 0});
       top.height = 0;
       this.open_set_sorted.push(top);
 
-      let bottom = this.get_tile({x, y: (tile_count - 1)});
+      let bottom = this.get_tile({x, y: (this.enviroment.tile_count - 1)});
       bottom.height = 0;
       this.open_set_sorted.push(bottom);
     }
-    for(let y = 0; y < tile_count; y++) {
+    for(let y = 0; y < this.enviroment.tile_count; y++) {
       let top = this.get_tile({x: 0, y});
       top.height = 0;
       this.open_set_sorted.push(top);
 
-      let bottom = this.get_tile({x: (tile_count - 1), y});
+      let bottom = this.get_tile({x: (this.enviroment.tile_count - 1), y});
       bottom.height = 0;
       this.open_set_sorted.push(bottom);
     }
+
+    let random_low_points = Math.round(Math.random() * this.enviroment.tile_count / 2);
+    for(let count = 0; count < random_low_points; count++){
+      let tile = this.get_tile({
+        x: Math.round(Math.random() * (this.enviroment.tile_count - 1)),
+        y: Math.round(Math.random() * (this.enviroment.tile_count - 1))});
+      tile.height = 0;
+      this.open_set_sorted.push(tile);
+    }
   }
 
+  // Populate all tiles with height data. Also set the sealevel.
   heights_algorithm(): void {
     while(this.open_set_sorted.length) {
       let tile = this.open_set_sorted.shift();
       this.get_neighbours(tile).forEach((neighbour) => {
         if(neighbour.height < 0) {
-          neighbour.height = tile.height + Math.random() * 3;
+          neighbour.height = tile.height + 0.01 + Math.random() * 3;
           this.open_set_sorted.push(neighbour);
+        }
+        if(neighbour.height > this.enviroment.highest_point) {
+          this.enviroment.highest_point = neighbour.height;
         }
       });
     }
+
+    this.enviroment.sealevel = this.enviroment.highest_point / (1 + Math.random() * 4);
+
+    for(let y = 0; y < this.enviroment.tile_count; y++) {
+      for(let x = 0; x < this.enviroment.tile_count; x++) {
+        let tile = this.get_tile({x, y});
+        tile.height -= this.enviroment.sealevel;
+        //console.log(tile.toString());
+      }
+    }
+    this.enviroment.highest_point -= this.enviroment.sealevel;
   }
 
   get_tile(coordinate: Coordinate): Tile {
     if(coordinate.x < 0 ||
        coordinate.y < 0 ||
-       coordinate.x >= tile_count ||
-       coordinate.y >= tile_count) {
+       coordinate.x >= this.enviroment.tile_count ||
+       coordinate.y >= this.enviroment.tile_count) {
       return null;
     }
-    return this.tiles[coordinate.x][coordinate.y];
+    return this.tiles[coordinate.y][coordinate.x];
   }
 
   get_neighbours(tile: Tile): Array<Tile> {
@@ -142,15 +168,17 @@ export class Geography {
 
 export class Display {
   geography: Geography;
+  enviroment: Enviroment;
 
   constructor(geography: Geography) {
     this.geography = geography;
+    this.enviroment = geography.enviroment;
   }
   
   draw(): void {
     this.draw_start();
-    for(let y = 0; y < tile_count; y++) {
-      for(let x = 0; x < tile_count; x++) {
+    for(let y = 0; y < this.enviroment.tile_count; y++) {
+      for(let x = 0; x < this.enviroment.tile_count; x++) {
         this.draw_tile({x, y});
       }
     }
@@ -236,18 +264,4 @@ class SortedSet {
     return val;
   }
 }
-
-let ss = new SortedSet([7, 9, 3, 5, 42, 2], (a, b) => a - b);
-console.log(ss.values, ss.get_index(5));
-
-ss = new SortedSet([7, 9, 3, 5, 42, 2, 7, 9, 3, 5, 42, 2, 0, 3], (a, b) => a - b);
-console.log(ss.values, ss.get_index(5));
-ss = new SortedSet([0, 1, 2, 3], (a, b) => a - b);
-console.log(ss.values, ss.get_index(5));
-ss = new SortedSet([3, 2, 1, 0], (a, b) => a - b);
-console.log(ss.values, ss.get_index(5));
-ss = new SortedSet([0, 0, 0], (a, b) => a - b);
-console.log(ss.values, ss.get_index(0));
-ss = new SortedSet([1, 1, 1], (a, b) => a - b);
-console.log(ss.values);
 
