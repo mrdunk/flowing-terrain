@@ -27,17 +27,20 @@ export interface Coordinate {
   y: number;
 }
 
+// State to be shared between all classes.
 class Enviroment {
   highest_point: number = 0;
   sealevel: number = 0;
   dampest: number = 0;
-  tile_count: number = 100;
+  tile_count: number = 200;
 }
 
+// A single point on the map.
 export class Tile {
   pos: Coordinate = {x: -1, y: -1};
   height: number = -1;
   dampness: number = 1;
+  lowest_neighbour: Tile = null;
   enviroment: Enviroment;
 
   constructor(pos: Coordinate, enviroment: Enviroment) {
@@ -50,6 +53,7 @@ export class Tile {
   }
 }
 
+// Data for a procedurally generated map.
 export class Geography {
   tiles: Array<Array<Tile>> = [];
   enviroment: Enviroment = new Enviroment();
@@ -67,15 +71,18 @@ export class Geography {
 
     this.starting_points();
     this.heights_algorithm();
+    this.diamond();
+    this.square();
   }
 
+  // Used for sorting tiles according to height.
   compare_tiles(a: any, b: any): number {
     let diff = a.height - b.height;
-    if(diff != 0) {
+    if(diff !== 0) {
       return diff;
     }
     diff = a.pos.x - b.pos.x;
-    if(diff != 0) {
+    if(diff !== 0) {
       return diff;
     }
     diff = a.pos.y - b.pos.y;
@@ -84,30 +91,33 @@ export class Geography {
 
   // Set seed heights on map to start the height generation algorithm at.
   starting_points(): void {
-    for(let x = 0; x < this.enviroment.tile_count; x++) {
-      let top = this.get_tile({x, y: 0});
+    for(let x = 0; x < this.enviroment.tile_count; x += 2) {
+      const top = this.get_tile({x, y: 0});
       top.height = 0;
       this.open_set_sorted.push(top);
 
-      let bottom = this.get_tile({x, y: (this.enviroment.tile_count - 1)});
+      const bottom = this.get_tile({x, y: (this.enviroment.tile_count - 2)});
       bottom.height = 0;
       this.open_set_sorted.push(bottom);
     }
-    for(let y = 0; y < this.enviroment.tile_count; y++) {
-      let top = this.get_tile({x: 0, y});
+    for(let y = 0; y < this.enviroment.tile_count; y += 2) {
+      const top = this.get_tile({x: 0, y});
       top.height = 0;
       this.open_set_sorted.push(top);
 
-      let bottom = this.get_tile({x: (this.enviroment.tile_count - 1), y});
+      const bottom = this.get_tile({x: (this.enviroment.tile_count - 2), y});
       bottom.height = 0;
       this.open_set_sorted.push(bottom);
     }
 
     let random_low_points = Math.round(Math.random() * this.enviroment.tile_count / 2);
     for(let count = 0; count < random_low_points; count++){
-      let tile = this.get_tile({
-        x: Math.round(Math.random() * (this.enviroment.tile_count - 1)),
-        y: Math.round(Math.random() * (this.enviroment.tile_count - 1))});
+      const x = Math.round(Math.round(Math.random() * (this.enviroment.tile_count - 2)) / 2) * 2;
+      const y = Math.round(Math.round(Math.random() * (this.enviroment.tile_count - 2)) / 2) * 2;
+      console.assert(x % 2 === 0);
+      console.assert(y % 2 === 0);
+      const tile = this.get_tile({x, y});
+      console.assert(tile !== null, {x, y});
       tile.height = 0;
       this.open_set_sorted.push(tile);
     }
@@ -117,7 +127,7 @@ export class Geography {
   heights_algorithm(): void {
     while(this.open_set_sorted.length) {
       let tile = this.open_set_sorted.shift();
-      this.get_neighbours(tile).forEach((neighbour) => {
+      this.get_neighbours(tile, 2).forEach((neighbour) => {
         if(neighbour.height < 0) {
           neighbour.height = tile.height + 0.01 + Math.random() * 3;
           this.open_set_sorted.push(neighbour);
@@ -128,16 +138,200 @@ export class Geography {
       });
     }
 
-    this.enviroment.sealevel = this.enviroment.highest_point / (1 + Math.random() * 4);
+    this.enviroment.sealevel = this.enviroment.highest_point / (1.5 + Math.random() * 4);
 
-    for(let y = 0; y < this.enviroment.tile_count; y++) {
-      for(let x = 0; x < this.enviroment.tile_count; x++) {
+    for(let y = 0; y < this.enviroment.tile_count; y += 2) {
+      for(let x = 0; x < this.enviroment.tile_count; x += 2) {
         let tile = this.get_tile({x, y});
         tile.height -= this.enviroment.sealevel;
         //console.log(tile.toString());
       }
     }
     this.enviroment.highest_point -= this.enviroment.sealevel;
+  }
+
+  // Calculate the number of uphill tiles draining into each tile on the
+  // map. High tile.dampness values indicate a river runs through that tile.
+  drainage_algorithm(): void {
+    this.open_set_sorted.clear();
+    for(let y = 0; y < this.enviroment.tile_count; y += 2) {
+      for(let x = 0; x < this.enviroment.tile_count; x += 2) {
+        const tile = this.get_tile({x, y});
+        if(tile.height > this.enviroment.sealevel) {
+          this.open_set_sorted.push(tile);
+        }
+      }
+    }
+
+    this.enviroment.dampest = 0;
+    while(this.open_set_sorted.length > 0) {
+      const tile = this.open_set_sorted.shift();
+      let lowest_neighbour: Tile = null;
+      this.get_neighbours(tile, 2).forEach((neighbour) => {
+        if(neighbour !== null && neighbour.height < tile.height) {
+          if(lowest_neighbour === null || neighbour.height < lowest_neighbour.height) {
+            lowest_neighbour = neighbour;
+          }
+        }
+      });
+      console.assert(lowest_neighbour !== null);
+      lowest_neighbour.dampness += tile.dampness;
+      tile.lowest_neighbour = lowest_neighbour;
+
+      if(lowest_neighbour.dampness > this.enviroment.dampest) {
+        this.enviroment.dampest = lowest_neighbour.dampness;
+      }
+    }
+  }
+
+  // Use Diamond-Square algorithm to fill intermediate heights to aid in 3D
+  // tiling. https://en.wikipedia.org/wiki/Diamond-square_algorithm
+  diamond(): void {
+    for(let y = 1; y < this.enviroment.tile_count; y += 2) {
+      for(let x = 1; x < this.enviroment.tile_count; x += 2) {
+        const tile = this.get_tile({x, y});
+        if(tile !== null) {
+          console.assert(
+            tile.height === -1,
+            { errorMsg:"Tile already configured.", tile: tile.toString()});
+
+          const tile00 = this.get_tile({x: x - 1, y: y - 1});
+          const tile10 = this.get_tile({x: x + 1, y: y - 1});
+          const tile01 = this.get_tile({x: x - 1, y: y + 1});
+          const tile11 = this.get_tile({x: x + 1, y: y + 1});
+
+          let average_height = 0;
+          let count = 0;
+          let lowest = this.enviroment.highest_point;
+          if(tile00 !== null) {
+            console.assert(
+              tile00.height !== -1,
+              { errorMsg:"Tile not configured.", tile: tile00.toString()});
+            average_height += tile00.height;
+            count++;
+          }
+          if(tile10 !== null) {
+            console.assert(
+              tile10.height !== -1,
+              { errorMsg:"Tile not configured.", tile: tile10.toString()});
+            average_height += tile10.height;
+            count++;
+          }
+          if(tile01 !== null) {
+            console.assert(
+              tile01.height !== -1,
+              { errorMsg:"Tile not configured.", tile: tile01.toString()});
+            average_height += tile01.height;
+            count++;
+          }
+          if(tile11 !== null) {
+            console.assert(
+              tile11.height !== -1,
+              { errorMsg:"Tile not configured.", tile: tile11.toString()});
+            average_height += tile11.height;
+            count++;
+          }
+          tile.height = average_height / count;
+        }
+      }
+    }
+  }
+
+  // Use Diamond-Square algorithm to fill intermediate heights to aid in 3D
+  // tiling. https://en.wikipedia.org/wiki/Diamond-square_algorithm
+  square(): void {
+    for(let y = 0; y < this.enviroment.tile_count; y += 2) {
+      for(let x = 0; x < this.enviroment.tile_count; x += 2) {
+        // Already configured tiles to be averaged.
+        const tile11 = this.get_tile({x, y});
+        const tile20 = this.get_tile({x: x + 1, y: y - 1});
+        const tile22 = this.get_tile({x: x + 1, y: y + 1});
+        const tile31 = this.get_tile({x: x + 2, y: y + 0});
+        const tile02 = this.get_tile({x: x - 1, y: y + 1});
+        const tile13 = this.get_tile({x: x + 0, y: y + 2});
+
+        // Un-configured tiles to be updated.
+        const tile21 = this.get_tile({x: x + 1, y: y + 0});
+        const tile12 = this.get_tile({x: x + 0, y: y + 1});
+
+        let average_height = 0;
+        let count = 0;
+
+        if(tile21 !== null) {
+          console.assert(
+            tile21.height === -1,
+            { errorMsg:"Tile already configured.", tile: tile21.toString()});
+
+          if(tile11 !== null) {
+            console.assert(
+              tile11.height !== -1,
+              { errorMsg:"Tile not configured.", tile: tile11.toString()});
+            average_height += tile11.height;
+            count++;
+          }
+          if(tile20 !== null) {
+            console.assert(
+              tile20.height !== -1,
+              { errorMsg:"Tile not configured.", tile: tile20.toString()});
+            average_height += tile20.height;
+            count++;
+          }
+          if(tile22 !== null) {
+            console.assert(
+              tile22.height !== -1,
+              { errorMsg:"Tile not configured.", tile: tile22.toString()});
+            average_height += tile22.height;
+            count++;
+          }
+          if(tile31 !== null) {
+            console.assert(
+              tile31.height !== -1,
+              { errorMsg:"Tile not configured.", tile: tile31.toString()});
+            average_height += tile31.height;
+            count++;
+          }
+
+          tile21.height = average_height / count;
+        }
+
+        if(tile12 !== null) {
+          console.assert(
+            tile12.height === -1,
+            { errorMsg:"Tile already configured.", tile: tile12.toString()});
+
+          if(tile11 !== null) {
+            console.assert(
+              tile11.height !== -1,
+              { errorMsg:"Tile not configured.", tile: tile11.toString()});
+            average_height += tile11.height;
+            count++;
+          }
+          if(tile02 !== null) {
+            console.assert(
+              tile02.height !== -1,
+              { errorMsg:"Tile not configured.", tile: tile02.toString()});
+            average_height += tile02.height;
+            count++;
+          }
+          if(tile22 !== null) {
+            console.assert(
+              tile22.height !== -1,
+              { errorMsg:"Tile not configured.", tile: tile22.toString()});
+            average_height += tile22.height;
+            count++;
+          }
+          if(tile13 !== null) {
+            console.assert(
+              tile13.height !== -1,
+              { errorMsg:"Tile not configured.", tile: tile13.toString()});
+            average_height += tile13.height;
+            count++;
+          }
+
+          tile12.height = average_height / count;
+        }
+      }
+    }
   }
 
   get_tile(coordinate: Coordinate): Tile {
@@ -150,23 +344,24 @@ export class Geography {
     return this.tiles[coordinate.y][coordinate.x];
   }
 
-  get_neighbours(tile: Tile): Array<Tile> {
+  get_neighbours(tile: Tile, offset: number): Array<Tile> {
     let neighbours = [
-      this.get_tile({x: tile.pos.x - 1, y: tile.pos.y - 1}),
-      this.get_tile({x: tile.pos.x - 1, y: tile.pos.y}),
-      this.get_tile({x: tile.pos.x - 1, y: tile.pos.y + 1}),
-      this.get_tile({x: tile.pos.x, y: tile.pos.y - 1}),
-      this.get_tile({x: tile.pos.x, y: tile.pos.y + 1}),
-      this.get_tile({x: tile.pos.x + 1, y: tile.pos.y - 1}),
-      this.get_tile({x: tile.pos.x + 1, y: tile.pos.y}),
-      this.get_tile({x: tile.pos.x + 1, y: tile.pos.y + 1}),
+      this.get_tile({x: tile.pos.x - offset, y: tile.pos.y - offset}),
+      this.get_tile({x: tile.pos.x - offset, y: tile.pos.y}),
+      this.get_tile({x: tile.pos.x - offset, y: tile.pos.y + offset}),
+      this.get_tile({x: tile.pos.x, y: tile.pos.y - offset}),
+      this.get_tile({x: tile.pos.x, y: tile.pos.y + offset}),
+      this.get_tile({x: tile.pos.x + offset, y: tile.pos.y - offset}),
+      this.get_tile({x: tile.pos.x + offset, y: tile.pos.y}),
+      this.get_tile({x: tile.pos.x + offset, y: tile.pos.y + offset}),
     ];
 
     return neighbours.filter((neighbour) => neighbour !== null);
   }
 }
 
-export class Display {
+// 
+export class DisplayBase {
   geography: Geography;
   enviroment: Enviroment;
 
@@ -174,26 +369,37 @@ export class Display {
     this.geography = geography;
     this.enviroment = geography.enviroment;
   }
-  
+
+  // Access all points in Geography and call `draw_tile(...)` method on each.
   draw(): void {
     this.draw_start();
-    for(let y = 0; y < this.enviroment.tile_count; y++) {
-      for(let x = 0; x < this.enviroment.tile_count; x++) {
-        this.draw_tile({x, y});
+    for(let y = 0; y < this.enviroment.tile_count; y += 2) {
+      for(let x = 0; x < this.enviroment.tile_count; x += 2) {
+        const tile = this.geography.get_tile({x, y});
+        this.draw_tile(tile);
+        this.draw_river(tile, tile.lowest_neighbour);
       }
     }
     this.draw_end();
   }
 
+  // Called before iteration through map's points.
   draw_start(): void {
+    // Override this method with display set-up related code.
   }
 
+  // Called after iteration through map's points.
   draw_end(): void {
+    // Override this method with code to draw whole map and cleanup.
   }
 
-  draw_tile(coordinate: Coordinate) {
-    let tile = this.geography.get_tile(coordinate);
+  // Called once per point on the map.
+  draw_tile(tile: Tile): void {
+    // Override this method with code to draw one point on the map.
     console.log(tile);
+  }
+
+  draw_river(a: Tile, b: Tile): void {
   }
 }
 
@@ -216,7 +422,7 @@ class SortedSet {
       let comp = this.compare(value, this.values[mid]);
       if(comp > 0) {
         left = mid + 1;
-      } else if(comp == 0) {
+      } else if(comp === 0) {
         // Value matches one in set.
         this.values.splice(mid, 1, value);
         return;
@@ -236,7 +442,7 @@ class SortedSet {
       let comp = this.compare(value, this.values[mid]);
       if(comp > 0) {
         left = mid + 1;
-      } else if(comp == 0) {
+      } else if(comp === 0) {
         // Value matches one in set.
         return mid;
       } else {
@@ -247,7 +453,7 @@ class SortedSet {
   }
 
   has(value: any): boolean {
-    return this.get_index(value) != NaN;
+    return this.get_index(value) !== NaN;
   }
 
   pop() {
@@ -262,6 +468,11 @@ class SortedSet {
     let val = this.values.shift();
     this.length = this.values.length;
     return val;
+  }
+
+  clear() {
+    this.values = [];
+    this.length = 0;
   }
 }
 

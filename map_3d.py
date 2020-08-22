@@ -148,8 +148,8 @@ class Geography:
             lowest_neighbour.dampness += tile.dampness
             tile.lowest_neighbour = lowest_neighbour
 
-            if tile.dampness > self.enviroment.dampest:
-                self.enviroment.dampest = tile.dampness
+            if lowest_neighbour.dampness > self.enviroment.dampest:
+                self.enviroment.dampest = lowest_neighbour.dampness
 
     def get_neighbours(self, tile: Tile) -> Generator[Tile, Tile, None]:
         """ Get all tiles adjacent to the specified tile. """
