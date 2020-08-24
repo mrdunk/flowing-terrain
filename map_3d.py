@@ -227,7 +227,7 @@ class Geography:
             self.batch """
 
             def midpoint(*tiles: Tile) -> Tuple[float, float, float]:
-                """ Get mid point between 2 tiles. """
+                """ Get mid point between tiles. """
                 x = 0
                 y = 0
                 height = 0.0

@@ -32,13 +32,13 @@ class Enviroment {
   highest_point: number = 0;
   sealevel: number = 0;
   dampest: number = 0;
-  tile_count: number = 200;
+  tile_count: number = 100;
 }
 
 // A single point on the map.
 export class Tile {
   pos: Coordinate = {x: -1, y: -1};
-  height: number = -1;
+  height: number = null;
   dampness: number = 1;
   lowest_neighbour: Tile = null;
   enviroment: Enviroment;
@@ -71,6 +71,7 @@ export class Geography {
 
     this.starting_points();
     this.heights_algorithm();
+    this.drainage_algorithm();
     this.diamond();
     this.square();
   }
@@ -128,8 +129,8 @@ export class Geography {
     while(this.open_set_sorted.length) {
       let tile = this.open_set_sorted.shift();
       this.get_neighbours(tile, 2).forEach((neighbour) => {
-        if(neighbour.height < 0) {
-          neighbour.height = tile.height + 0.01 + Math.random() * 3;
+        if(neighbour.height === null) {
+          neighbour.height = tile.height + 0.1 + Math.random() * 1;
           this.open_set_sorted.push(neighbour);
         }
         if(neighbour.height > this.enviroment.highest_point) {
@@ -157,7 +158,10 @@ export class Geography {
     for(let y = 0; y < this.enviroment.tile_count; y += 2) {
       for(let x = 0; x < this.enviroment.tile_count; x += 2) {
         const tile = this.get_tile({x, y});
-        if(tile.height > this.enviroment.sealevel) {
+        // If we don't consider the heights below sealevel we get isolated pools
+        // along the coastline when drawing 3D views due to the averaging of
+        // heights at the meeting points of tiles in the `diamond()` method.
+        if(tile.height > -this.enviroment.sealevel) {
           this.open_set_sorted.push(tile);
         }
       }
@@ -184,54 +188,72 @@ export class Geography {
     }
   }
 
-  // Use Diamond-Square algorithm to fill intermediate heights to aid in 3D
-  // tiling. https://en.wikipedia.org/wiki/Diamond-square_algorithm
+  // Use Diamond-Square algorithm to fill intermediate heights for corners of
+  // map tiles when drawing in 3D.
+  // https://en.wikipedia.org/wiki/Diamond-square_algorithm
   diamond(): void {
     for(let y = 1; y < this.enviroment.tile_count; y += 2) {
       for(let x = 1; x < this.enviroment.tile_count; x += 2) {
         const tile = this.get_tile({x, y});
-        if(tile !== null) {
-          console.assert(
-            tile.height === -1,
-            { errorMsg:"Tile already configured.", tile: tile.toString()});
+        if(tile === null) {
+          continue;
+        }
 
-          const tile00 = this.get_tile({x: x - 1, y: y - 1});
-          const tile10 = this.get_tile({x: x + 1, y: y - 1});
-          const tile01 = this.get_tile({x: x - 1, y: y + 1});
-          const tile11 = this.get_tile({x: x + 1, y: y + 1});
+        // Diagonal neighbours.
+        const tile00 = this.get_tile({x: x - 1, y: y - 1});
+        const tile10 = this.get_tile({x: x + 1, y: y - 1});
+        const tile01 = this.get_tile({x: x - 1, y: y + 1});
+        const tile11 = this.get_tile({x: x + 1, y: y + 1});
+        const tiles = [];
+        if(tile00 !== null) {
+          tiles.push(tile00);
+        }
+        if(tile10 !== null) {
+          tiles.push(tile10);
+        }
+        if(tile01 !== null) {
+          tiles.push(tile01);
+        }
+        if(tile11 !== null) {
+          tiles.push(tile11);
+        }
 
-          let average_height = 0;
-          let count = 0;
-          let lowest = this.enviroment.highest_point;
-          if(tile00 !== null) {
-            console.assert(
-              tile00.height !== -1,
-              { errorMsg:"Tile not configured.", tile: tile00.toString()});
-            average_height += tile00.height;
-            count++;
+        const tiles_set = new Set(tiles);
+        const drain_from: Array<Tile> = [];
+        let drain_to: Tile = null;
+        let highest = -this.enviroment.sealevel;
+        let lowest = this.enviroment.highest_point;
+        let lowest_drain_from = this.enviroment.highest_point;
+
+        tiles.forEach((tile_from) => {
+          if(tile_from.lowest_neighbour !== null) {
+            if(tiles_set.has(tile_from.lowest_neighbour)) {
+              drain_from.push(tile_from);
+
+              console.assert(drain_to === null || drain_to === tile_from.lowest_neighbour);
+              drain_to = tile_from.lowest_neighbour;
+
+              if(tile_from.height < lowest_drain_from) {
+                lowest_drain_from = tile_from.height;
+              }
+            }
           }
-          if(tile10 !== null) {
-            console.assert(
-              tile10.height !== -1,
-              { errorMsg:"Tile not configured.", tile: tile10.toString()});
-            average_height += tile10.height;
-            count++;
+          if(tile_from.height > highest) {
+            highest = tile_from.height;
           }
-          if(tile01 !== null) {
-            console.assert(
-              tile01.height !== -1,
-              { errorMsg:"Tile not configured.", tile: tile01.toString()});
-            average_height += tile01.height;
-            count++;
+          if(tile_from.height < lowest) {
+            lowest = tile_from.height;
           }
-          if(tile11 !== null) {
-            console.assert(
-              tile11.height !== -1,
-              { errorMsg:"Tile not configured.", tile: tile11.toString()});
-            average_height += tile11.height;
-            count++;
-          }
-          tile.height = average_height / count;
+        });
+
+        if(drain_from.length <= 0) {
+          // No complicated rivers to worry about. Set height to whatever we
+          // want (as long as it doesn't create a depression).
+          tile.height = Math.random() * (highest - lowest) + lowest;
+        } else {
+          console.assert(lowest_drain_from >= lowest);
+          //tile.height = Math.random() * (lowest_drain_from - lowest) + lowest;
+          tile.height = lowest;
         }
       }
     }
@@ -239,96 +261,34 @@ export class Geography {
 
   // Use Diamond-Square algorithm to fill intermediate heights to aid in 3D
   // tiling. https://en.wikipedia.org/wiki/Diamond-square_algorithm
+  // This is not the "classic" square stage as we only need to consider
+  // the original heights, not those calculated in the "diamond" stage.
   square(): void {
-    for(let y = 0; y < this.enviroment.tile_count; y += 2) {
-      for(let x = 0; x < this.enviroment.tile_count; x += 2) {
+    for(let y = 0; y <= this.enviroment.tile_count; y += 2) {
+      for(let x = 0; x <= this.enviroment.tile_count; x += 2) {
         // Already configured tiles to be averaged.
-        const tile11 = this.get_tile({x, y});
-        const tile20 = this.get_tile({x: x + 1, y: y - 1});
-        const tile22 = this.get_tile({x: x + 1, y: y + 1});
-        const tile31 = this.get_tile({x: x + 2, y: y + 0});
-        const tile02 = this.get_tile({x: x - 1, y: y + 1});
-        const tile13 = this.get_tile({x: x + 0, y: y + 2});
+        const tile00 = this.get_tile({x: x + 0, y: y + 0});
+        const tile20 = this.get_tile({x: x + 2, y: y + 0});
+        const tile02 = this.get_tile({x: x + 0, y: y + 2});
 
         // Un-configured tiles to be updated.
-        const tile21 = this.get_tile({x: x + 1, y: y + 0});
-        const tile12 = this.get_tile({x: x + 0, y: y + 1});
+        const tile10 = this.get_tile({x: x + 1, y: y + 0});
+        const tile01 = this.get_tile({x: x + 0, y: y + 1});
 
-        let average_height = 0;
-        let count = 0;
-
-        if(tile21 !== null) {
-          console.assert(
-            tile21.height === -1,
-            { errorMsg:"Tile already configured.", tile: tile21.toString()});
-
-          if(tile11 !== null) {
-            console.assert(
-              tile11.height !== -1,
-              { errorMsg:"Tile not configured.", tile: tile11.toString()});
-            average_height += tile11.height;
-            count++;
-          }
-          if(tile20 !== null) {
-            console.assert(
-              tile20.height !== -1,
-              { errorMsg:"Tile not configured.", tile: tile20.toString()});
-            average_height += tile20.height;
-            count++;
-          }
-          if(tile22 !== null) {
-            console.assert(
-              tile22.height !== -1,
-              { errorMsg:"Tile not configured.", tile: tile22.toString()});
-            average_height += tile22.height;
-            count++;
-          }
-          if(tile31 !== null) {
-            console.assert(
-              tile31.height !== -1,
-              { errorMsg:"Tile not configured.", tile: tile31.toString()});
-            average_height += tile31.height;
-            count++;
-          }
-
-          tile21.height = average_height / count;
+        if(tile00 === null) {
+          continue;
         }
 
-        if(tile12 !== null) {
-          console.assert(
-            tile12.height === -1,
-            { errorMsg:"Tile already configured.", tile: tile12.toString()});
+        if(tile20 !== null) {
+          tile10.height = (tile00.height + tile20.height) / 2;
+        } else {
+          tile10.height = tile00.height;
+        }
 
-          if(tile11 !== null) {
-            console.assert(
-              tile11.height !== -1,
-              { errorMsg:"Tile not configured.", tile: tile11.toString()});
-            average_height += tile11.height;
-            count++;
-          }
-          if(tile02 !== null) {
-            console.assert(
-              tile02.height !== -1,
-              { errorMsg:"Tile not configured.", tile: tile02.toString()});
-            average_height += tile02.height;
-            count++;
-          }
-          if(tile22 !== null) {
-            console.assert(
-              tile22.height !== -1,
-              { errorMsg:"Tile not configured.", tile: tile22.toString()});
-            average_height += tile22.height;
-            count++;
-          }
-          if(tile13 !== null) {
-            console.assert(
-              tile13.height !== -1,
-              { errorMsg:"Tile not configured.", tile: tile13.toString()});
-            average_height += tile13.height;
-            count++;
-          }
-
-          tile12.height = average_height / count;
+        if(tile02 !== null) {
+          tile01.height = (tile00.height + tile02.height) / 2;
+        } else {
+          tile01.height = tile00.height;
         }
       }
     }
@@ -360,7 +320,7 @@ export class Geography {
   }
 }
 
-// 
+// Example to iterate over a Geography object.
 export class DisplayBase {
   geography: Geography;
   enviroment: Enviroment;
