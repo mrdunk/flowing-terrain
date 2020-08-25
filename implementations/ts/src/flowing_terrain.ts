@@ -167,9 +167,10 @@ export class Geography {
       }
     }
 
+    // Work through all tiles from the highest on the map downwards.
     this.enviroment.dampest = 0;
     while(this.open_set_sorted.length > 0) {
-      const tile = this.open_set_sorted.shift();
+      const tile = this.open_set_sorted.pop();
       let lowest_neighbour: Tile = null;
       this.get_neighbours(tile, 2).forEach((neighbour) => {
         if(neighbour !== null && neighbour.height < tile.height) {
@@ -182,9 +183,11 @@ export class Geography {
       lowest_neighbour.dampness += tile.dampness;
       tile.lowest_neighbour = lowest_neighbour;
 
-      if(lowest_neighbour.dampness > this.enviroment.dampest) {
+      if(lowest_neighbour.dampness > this.enviroment.dampest &&
+         lowest_neighbour.height > 0) {
         this.enviroment.dampest = lowest_neighbour.dampness;
       }
+      console.assert(lowest_neighbour.dampness> tile.dampness);
     }
   }
 
@@ -252,8 +255,8 @@ export class Geography {
           tile.height = Math.random() * (highest - lowest) + lowest;
         } else {
           console.assert(lowest_drain_from >= lowest);
-          //tile.height = Math.random() * (lowest_drain_from - lowest) + lowest;
-          tile.height = lowest;
+          tile.height = Math.random() * (lowest_drain_from - lowest) + lowest;
+          //tile.height = lowest;
         }
       }
     }

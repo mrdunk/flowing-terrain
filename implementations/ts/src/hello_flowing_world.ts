@@ -175,26 +175,58 @@ class Display extends DisplayBase {
     this.colors.push(0.2);
     this.colors.push(1);
   }
-  
-  draw_river(a: Tile, b: Tile): void {
-    if(a === null || b === null) {
-      return;
-    }
-    if(a.height < 0) {
-      return;
-    }
-    const mid = this.geography.get_tile(
-      {x: (a.pos.x + b.pos.x) / 2, y: (a.pos.y + b.pos.y) / 2});
-    console.log(a.toString(), mid.toString(), b.toString());
 
-    this.rivers.push([
-      new BABYLON.Vector3(
-        a.pos.x * this.tile_size, a.height, a.pos.y * this.tile_size),
-      new BABYLON.Vector3(
-        mid.pos.x * this.tile_size, mid.height, mid.pos.y * this.tile_size),
-      new BABYLON.Vector3(
-        b.pos.x * this.tile_size, b.height, b.pos.y * this.tile_size)
-    ]);
+  // Draw drainage between 2 points.
+  draw_river(highest: Tile, lowest: Tile): void {
+    if(highest === null || lowest === null) {
+      return;
+    }
+    if(highest.height < 0.0) {
+      // Whole thing below sealevel.
+      return;
+    }
+
+    if(highest.dampness <= this.geography.enviroment.dampest / 16) {
+      return;
+    }
+
+    const mid = this.geography.get_tile(
+      {x: (highest.pos.x + lowest.pos.x) / 2, y: (highest.pos.y + lowest.pos.y) / 2});
+    // Offset to prevent height fighting during render.
+    // Make rivers slightly above land.
+    const offset = 0.01;
+
+    const river: Array<BABYLON.Vector3> = [];
+    river.push(new BABYLON.Vector3(
+      highest.pos.x * this.tile_size, highest.height + offset, highest.pos.y * this.tile_size));
+
+    // River section from highest to mid-point.
+    if(mid.height >= 0.0) {
+      river.push(new BABYLON.Vector3(
+        mid.pos.x * this.tile_size, mid.height + offset, mid.pos.y * this.tile_size));
+    } else {
+      // Stop at shoreline.
+      const ratio_x = (highest.pos.x - mid.pos.x) / (highest.height - mid.height);
+      const ratio_y = (highest.pos.y - mid.pos.y) / (highest.height - mid.height);
+      let x = highest.pos.x - (highest.height * ratio_x);
+      let y = highest.pos.y - (highest.height * ratio_y);
+      river.push(new BABYLON.Vector3(x, 0 + offset, y));
+    }
+
+    // River section from mid-point to lowest.
+    if(lowest.height >= 0.0) {
+      river.push(new BABYLON.Vector3(
+        lowest.pos.x * this.tile_size, lowest.height + offset, lowest.pos.y * this.tile_size));
+    } else if(mid.height >= 0.0) {
+      // Stop at shoreline.
+      const ratio_x = (mid.pos.x - lowest.pos.x) / (mid.height - lowest.height);
+      const ratio_y = (mid.pos.y - lowest.pos.y) / (mid.height - lowest.height);
+      let x = mid.pos.x - (mid.height * ratio_x);
+      let y = mid.pos.y - (mid.height * ratio_y);
+      river.push(new BABYLON.Vector3(x, 0 + offset, y));
+    }
+
+    this.rivers.push(river);
   }
 
   draw_end(): void {
@@ -227,13 +259,11 @@ class Display extends DisplayBase {
 
     // Rivers
     this.rivers.forEach((river) => {
-      BABYLON.MeshBuilder.CreateLines(
+      const mesh = BABYLON.MeshBuilder.CreateLines(
         "river", {points: river}, this.scene); 
+      mesh.enableEdgesRendering();
+      mesh.edgesWidth = 6.0;
     });
-
-    //const rivers = new BABYLON.Mesh("rivers");
-    //rivers.material = seabed_material;
-    //vertexData.applyToMesh(rivers, true);
     
     // Generate seabed.
     const mapsize = this.tile_size * this.enviroment.tile_count;
