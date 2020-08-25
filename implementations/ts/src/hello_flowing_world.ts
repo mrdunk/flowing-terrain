@@ -23,14 +23,25 @@ class Display extends DisplayBase {
     this.scene = new BABYLON.Scene(this.engine);
     this.camera = new BABYLON.UniversalCamera(
       "UniversalCamera",
-      new BABYLON.Vector3(-mapsize / 2, mapsize / 2, -mapsize / 2),
+      new BABYLON.Vector3(-mapsize / 4, mapsize / 4, -mapsize / 4),
       this.scene);
+    this.camera.checkCollisions = true;
+    this.camera.ellipsoid = new BABYLON.Vector3(0.5, 0.5, 0.5);
     this.camera.attachControl(renderCanvas);
 
-    const light = new BABYLON.HemisphericLight(
-      "light",
-      new BABYLON.Vector3(0, 1, 0),
+    const light_1 = new BABYLON.HemisphericLight(
+      "light_1",
+      new BABYLON.Vector3(1, 0.5, 0),
       this.scene);
+    light_1.diffuse = new BABYLON.Color3(1, 0, 1);
+    light_1.specular = new BABYLON.Color3(0, 0, 0);
+
+    const light_2 = new BABYLON.HemisphericLight(
+      "light_2",
+      new BABYLON.Vector3(0, 0.5, 1),
+      this.scene);
+    light_2.diffuse = new BABYLON.Color3(0, 1, 1);
+    light_2.specular = new BABYLON.Color3(0.3, 0.3, 0.3);
 
     this.scene.ambientColor = new BABYLON.Color3(0.2, 0.2, 0.3);
   }
@@ -138,42 +149,12 @@ class Display extends DisplayBase {
     this.positions.push(tile22.height);
     this.positions.push(tile22.pos.y * this.tile_size);
 
-    this.colors.push(0.1 + 0.1 * tile11.height / highest_point);
-    this.colors.push(0.6 - 0.5 * tile11.height / highest_point);
-    this.colors.push(0.2);
-    this.colors.push(1);
-    this.colors.push(0.1 + 0.1 * tile11.height / highest_point);
-    this.colors.push(0.6 - 0.5 * tile11.height / highest_point);
-    this.colors.push(0.2);
-    this.colors.push(1);
-    this.colors.push(0.1 + 0.1 * tile11.height / highest_point);
-    this.colors.push(0.6 - 0.5 * tile11.height / highest_point);
-    this.colors.push(0.2);
-    this.colors.push(1);
-    this.colors.push(0.1 + 0.1 * tile11.height / highest_point);
-    this.colors.push(0.6 - 0.5 * tile11.height / highest_point);
-    this.colors.push(0.2);
-    this.colors.push(1);
-    this.colors.push(0.1 + 0.1 * tile11.height / highest_point);
-    this.colors.push(0.6 - 0.5 * tile11.height / highest_point);
-    this.colors.push(0.2);
-    this.colors.push(1);
-    this.colors.push(0.1 + 0.1 * tile11.height / highest_point);
-    this.colors.push(0.6 - 0.5 * tile11.height / highest_point);
-    this.colors.push(0.2);
-    this.colors.push(1);
-    this.colors.push(0.1 + 0.1 * tile11.height / highest_point);
-    this.colors.push(0.6 - 0.5 * tile11.height / highest_point);
-    this.colors.push(0.2);
-    this.colors.push(1);
-    this.colors.push(0.1 + 0.1 * tile11.height / highest_point);
-    this.colors.push(0.6 - 0.5 * tile11.height / highest_point);
-    this.colors.push(0.2);
-    this.colors.push(1);
-    this.colors.push(0.1 + 0.1 * tile11.height / highest_point);
-    this.colors.push(0.6 - 0.5 * tile11.height / highest_point);
-    this.colors.push(0.2);
-    this.colors.push(1);
+    for(let c = 0; c < 9; c++) {
+      this.colors.push(0.2);
+      this.colors.push(0.5);
+      this.colors.push(0.2);
+      this.colors.push(1);
+    }
   }
 
   // Draw drainage between 2 points.
@@ -186,6 +167,7 @@ class Display extends DisplayBase {
       return;
     }
 
+    // Only draw rivers in the wettest tiles.
     if(highest.dampness <= this.geography.enviroment.dampest / 16) {
       return;
     }
@@ -195,6 +177,10 @@ class Display extends DisplayBase {
     // Offset to prevent height fighting during render.
     // Make rivers slightly above land.
     const offset = 0.01;
+
+    // Prove river is indeed flowing down hill.
+    console.assert( highest.height >= mid.height, {errormessage: "river flows uphill"});
+    console.assert( mid.height >= lowest.height, {errormessage: "river flows uphill"});
 
     const river: Array<BABYLON.Vector3> = [];
     river.push(new BABYLON.Vector3(
@@ -235,9 +221,9 @@ class Display extends DisplayBase {
     //land_material.backFaceCulling = false;
 
     const seabed_material = new BABYLON.StandardMaterial("sea_material", this.scene);
-    //seabed_material.diffuseColor = new BABYLON.Color3(0.15, 0.8, 0.2);
+    seabed_material.diffuseColor = new BABYLON.Color3(0.2, 0.5, 0.2);
     seabed_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
-    seabed_material.backFaceCulling = false;
+    //seabed_material.backFaceCulling = false;
 
     const sea_material = new BABYLON.StandardMaterial("sea_material", this.scene);
     sea_material.diffuseColor = new BABYLON.Color3(0, 0.3, 1);
@@ -246,7 +232,7 @@ class Display extends DisplayBase {
     sea_material.backFaceCulling = false;
 
     // Finish computing land.
-    BABYLON.VertexData.ComputeNormals(this.positions, this.indices, this.normals);
+    //BABYLON.VertexData.ComputeNormals(this.positions, this.indices, this.normals);
     const vertexData = new BABYLON.VertexData();
     vertexData.positions = this.positions;
     vertexData.indices = this.indices;
@@ -256,6 +242,8 @@ class Display extends DisplayBase {
     const land = new BABYLON.Mesh("land");
     land.material = land_material;
     vertexData.applyToMesh(land, true);
+    land.checkCollisions = true;
+    land.convertToFlatShadedMesh();
 
     // Rivers
     this.rivers.forEach((river) => {
@@ -272,12 +260,14 @@ class Display extends DisplayBase {
     seabed.position = new BABYLON.Vector3(
       mapsize / 2, -this.enviroment.sealevel - 0.01, mapsize / 2);
     seabed.material = seabed_material;
+    seabed.checkCollisions = true;
 
     // Generate sea.
     const sea = BABYLON.MeshBuilder.CreateGround(
       "sea", {width: mapsize * 2, height: mapsize * 2});
     sea.position = new BABYLON.Vector3(mapsize / 2, 0, mapsize / 2);
     sea.material = sea_material;
+    //sea.checkCollisions = false;
 
     this.camera.setTarget(sea.position);
   }
@@ -288,5 +278,11 @@ const display = new Display(geography);
 display.draw();
 
 display.engine.runRenderLoop(() => {
-    display.scene.render();
+  display.scene.render();
 })
+
+window.addEventListener("resize", function () {
+  display.engine.resize();
+});
+
+document.getElementById('renderCanvas').focus();
