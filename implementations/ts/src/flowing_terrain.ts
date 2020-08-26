@@ -51,6 +51,10 @@ export class Tile {
   toString(): string {
     return `x: ${this.pos.x} y: ${this.pos.y}, height: ${this.height}`;
   }
+
+  key(): string {
+    return `${this.pos.x},${this.pos.y}`
+  }
 }
 
 // Data for a procedurally generated map.
@@ -60,11 +64,13 @@ export class Geography {
   open_set_sorted: SortedSet = new SortedSet([], this.compare_tiles);
 
   constructor() {
+    const t0 = performance.now();
     // Populate tile array with un-configured Tile elements.
     for(let y = 0; y < this.enviroment.tile_count; y++) {
       let row: Array<Tile> = [];
       for(let x = 0; x < this.enviroment.tile_count; x++) {
-        row.push(new Tile({x, y}, this.enviroment));
+        const tile: Tile = new Tile({x, y}, this.enviroment);
+        row.push(tile);
       }
       this.tiles.push(row);
     }
@@ -74,6 +80,9 @@ export class Geography {
     this.drainage_algorithm();
     this.diamond();
     this.square();
+
+    const t1 = performance.now();
+    console.log(`Generating Geography took: ${t1 - t0}ms`);
   }
 
   // Used for sorting tiles according to height.

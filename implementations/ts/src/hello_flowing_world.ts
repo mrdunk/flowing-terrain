@@ -45,118 +45,80 @@ class Display extends DisplayBase {
 
     this.scene.ambientColor = new BABYLON.Color3(0.2, 0.2, 0.3);
   }
+  
+  coordinate_to_index(coordinate: Coordinate): number {
+    return (coordinate.y * this.enviroment.tile_count + coordinate.x);
+  }
+  
+  // Called before iteration through map's points.
+  draw_start(): void {
+    for(let y = 0; y < this.enviroment.tile_count; y++) {
+      for(let x = 0; x < this.enviroment.tile_count; x++) {
+        const tile = this.geography.get_tile({x, y});
 
-  draw_tile(tile11: Tile): void {
-    const highest_point = this.enviroment.highest_point;
+        this.positions.push(tile.pos.x * this.tile_size);
+        this.positions.push(tile.height);
+        this.positions.push(tile.pos.y * this.tile_size);
 
-    const x = tile11.pos.x;
-    const y = tile11.pos.y;
-    const tile00 = this.geography.get_tile({x: x - 1, y: y - 1});
-    const tile10 = this.geography.get_tile({x: x    , y: y - 1});
-    const tile20 = this.geography.get_tile({x: x + 1, y: y - 1});
-    const tile01 = this.geography.get_tile({x: x - 1, y       });
-    // const tile11 = this.geography.get_tile({x       , y       });
-    const tile21 = this.geography.get_tile({x: x + 1, y       });
-    const tile02 = this.geography.get_tile({x: x - 1, y: y + 1});
-    const tile12 = this.geography.get_tile({x: x    , y: y + 1});
-    const tile22 = this.geography.get_tile({x: x + 1, y: y + 1});
-
-    if(tile00 === null || tile10 === null || tile20 === null ||
-       tile01 === null || tile11 === null || tile21 === null ||
-       tile02 === null || tile12 === null || tile22 === null) {
-      return;
-    }
-
-    console.assert(tile00.height !== null);
-    console.assert(tile10.height !== null);
-    console.assert(tile20.height !== null);
-
-    console.assert(tile01.height !== null);
-    console.assert(tile11.height !== null);
-    console.assert(tile21.height !== null, {a: tile21.toString()});
-    
-    console.assert(tile01.height !== null);
-    console.assert(tile12.height !== null, {b: tile12.toString()});
-    console.assert(tile22.height !== null);
-
-    const offset00 = this.positions.length / 3;
-    const offset10 = offset00 + 1;
-    const offset20 = offset00 + 2;
-    const offset01 = offset00 + 3;
-    const offset11 = offset00 + 4;
-    const offset21 = offset00 + 5;
-    const offset02 = offset00 + 6;
-    const offset12 = offset00 + 7;
-    const offset22 = offset00 + 8;
-
-    this.indices.push(offset11);
-    this.indices.push(offset00);
-    this.indices.push(offset10);
-
-    this.indices.push(offset11);
-    this.indices.push(offset10);
-    this.indices.push(offset20);
-
-    this.indices.push(offset11);
-    this.indices.push(offset20);
-    this.indices.push(offset21);
-
-    this.indices.push(offset11);
-    this.indices.push(offset21);
-    this.indices.push(offset22);
-
-    this.indices.push(offset11);
-    this.indices.push(offset22);
-    this.indices.push(offset12);
-
-    this.indices.push(offset11);
-    this.indices.push(offset12);
-    this.indices.push(offset02);
-
-    this.indices.push(offset11);
-    this.indices.push(offset02);
-    this.indices.push(offset01);
-
-    this.indices.push(offset11);
-    this.indices.push(offset01);
-    this.indices.push(offset00);
-
-    this.positions.push(tile00.pos.x * this.tile_size);
-    this.positions.push(tile00.height);
-    this.positions.push(tile00.pos.y * this.tile_size);
-    this.positions.push(tile10.pos.x * this.tile_size);
-    this.positions.push(tile10.height);
-    this.positions.push(tile10.pos.y * this.tile_size);
-    this.positions.push(tile20.pos.x * this.tile_size);
-    this.positions.push(tile20.height);
-    this.positions.push(tile20.pos.y * this.tile_size);
-    this.positions.push(tile01.pos.x * this.tile_size);
-    this.positions.push(tile01.height);
-    this.positions.push(tile01.pos.y * this.tile_size);
-    this.positions.push(tile11.pos.x * this.tile_size);
-    this.positions.push(tile11.height);
-    this.positions.push(tile11.pos.y * this.tile_size);
-    this.positions.push(tile21.pos.x * this.tile_size);
-    this.positions.push(tile21.height);
-    this.positions.push(tile21.pos.y * this.tile_size);
-    this.positions.push(tile02.pos.x * this.tile_size);
-    this.positions.push(tile02.height);
-    this.positions.push(tile02.pos.y * this.tile_size);
-    this.positions.push(tile12.pos.x * this.tile_size);
-    this.positions.push(tile12.height);
-    this.positions.push(tile12.pos.y * this.tile_size);
-    this.positions.push(tile22.pos.x * this.tile_size);
-    this.positions.push(tile22.height);
-    this.positions.push(tile22.pos.y * this.tile_size);
-
-    for(let c = 0; c < 9; c++) {
-      this.colors.push(0.2);
-      this.colors.push(0.5);
-      this.colors.push(0.2);
-      this.colors.push(1);
+        this.colors.push(0.2);
+        this.colors.push(0.5);
+        this.colors.push(0.2);
+        this.colors.push(1);
+      }
     }
   }
 
+  draw_tile(tile: Tile): void {
+    const x = tile.pos.x;
+    const y = tile.pos.y;
+    if( x < 1 || x >= this.enviroment.tile_count ||
+        y < 1 || y >= this.enviroment.tile_count) {
+      return;
+    }
+
+    const offset00 = this.coordinate_to_index({x: x - 1, y: y - 1});
+    const offset10 = this.coordinate_to_index({x: x + 0, y: y - 1});
+    const offset20 = this.coordinate_to_index({x: x + 1, y: y - 1});
+    const offset01 = this.coordinate_to_index({x: x - 1, y: y + 0});
+    const offset11 = this.coordinate_to_index({x: x + 0, y: y + 0});
+    const offset21 = this.coordinate_to_index({x: x + 1, y: y + 0});
+    const offset02 = this.coordinate_to_index({x: x - 1, y: y + 1});
+    const offset12 = this.coordinate_to_index({x: x + 0, y: y + 1});
+    const offset22 = this.coordinate_to_index({x: x + 1, y: y + 1});
+
+    this.indices.push(offset11);
+    this.indices.push(offset00);
+    this.indices.push(offset10);
+
+    this.indices.push(offset11);
+    this.indices.push(offset10);
+    this.indices.push(offset20);
+
+    this.indices.push(offset11);
+    this.indices.push(offset20);
+    this.indices.push(offset21);
+
+    this.indices.push(offset11);
+    this.indices.push(offset21);
+    this.indices.push(offset22);
+
+    this.indices.push(offset11);
+    this.indices.push(offset22);
+    this.indices.push(offset12);
+
+    this.indices.push(offset11);
+    this.indices.push(offset12);
+    this.indices.push(offset02);
+
+    this.indices.push(offset11);
+    this.indices.push(offset02);
+    this.indices.push(offset01);
+
+    this.indices.push(offset11);
+    this.indices.push(offset01);
+    this.indices.push(offset00);
+  }
+  
   // Draw drainage between 2 points.
   draw_river(highest: Tile, lowest: Tile): void {
     if(highest === null || lowest === null) {
@@ -232,18 +194,18 @@ class Display extends DisplayBase {
     sea_material.backFaceCulling = false;
 
     // Finish computing land.
-    //BABYLON.VertexData.ComputeNormals(this.positions, this.indices, this.normals);
+    BABYLON.VertexData.ComputeNormals(this.positions, this.indices, this.normals);
     const vertexData = new BABYLON.VertexData();
     vertexData.positions = this.positions;
     vertexData.indices = this.indices;
     vertexData.colors = this.colors;
-    //vertexData.normals = this.normals;
+    vertexData.normals = this.normals;
 
     const land = new BABYLON.Mesh("land");
     land.material = land_material;
     vertexData.applyToMesh(land, true);
     land.checkCollisions = true;
-    land.convertToFlatShadedMesh();
+    //land.convertToFlatShadedMesh();
 
     // Rivers
     this.rivers.forEach((river) => {

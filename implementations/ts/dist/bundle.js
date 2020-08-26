@@ -80,6 +80,11 @@ var Tile = function () {
         value: function toString() {
             return "x: " + this.pos.x + " y: " + this.pos.y + ", height: " + this.height;
         }
+    }, {
+        key: "key",
+        value: function key() {
+            return this.pos.x + "," + this.pos.y;
+        }
     }]);
 
     return Tile;
@@ -95,11 +100,13 @@ var Geography = function () {
         this.tiles = [];
         this.enviroment = new Enviroment();
         this.open_set_sorted = new SortedSet([], this.compare_tiles);
+        var t0 = performance.now();
         // Populate tile array with un-configured Tile elements.
         for (var y = 0; y < this.enviroment.tile_count; y++) {
             var row = [];
             for (var x = 0; x < this.enviroment.tile_count; x++) {
-                row.push(new Tile({ x: x, y: y }, this.enviroment));
+                var tile = new Tile({ x: x, y: y }, this.enviroment);
+                row.push(tile);
             }
             this.tiles.push(row);
         }
@@ -108,6 +115,8 @@ var Geography = function () {
         this.drainage_algorithm();
         this.diamond();
         this.square();
+        var t1 = performance.now();
+        console.log("Generating Geography took: " + (t1 - t0) + "ms");
     }
     // Used for sorting tiles according to height.
 
@@ -559,41 +568,45 @@ var Display = function (_flowing_terrain_1$Di) {
     }
 
     _createClass(Display, [{
+        key: "coordinate_to_index",
+        value: function coordinate_to_index(coordinate) {
+            return coordinate.y * this.enviroment.tile_count + coordinate.x;
+        }
+        // Called before iteration through map's points.
+
+    }, {
+        key: "draw_start",
+        value: function draw_start() {
+            for (var y = 0; y < this.enviroment.tile_count; y++) {
+                for (var x = 0; x < this.enviroment.tile_count; x++) {
+                    var tile = this.geography.get_tile({ x: x, y: y });
+                    this.positions.push(tile.pos.x * this.tile_size);
+                    this.positions.push(tile.height);
+                    this.positions.push(tile.pos.y * this.tile_size);
+                    this.colors.push(0.2);
+                    this.colors.push(0.5);
+                    this.colors.push(0.2);
+                    this.colors.push(1);
+                }
+            }
+        }
+    }, {
         key: "draw_tile",
-        value: function draw_tile(tile11) {
-            var highest_point = this.enviroment.highest_point;
-            var x = tile11.pos.x;
-            var y = tile11.pos.y;
-            var tile00 = this.geography.get_tile({ x: x - 1, y: y - 1 });
-            var tile10 = this.geography.get_tile({ x: x, y: y - 1 });
-            var tile20 = this.geography.get_tile({ x: x + 1, y: y - 1 });
-            var tile01 = this.geography.get_tile({ x: x - 1, y: y });
-            // const tile11 = this.geography.get_tile({x       , y       });
-            var tile21 = this.geography.get_tile({ x: x + 1, y: y });
-            var tile02 = this.geography.get_tile({ x: x - 1, y: y + 1 });
-            var tile12 = this.geography.get_tile({ x: x, y: y + 1 });
-            var tile22 = this.geography.get_tile({ x: x + 1, y: y + 1 });
-            if (tile00 === null || tile10 === null || tile20 === null || tile01 === null || tile11 === null || tile21 === null || tile02 === null || tile12 === null || tile22 === null) {
+        value: function draw_tile(tile) {
+            var x = tile.pos.x;
+            var y = tile.pos.y;
+            if (x < 1 || x >= this.enviroment.tile_count || y < 1 || y >= this.enviroment.tile_count) {
                 return;
             }
-            console.assert(tile00.height !== null);
-            console.assert(tile10.height !== null);
-            console.assert(tile20.height !== null);
-            console.assert(tile01.height !== null);
-            console.assert(tile11.height !== null);
-            console.assert(tile21.height !== null, { a: tile21.toString() });
-            console.assert(tile01.height !== null);
-            console.assert(tile12.height !== null, { b: tile12.toString() });
-            console.assert(tile22.height !== null);
-            var offset00 = this.positions.length / 3;
-            var offset10 = offset00 + 1;
-            var offset20 = offset00 + 2;
-            var offset01 = offset00 + 3;
-            var offset11 = offset00 + 4;
-            var offset21 = offset00 + 5;
-            var offset02 = offset00 + 6;
-            var offset12 = offset00 + 7;
-            var offset22 = offset00 + 8;
+            var offset00 = this.coordinate_to_index({ x: x - 1, y: y - 1 });
+            var offset10 = this.coordinate_to_index({ x: x + 0, y: y - 1 });
+            var offset20 = this.coordinate_to_index({ x: x + 1, y: y - 1 });
+            var offset01 = this.coordinate_to_index({ x: x - 1, y: y + 0 });
+            var offset11 = this.coordinate_to_index({ x: x + 0, y: y + 0 });
+            var offset21 = this.coordinate_to_index({ x: x + 1, y: y + 0 });
+            var offset02 = this.coordinate_to_index({ x: x - 1, y: y + 1 });
+            var offset12 = this.coordinate_to_index({ x: x + 0, y: y + 1 });
+            var offset22 = this.coordinate_to_index({ x: x + 1, y: y + 1 });
             this.indices.push(offset11);
             this.indices.push(offset00);
             this.indices.push(offset10);
@@ -618,39 +631,6 @@ var Display = function (_flowing_terrain_1$Di) {
             this.indices.push(offset11);
             this.indices.push(offset01);
             this.indices.push(offset00);
-            this.positions.push(tile00.pos.x * this.tile_size);
-            this.positions.push(tile00.height);
-            this.positions.push(tile00.pos.y * this.tile_size);
-            this.positions.push(tile10.pos.x * this.tile_size);
-            this.positions.push(tile10.height);
-            this.positions.push(tile10.pos.y * this.tile_size);
-            this.positions.push(tile20.pos.x * this.tile_size);
-            this.positions.push(tile20.height);
-            this.positions.push(tile20.pos.y * this.tile_size);
-            this.positions.push(tile01.pos.x * this.tile_size);
-            this.positions.push(tile01.height);
-            this.positions.push(tile01.pos.y * this.tile_size);
-            this.positions.push(tile11.pos.x * this.tile_size);
-            this.positions.push(tile11.height);
-            this.positions.push(tile11.pos.y * this.tile_size);
-            this.positions.push(tile21.pos.x * this.tile_size);
-            this.positions.push(tile21.height);
-            this.positions.push(tile21.pos.y * this.tile_size);
-            this.positions.push(tile02.pos.x * this.tile_size);
-            this.positions.push(tile02.height);
-            this.positions.push(tile02.pos.y * this.tile_size);
-            this.positions.push(tile12.pos.x * this.tile_size);
-            this.positions.push(tile12.height);
-            this.positions.push(tile12.pos.y * this.tile_size);
-            this.positions.push(tile22.pos.x * this.tile_size);
-            this.positions.push(tile22.height);
-            this.positions.push(tile22.pos.y * this.tile_size);
-            for (var c = 0; c < 9; c++) {
-                this.colors.push(0.2);
-                this.colors.push(0.5);
-                this.colors.push(0.2);
-                this.colors.push(1);
-            }
         }
         // Draw drainage between 2 points.
 
@@ -719,17 +699,17 @@ var Display = function (_flowing_terrain_1$Di) {
             sea_material.alpha = 0.85;
             sea_material.backFaceCulling = false;
             // Finish computing land.
-            //BABYLON.VertexData.ComputeNormals(this.positions, this.indices, this.normals);
+            BABYLON.VertexData.ComputeNormals(this.positions, this.indices, this.normals);
             var vertexData = new BABYLON.VertexData();
             vertexData.positions = this.positions;
             vertexData.indices = this.indices;
             vertexData.colors = this.colors;
-            //vertexData.normals = this.normals;
+            vertexData.normals = this.normals;
             var land = new BABYLON.Mesh("land");
             land.material = land_material;
             vertexData.applyToMesh(land, true);
             land.checkCollisions = true;
-            land.convertToFlatShadedMesh();
+            //land.convertToFlatShadedMesh();
             // Rivers
             this.rivers.forEach(function (river) {
                 var mesh = BABYLON.MeshBuilder.CreateLines("river", { points: river }, _this2.scene);
