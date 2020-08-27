@@ -10,7 +10,7 @@ __pycache__/
 .Python
 build/
 develop-eggs/
-dist/
+# dist/
 downloads/
 eggs/
 .eggs/
@@ -130,3 +130,6 @@ dmypy.json
 
 # vim
 *.swp
+
+# npm modules
+implementations/ts/node_modules/

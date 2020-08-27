@@ -148,8 +148,8 @@ class Geography:
             lowest_neighbour.dampness += tile.dampness
             tile.lowest_neighbour = lowest_neighbour
 
-            if tile.dampness > self.enviroment.dampest:
-                self.enviroment.dampest = tile.dampness
+            if lowest_neighbour.dampness > self.enviroment.dampest:
+                self.enviroment.dampest = lowest_neighbour.dampness
 
     def get_neighbours(self, tile: Tile) -> Generator[Tile, Tile, None]:
         """ Get all tiles adjacent to the specified tile. """
@@ -227,7 +227,7 @@ class Geography:
             self.batch """
 
             def midpoint(*tiles: Tile) -> Tuple[float, float, float]:
-                """ Get mid point between 2 tiles. """
+                """ Get mid point between tiles. """
                 x = 0
                 y = 0
                 height = 0.0
