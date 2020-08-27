@@ -42,7 +42,9 @@ var n=function(e,t){return(n=Object.setPrototypeOf||{__proto__:[]}instanceof Arr
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-*/
+ */
+
+var _slicedToArray = function () { function sliceIterator(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"]) _i["return"](); } finally { if (_d) throw _e; } } return _arr; } return function (arr, i) { if (Array.isArray(arr)) { return arr; } else if (Symbol.iterator in Object(arr)) { return sliceIterator(arr, i); } else { throw new TypeError("Invalid attempt to destructure non-iterable instance"); } }; }();
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
@@ -50,6 +52,11 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DisplayBase = exports.Geography = exports.Tile = void 0;
+/* An algorithm for generating procedurally generated terrain where there is
+ * always a downhill path to the sea from any tile.
+ * See https://github.com/mrdunk/flowing-terrain for more information. */
+var ordered_set_1 = require("./ordered_set");
+var genesis_1 = require("./genesis");
 // State to be shared between all classes.
 
 var Enviroment = function Enviroment() {
@@ -99,7 +106,7 @@ var Geography = function () {
 
         this.tiles = [];
         this.enviroment = new Enviroment();
-        this.open_set_sorted = new SortedSet([], this.compare_tiles);
+        this.open_set_sorted = new ordered_set_1.SortedSet([], this.compare_tiles);
         var t0 = performance.now();
         // Populate tile array with un-configured Tile elements.
         for (var y = 0; y < this.enviroment.tile_count; y++) {
@@ -140,6 +147,7 @@ var Geography = function () {
     }, {
         key: "starting_points",
         value: function starting_points() {
+            // Make tiles around the edges of the map low seed points.
             for (var x = 0; x < this.enviroment.tile_count; x += 2) {
                 var top = this.get_tile({ x: x, y: 0 });
                 top.height = 0;
@@ -156,16 +164,40 @@ var Geography = function () {
                 _bottom.height = 0;
                 this.open_set_sorted.push(_bottom);
             }
-            var random_low_points = Math.round(Math.random() * this.enviroment.tile_count / 2);
-            for (var count = 0; count < random_low_points; count++) {
-                var _x = Math.round(Math.round(Math.random() * (this.enviroment.tile_count - 2)) / 2) * 2;
-                var _y = Math.round(Math.round(Math.random() * (this.enviroment.tile_count - 2)) / 2) * 2;
-                console.assert(_x % 2 === 0);
-                console.assert(_y % 2 === 0);
-                var tile = this.get_tile({ x: _x, y: _y });
-                console.assert(tile !== null, { x: _x, y: _y });
-                tile.height = 0;
-                this.open_set_sorted.push(tile);
+            var sea = genesis_1.seed_points(this.enviroment.tile_count);
+            var _iteratorNormalCompletion = true;
+            var _didIteratorError = false;
+            var _iteratorError = undefined;
+
+            try {
+                for (var _iterator = sea[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+                    var coord = _step.value;
+
+                    var _coord$split = coord.split(","),
+                        _coord$split2 = _slicedToArray(_coord$split, 2),
+                        x_str = _coord$split2[0],
+                        y_str = _coord$split2[1];
+
+                    var _x = parseInt(x_str);
+                    var _y = parseInt(y_str);
+                    var tile = this.get_tile({ x: _x, y: _y });
+                    console.assert(tile !== null, { x: _x, y: _y, tile: tile });
+                    tile.height = 0;
+                    this.open_set_sorted.push(tile);
+                }
+            } catch (err) {
+                _didIteratorError = true;
+                _iteratorError = err;
+            } finally {
+                try {
+                    if (!_iteratorNormalCompletion && _iterator.return) {
+                        _iterator.return();
+                    }
+                } finally {
+                    if (_didIteratorError) {
+                        throw _iteratorError;
+                    }
+                }
             }
         }
         // Populate all tiles with height data. Also set the sealevel.
@@ -191,7 +223,8 @@ var Geography = function () {
             while (this.open_set_sorted.length) {
                 _loop();
             }
-            this.enviroment.sealevel = this.enviroment.highest_point / (1.5 + Math.random() * 4);
+            //this.enviroment.sealevel = this.enviroment.highest_point / (1.5 + Math.random() * 4);
+            this.enviroment.sealevel = this.enviroment.highest_point / (1.5 + Math.random() * 10);
             for (var y = 0; y < this.enviroment.tile_count; y += 2) {
                 for (var x = 0; x < this.enviroment.tile_count; x += 2) {
                     var _tile = this.get_tile({ x: x, y: y });
@@ -308,6 +341,8 @@ var Geography = function () {
                         // No complicated rivers to worry about. Set height to whatever we
                         // want (as long as it doesn't create a depression).
                         tile.height = Math.random() * (highest - lowest) + lowest;
+                        //tile.height = highest;
+                        //tile.height = lowest;
                     } else {
                         console.assert(lowest_drain_from >= lowest);
                         tile.height = Math.random() * (lowest_drain_from - lowest) + lowest;
@@ -434,94 +469,169 @@ var DisplayBase = function () {
 
 exports.DisplayBase = DisplayBase;
 
-var SortedSet = function () {
-    function SortedSet(values, compare) {
-        var _this4 = this;
+},{"./genesis":3,"./ordered_set":5}],3:[function(require,module,exports){
+"use strict";
+/*
+# MIT License
+#
+# Copyright (c) 2020 duncan law
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+ */
 
-        _classCallCheck(this, SortedSet);
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-        this.values = [];
-        this.compare = compare;
-        //this.values = values.sort(this.compare);
-        values.forEach(function (v) {
-            return _this4.push(v);
-        });
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.seed_points = void 0;
+var ordered_set_1 = require("./ordered_set");
+/* Convert Coordinate into something that can be used as a key in a Set(). */
+function coord_to_str(coord) {
+    return coord.x + "," + coord.y;
+}
+/* Generate coordinates of neighbouring tiles. */
+function get_neighbours(coordinate) {
+    var neighbours = [];
+    neighbours.push({ x: coordinate.x - 2, y: coordinate.y - 2 });
+    neighbours.push({ x: coordinate.x - 2, y: coordinate.y });
+    neighbours.push({ x: coordinate.x - 2, y: coordinate.y + 2 });
+    neighbours.push({ x: coordinate.x + 2, y: coordinate.y - 2 });
+    neighbours.push({ x: coordinate.x + 2, y: coordinate.y });
+    neighbours.push({ x: coordinate.x + 2, y: coordinate.y + 2 });
+    neighbours.push({ x: coordinate.x, y: coordinate.y - 2 });
+    neighbours.push({ x: coordinate.x, y: coordinate.y + 2 });
+    return neighbours;
+}
+
+var Flood = function Flood(coordinate, value) {
+    _classCallCheck(this, Flood);
+
+    this.coordinate = coordinate;
+    this.value = value;
+};
+
+function compare_floods(a, b) {
+    if (a.value !== b.value) {
+        return a.value - b.value;
+    }
+    if (a.coordinate.x !== b.coordinate.x) {
+        return a.coordinate.x - b.coordinate.x;
+    }
+    return a.coordinate.y - b.coordinate.y;
+}
+/* Function to generate an area of the seabed from which to generate height.
+ * Areas not in the returned set will never be above the base seabed height. */
+function seed_points(tile_count) {
+    var sea = new Set();
+    var open = new ordered_set_1.SortedSet([], compare_floods);
+    for (var x = 0; x < tile_count; x += 2) {
+        var dx = Math.abs(x - tile_count / 2);
+        var dy = tile_count / 2;
+        var dist_from_center = dx * dx + dy * dy;
+        var y = 0;
+        open.push(new Flood({ x: x, y: y }, dist_from_center));
+        y = tile_count - 2;
+        open.push(new Flood({ x: x, y: y }, dist_from_center));
+    }
+    for (var _y = 0; _y < tile_count; _y += 2) {
+        var _dx = tile_count / 2;
+        var _dy = Math.abs(_y - tile_count / 2);
+        var _dist_from_center = _dx * _dx + _dy * _dy;
+        var _x = 0;
+        open.push(new Flood({ x: _x, y: _y }, _dist_from_center));
+        _x = tile_count - 2;
+        open.push(new Flood({ x: _x, y: _y }, _dist_from_center));
     }
 
-    _createClass(SortedSet, [{
-        key: "push",
-        value: function push(value) {
-            var left = 0;
-            var right = this.length;
-            while (right > left) {
-                var mid = Math.round((left + right - 1) / 2);
-                var comp = this.compare(value, this.values[mid]);
-                if (comp > 0) {
-                    left = mid + 1;
-                } else if (comp === 0) {
-                    // Value matches one in set.
-                    this.values.splice(mid, 1, value);
-                    return;
-                } else {
-                    right = mid;
+    var _loop = function _loop() {
+        var tile = open.pop();
+        sea.add(coord_to_str(tile.coordinate));
+        get_neighbours(tile.coordinate).forEach(function (neighbour) {
+            if (neighbour.x >= 0 && neighbour.x < tile_count && neighbour.y >= 0 && neighbour.y < tile_count) {
+                if (Math.random() < 0.21) {
+                    if (!sea.has(coord_to_str(neighbour))) {
+                        open.push(new Flood(neighbour, tile.value));
+                    }
                 }
             }
-            this.values.splice(left, 0, value);
-            this.length = this.values.length;
-        }
-    }, {
-        key: "get_index",
-        value: function get_index(value) {
-            var left = 0;
-            var right = this.length;
-            while (right > left) {
-                var mid = Math.round((left + right - 1) / 2);
-                var comp = this.compare(value, this.values[mid]);
-                if (comp > 0) {
-                    left = mid + 1;
-                } else if (comp === 0) {
-                    // Value matches one in set.
-                    return mid;
-                } else {
-                    right = mid;
-                }
+        });
+    };
+
+    while (open.length > 0) {
+        _loop();
+    }
+    // Display the seed area in the console.
+    var line = "   ";
+    for (var i = 0; i < tile_count; i += 2) {
+        if (i % 10 == 0) {
+            line += "" + i;
+            if (i < 10) {
+                line += " ";
             }
-            return NaN;
+        } else {
+            line += "  ";
         }
-    }, {
-        key: "has",
-        value: function has(value) {
-            return this.get_index(value) !== NaN;
+    }
+    console.log(line);
+    for (var _y2 = 0; _y2 < tile_count; _y2 += 2) {
+        line = _y2 + " ";
+        if (_y2 < 10) {
+            line += " ";
         }
-    }, {
-        key: "pop",
-        value: function pop() {
-            // Return highest value.
-            var val = this.values.pop();
-            this.length = this.values.length;
-            return val;
+        for (var _x2 = tile_count - 2; _x2 >= 0; _x2 -= 2) {
+            var key = coord_to_str({ x: _x2, y: _y2 });
+            if (sea.has(key)) {
+                line += "~ ";
+            } else {
+                line += "# ";
+            }
         }
-    }, {
-        key: "shift",
-        value: function shift() {
-            // Return lowest value.
-            var val = this.values.shift();
-            this.length = this.values.length;
-            return val;
-        }
-    }, {
-        key: "clear",
-        value: function clear() {
-            this.values = [];
-            this.length = 0;
-        }
-    }]);
+        console.log(line);
+    }
+    return sea;
+}
+exports.seed_points = seed_points;
 
-    return SortedSet;
-}();
-
-},{}],3:[function(require,module,exports){
+},{"./ordered_set":5}],4:[function(require,module,exports){
 "use strict";
+/*
+# MIT License
+#
+# Copyright (c) 2020 duncan law
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+ */
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
@@ -546,14 +656,15 @@ var Display = function (_flowing_terrain_1$Di) {
         _this.tile_size = 1;
         _this.positions = [];
         _this.indices = [];
-        _this.colors = [];
         _this.normals = [];
         _this.rivers = [];
         var mapsize = _this.tile_size * _this.enviroment.tile_count;
         var renderCanvas = document.getElementById("renderCanvas");
         _this.engine = new BABYLON.Engine(renderCanvas, true);
         _this.scene = new BABYLON.Scene(_this.engine);
-        _this.camera = new BABYLON.UniversalCamera("UniversalCamera", new BABYLON.Vector3(-mapsize / 4, mapsize / 4, -mapsize / 4), _this.scene);
+        _this.camera = new BABYLON.UniversalCamera("UniversalCamera",
+        //new BABYLON.Vector3(-mapsize / 4, mapsize / 4, -mapsize / 4),
+        new BABYLON.Vector3(mapsize / 2, mapsize, mapsize / 2), _this.scene);
         _this.camera.checkCollisions = true;
         _this.camera.ellipsoid = new BABYLON.Vector3(0.5, 0.5, 0.5);
         _this.camera.attachControl(renderCanvas);
@@ -580,13 +691,11 @@ var Display = function (_flowing_terrain_1$Di) {
             for (var y = 0; y < this.enviroment.tile_count; y++) {
                 for (var x = 0; x < this.enviroment.tile_count; x++) {
                     var tile = this.geography.get_tile({ x: x, y: y });
+                    // TODO: Some of these positions are not actually used.
+                    // Tiles at the height of the seabed are not drawn.
                     this.positions.push(tile.pos.x * this.tile_size);
                     this.positions.push(tile.height);
                     this.positions.push(tile.pos.y * this.tile_size);
-                    this.colors.push(0.2);
-                    this.colors.push(0.5);
-                    this.colors.push(0.2);
-                    this.colors.push(1);
                 }
             }
         }
@@ -607,6 +716,10 @@ var Display = function (_flowing_terrain_1$Di) {
             var offset02 = this.coordinate_to_index({ x: x - 1, y: y + 1 });
             var offset12 = this.coordinate_to_index({ x: x + 0, y: y + 1 });
             var offset22 = this.coordinate_to_index({ x: x + 1, y: y + 1 });
+            if (this.positions[offset00 * 3 + 1] === -this.geography.enviroment.sealevel && this.positions[offset10 * 3 + 1] === -this.geography.enviroment.sealevel && this.positions[offset20 * 3 + 1] === -this.geography.enviroment.sealevel && this.positions[offset01 * 3 + 1] === -this.geography.enviroment.sealevel && this.positions[offset11 * 3 + 1] === -this.geography.enviroment.sealevel && this.positions[offset21 * 3 + 1] === -this.geography.enviroment.sealevel && this.positions[offset02 * 3 + 1] === -this.geography.enviroment.sealevel && this.positions[offset12 * 3 + 1] === -this.geography.enviroment.sealevel && this.positions[offset22 * 3 + 1] === -this.geography.enviroment.sealevel) {
+                console.log();
+                return;
+            }
             this.indices.push(offset11);
             this.indices.push(offset00);
             this.indices.push(offset10);
@@ -687,23 +800,24 @@ var Display = function (_flowing_terrain_1$Di) {
             var _this2 = this;
 
             var land_material = new BABYLON.StandardMaterial("land_material", this.scene);
+            land_material.diffuseColor = new BABYLON.Color3(0.3, 0.7, 0.2);
             land_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
             //land_material.backFaceCulling = false;
             var seabed_material = new BABYLON.StandardMaterial("sea_material", this.scene);
-            seabed_material.diffuseColor = new BABYLON.Color3(0.2, 0.5, 0.2);
+            seabed_material.diffuseColor = new BABYLON.Color3(0.3, 0.7, 0.2);
             seabed_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
             //seabed_material.backFaceCulling = false;
             var sea_material = new BABYLON.StandardMaterial("sea_material", this.scene);
             sea_material.diffuseColor = new BABYLON.Color3(0, 0.3, 1);
             sea_material.specularColor = new BABYLON.Color3(0.5, 0.5, 0.5);
-            sea_material.alpha = 0.85;
+            //sea_material.alpha = 0.85;
+            sea_material.alpha = 0.5;
             sea_material.backFaceCulling = false;
             // Finish computing land.
             BABYLON.VertexData.ComputeNormals(this.positions, this.indices, this.normals);
             var vertexData = new BABYLON.VertexData();
             vertexData.positions = this.positions;
             vertexData.indices = this.indices;
-            vertexData.colors = this.colors;
             vertexData.normals = this.normals;
             var land = new BABYLON.Mesh("land");
             land.material = land_material;
@@ -726,8 +840,8 @@ var Display = function (_flowing_terrain_1$Di) {
             var sea = BABYLON.MeshBuilder.CreateGround("sea", { width: mapsize * 2, height: mapsize * 2 });
             sea.position = new BABYLON.Vector3(mapsize / 2, 0, mapsize / 2);
             sea.material = sea_material;
-            //sea.checkCollisions = false;
-            this.camera.setTarget(sea.position);
+            sea.checkCollisions = false;
+            this.camera.setTarget(new BABYLON.Vector3(mapsize / 2, 0, mapsize / 2));
         }
     }]);
 
@@ -745,6 +859,137 @@ window.addEventListener("resize", function () {
 });
 document.getElementById('renderCanvas').focus();
 
-},{"./flowing_terrain":2,"babylonjs":1}]},{},[3])
+},{"./flowing_terrain":2,"babylonjs":1}],5:[function(require,module,exports){
+"use strict";
+/*
+# MIT License
+#
+# Copyright (c) 2020 duncan law
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+*/
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.SortedSet = void 0;
+/* A Set implementation that allows highest and lowest values to be retrieved.
+ * Adding to and querying the Set takes O(log n) time.
+ * Retrieving the highest or lowest value takes constant time.
+ * A comparison function must be provided to determine whether 2 stored values
+ * are greater, equal or less than each other.
+ */
+
+var SortedSet = function () {
+    function SortedSet(values, compare) {
+        var _this = this;
+
+        _classCallCheck(this, SortedSet);
+
+        this.values = [];
+        this.compare = compare;
+        values.forEach(function (v) {
+            return _this.push(v);
+        });
+    }
+
+    _createClass(SortedSet, [{
+        key: "push",
+        value: function push(value) {
+            // O(log n) time.
+            var left = 0;
+            var right = this.length;
+            while (right > left) {
+                var mid = Math.round((left + right - 1) / 2);
+                var comp = this.compare(value, this.values[mid]);
+                if (comp > 0) {
+                    left = mid + 1;
+                } else if (comp === 0) {
+                    // Value matches one in set.
+                    this.values.splice(mid, 1, value);
+                    return;
+                } else {
+                    right = mid;
+                }
+            }
+            this.values.splice(left, 0, value);
+            this.length = this.values.length;
+        }
+    }, {
+        key: "get_index",
+        value: function get_index(value) {
+            // O(log n) time.
+            var left = 0;
+            var right = this.length;
+            while (right > left) {
+                var mid = Math.round((left + right - 1) / 2);
+                var comp = this.compare(value, this.values[mid]);
+                if (comp > 0) {
+                    left = mid + 1;
+                } else if (comp === 0) {
+                    // Value matches one in set.
+                    return mid;
+                } else {
+                    right = mid;
+                }
+            }
+            return NaN;
+        }
+    }, {
+        key: "has",
+        value: function has(value) {
+            // O(log n) time.
+            return this.get_index(value) !== NaN;
+        }
+    }, {
+        key: "pop",
+        value: function pop() {
+            // Return highest value.
+            // Constant time.
+            var val = this.values.pop();
+            this.length = this.values.length;
+            return val;
+        }
+    }, {
+        key: "shift",
+        value: function shift() {
+            // Return lowest value.
+            // Constant time.
+            var val = this.values.shift();
+            this.length = this.values.length;
+            return val;
+        }
+    }, {
+        key: "clear",
+        value: function clear() {
+            this.values = [];
+            this.length = 0;
+        }
+    }]);
+
+    return SortedSet;
+}();
+
+exports.SortedSet = SortedSet;
+
+},{}]},{},[4])
 
 //# sourceMappingURL=bundle.js.map

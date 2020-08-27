@@ -1,3 +1,30 @@
+/*
+# MIT License
+#
+# Copyright (c) 2020 duncan law
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+ */
+
+/* A sample frontend for the algorithm described at
+ * https://github.com/mrdunk/flowing-terrain */
+
 import * as BABYLON from 'babylonjs';
 import {Geography, Tile, DisplayBase, Coordinate} from "./flowing_terrain"
 
@@ -6,7 +33,6 @@ class Display extends DisplayBase {
   tile_size: number = 1;
   positions: Array<number> = [];
   indices: Array<number> = [];
-  colors: Array<number> = [];
   normals: Array<number> = [];
   rivers: Array<Array<BABYLON.Vector3>> = [];
 
@@ -23,7 +49,8 @@ class Display extends DisplayBase {
     this.scene = new BABYLON.Scene(this.engine);
     this.camera = new BABYLON.UniversalCamera(
       "UniversalCamera",
-      new BABYLON.Vector3(-mapsize / 4, mapsize / 4, -mapsize / 4),
+      //new BABYLON.Vector3(-mapsize / 4, mapsize / 4, -mapsize / 4),
+      new BABYLON.Vector3(mapsize / 2, mapsize, mapsize / 2),
       this.scene);
     this.camera.checkCollisions = true;
     this.camera.ellipsoid = new BABYLON.Vector3(0.5, 0.5, 0.5);
@@ -56,14 +83,11 @@ class Display extends DisplayBase {
       for(let x = 0; x < this.enviroment.tile_count; x++) {
         const tile = this.geography.get_tile({x, y});
 
+        // TODO: Some of these positions are not actually used.
+        // Tiles at the height of the seabed are not drawn.
         this.positions.push(tile.pos.x * this.tile_size);
         this.positions.push(tile.height);
         this.positions.push(tile.pos.y * this.tile_size);
-
-        this.colors.push(0.2);
-        this.colors.push(0.5);
-        this.colors.push(0.2);
-        this.colors.push(1);
       }
     }
   }
@@ -85,6 +109,19 @@ class Display extends DisplayBase {
     const offset02 = this.coordinate_to_index({x: x - 1, y: y + 1});
     const offset12 = this.coordinate_to_index({x: x + 0, y: y + 1});
     const offset22 = this.coordinate_to_index({x: x + 1, y: y + 1});
+
+    if((this.positions[offset00 * 3 + 1]) === -this.geography.enviroment.sealevel &&
+       (this.positions[offset10 * 3 + 1]) === -this.geography.enviroment.sealevel &&
+       (this.positions[offset20 * 3 + 1]) === -this.geography.enviroment.sealevel &&
+       (this.positions[offset01 * 3 + 1]) === -this.geography.enviroment.sealevel &&
+       (this.positions[offset11 * 3 + 1]) === -this.geography.enviroment.sealevel &&
+       (this.positions[offset21 * 3 + 1]) === -this.geography.enviroment.sealevel &&
+       (this.positions[offset02 * 3 + 1]) === -this.geography.enviroment.sealevel &&
+       (this.positions[offset12 * 3 + 1]) === -this.geography.enviroment.sealevel &&
+       (this.positions[offset22 * 3 + 1]) === -this.geography.enviroment.sealevel) {
+      console.log();
+      return;
+    }
 
     this.indices.push(offset11);
     this.indices.push(offset00);
@@ -179,18 +216,20 @@ class Display extends DisplayBase {
 
   draw_end(): void {
     const land_material = new BABYLON.StandardMaterial("land_material", this.scene);
+    land_material.diffuseColor = new BABYLON.Color3(0.3, 0.7, 0.2);
     land_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
     //land_material.backFaceCulling = false;
 
     const seabed_material = new BABYLON.StandardMaterial("sea_material", this.scene);
-    seabed_material.diffuseColor = new BABYLON.Color3(0.2, 0.5, 0.2);
+    seabed_material.diffuseColor = new BABYLON.Color3(0.3, 0.7, 0.2);
     seabed_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
     //seabed_material.backFaceCulling = false;
 
     const sea_material = new BABYLON.StandardMaterial("sea_material", this.scene);
     sea_material.diffuseColor = new BABYLON.Color3(0, 0.3, 1);
     sea_material.specularColor = new BABYLON.Color3(0.5, 0.5, 0.5);
-    sea_material.alpha = 0.85;
+    //sea_material.alpha = 0.85;
+    sea_material.alpha = 0.5;
     sea_material.backFaceCulling = false;
 
     // Finish computing land.
@@ -198,7 +237,6 @@ class Display extends DisplayBase {
     const vertexData = new BABYLON.VertexData();
     vertexData.positions = this.positions;
     vertexData.indices = this.indices;
-    vertexData.colors = this.colors;
     vertexData.normals = this.normals;
 
     const land = new BABYLON.Mesh("land");
@@ -229,9 +267,9 @@ class Display extends DisplayBase {
       "sea", {width: mapsize * 2, height: mapsize * 2});
     sea.position = new BABYLON.Vector3(mapsize / 2, 0, mapsize / 2);
     sea.material = sea_material;
-    //sea.checkCollisions = false;
+    sea.checkCollisions = false;
 
-    this.camera.setTarget(sea.position);
+    this.camera.setTarget(new BABYLON.Vector3(mapsize / 2, 0, mapsize / 2));
   }
 }
 

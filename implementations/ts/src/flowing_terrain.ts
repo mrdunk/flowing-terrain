@@ -20,7 +20,14 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-*/
+ */
+
+/* An algorithm for generating procedurally generated terrain where there is
+ * always a downhill path to the sea from any tile.
+ * See https://github.com/mrdunk/flowing-terrain for more information. */
+
+import {SortedSet} from "./ordered_set"
+import {seed_points} from "./genesis"
 
 export interface Coordinate {
   x: number;
@@ -101,6 +108,7 @@ export class Geography {
 
   // Set seed heights on map to start the height generation algorithm at.
   starting_points(): void {
+    // Make tiles around the edges of the map low seed points.
     for(let x = 0; x < this.enviroment.tile_count; x += 2) {
       const top = this.get_tile({x, y: 0});
       top.height = 0;
@@ -120,14 +128,13 @@ export class Geography {
       this.open_set_sorted.push(bottom);
     }
 
-    let random_low_points = Math.round(Math.random() * this.enviroment.tile_count / 2);
-    for(let count = 0; count < random_low_points; count++){
-      const x = Math.round(Math.round(Math.random() * (this.enviroment.tile_count - 2)) / 2) * 2;
-      const y = Math.round(Math.round(Math.random() * (this.enviroment.tile_count - 2)) / 2) * 2;
-      console.assert(x % 2 === 0);
-      console.assert(y % 2 === 0);
+    const sea = seed_points(this.enviroment.tile_count);
+    for(let coord of sea) {
+      const [x_str, y_str] = coord.split(",");
+      const x = parseInt(x_str);
+      const y = parseInt(y_str);
       const tile = this.get_tile({x, y});
-      console.assert(tile !== null, {x, y});
+      console.assert(tile !== null, {x, y, tile});
       tile.height = 0;
       this.open_set_sorted.push(tile);
     }
@@ -148,7 +155,8 @@ export class Geography {
       });
     }
 
-    this.enviroment.sealevel = this.enviroment.highest_point / (1.5 + Math.random() * 4);
+    //this.enviroment.sealevel = this.enviroment.highest_point / (1.5 + Math.random() * 4);
+    this.enviroment.sealevel = this.enviroment.highest_point / (1.5 + Math.random() * 10);
 
     for(let y = 0; y < this.enviroment.tile_count; y += 2) {
       for(let x = 0; x < this.enviroment.tile_count; x += 2) {
@@ -196,7 +204,7 @@ export class Geography {
          lowest_neighbour.height > 0) {
         this.enviroment.dampest = lowest_neighbour.dampness;
       }
-      console.assert(lowest_neighbour.dampness> tile.dampness);
+      console.assert(lowest_neighbour.dampness > tile.dampness);
     }
   }
 
@@ -262,6 +270,8 @@ export class Geography {
           // No complicated rivers to worry about. Set height to whatever we
           // want (as long as it doesn't create a depression).
           tile.height = Math.random() * (highest - lowest) + lowest;
+          //tile.height = highest;
+          //tile.height = lowest;
         } else {
           console.assert(lowest_drain_from >= lowest);
           tile.height = Math.random() * (lowest_drain_from - lowest) + lowest;
@@ -372,79 +382,6 @@ export class DisplayBase {
   }
 
   draw_river(a: Tile, b: Tile): void {
-  }
-}
-
-class SortedSet {
-  compare: (a: any, b: any) => number;
-  values: Array<any> = [];
-  length: number;
-
-  constructor(values: Array<any>, compare: (a: any, b: any) => number) {
-    this.compare = compare;
-    //this.values = values.sort(this.compare);
-    values.forEach((v) => this.push(v));
-  }
-
-  push(value: any) {
-    let left = 0;
-    let right = this.length;
-    while(right > left) {
-      let mid = Math.round((left + right - 1) / 2);
-      let comp = this.compare(value, this.values[mid]);
-      if(comp > 0) {
-        left = mid + 1;
-      } else if(comp === 0) {
-        // Value matches one in set.
-        this.values.splice(mid, 1, value);
-        return;
-      } else {
-        right = mid;
-      }
-    }
-    this.values.splice(left, 0, value);
-    this.length = this.values.length;
-  }
-
-  get_index(value: any): number {
-    let left = 0;
-    let right = this.length;
-    while(right > left) {
-      let mid = Math.round((left + right - 1) / 2);
-      let comp = this.compare(value, this.values[mid]);
-      if(comp > 0) {
-        left = mid + 1;
-      } else if(comp === 0) {
-        // Value matches one in set.
-        return mid;
-      } else {
-        right = mid;
-      }
-    }
-    return NaN;
-  }
-
-  has(value: any): boolean {
-    return this.get_index(value) !== NaN;
-  }
-
-  pop() {
-    // Return highest value.
-    let val = this.values.pop();
-    this.length = this.values.length;
-    return val;
-  }
-
-  shift() {
-    // Return lowest value.
-    let val = this.values.shift();
-    this.length = this.values.length;
-    return val;
-  }
-
-  clear() {
-    this.values = [];
-    this.length = 0;
   }
 }
 
