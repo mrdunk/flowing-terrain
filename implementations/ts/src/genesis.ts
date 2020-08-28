@@ -117,6 +117,7 @@ export function seed_points(tile_count: number): Set<string> {
   }
 
   // Display the seed area in the console.
+  console.log("Seed points:");
   let line = "   ";
   for(let i = 0; i < tile_count; i += 2) {
     if(i % 10 == 0) {

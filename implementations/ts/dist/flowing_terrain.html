@@ -17,9 +17,65 @@
                 height: 100%;
                 touch-action: none;
             }
+
+            .collapse {
+              background: white;
+              margin: 5px;
+              border: solid;
+              border-color: darkgrey;
+              border-width: thin;
+              position: fixed;
+              z-index: 100;
+            }
+
+            .collapse .expandButton {
+              background: grey;
+              cursor: default;
+              border: solid;
+              border-color: darkgrey;
+              display: table;
+            }
+
+            .collapse .content {
+              animation-duration: 2s;
+              width: 95%;
+              display: block;
+              white-space: nowrap;
+            }
+
+            .collapse .content.hidden {
+              animation-duration: 2s;
+              display: none;
+            }
     </style>
   </head>
   <body>
+    <div class="collapse" id="config">
+      <div class="expandButton">+</div>
+      <div class="content">
+        <div>This project is intended to document a simple algorithm for creating 3 dimensional terrain maps and their likely watercourses.</div>
+        <div>The map you see is randomly generated. Refresh for a new map. Cursor keys and mouse to move around.</div>
+        <div>An explanation of the algorithm can be found here:
+          <a href="https://github.com/mrdunk/flowing-terrain">https://github.com/mrdunk/flowing-terrain</a>
+        </div>
+        <div>This demonstration was made with the excellent
+          <a href="https://www.babylonjs.com/">babylonjs.com</a>
+          web rendering library.
+        </div>
+        <div>
+          <input type="range" id="seaLevel" name="seaLevel"
+           min="0" max="10" step="0.1" value="2">
+          <label for="seaLevel">Sea Level</label>
+        </div>
+        <div>
+          <input type="range" id="rivers" name="rivers" min="0" max="10" value="3">
+          <label for="rivers">River Likelihood</label>
+        </div>
+        <div>
+          <input type="button" id="inspector" name="inspector" value="Launch Inspector">
+        </div>
+      </div>
+    </div>
     <canvas id="renderCanvas" touch-action="none"></canvas>
     <script src="bundle.js"></script>
   </body>

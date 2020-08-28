@@ -143,27 +143,11 @@ var Geography = function () {
             return diff;
         }
         // Set seed heights on map to start the height generation algorithm at.
+        // These points will be at height===0.
 
     }, {
         key: "starting_points",
         value: function starting_points() {
-            // Make tiles around the edges of the map low seed points.
-            for (var x = 0; x < this.enviroment.tile_count; x += 2) {
-                var top = this.get_tile({ x: x, y: 0 });
-                top.height = 0;
-                this.open_set_sorted.push(top);
-                var bottom = this.get_tile({ x: x, y: this.enviroment.tile_count - 2 });
-                bottom.height = 0;
-                this.open_set_sorted.push(bottom);
-            }
-            for (var y = 0; y < this.enviroment.tile_count; y += 2) {
-                var _top = this.get_tile({ x: 0, y: y });
-                _top.height = 0;
-                this.open_set_sorted.push(_top);
-                var _bottom = this.get_tile({ x: this.enviroment.tile_count - 2, y: y });
-                _bottom.height = 0;
-                this.open_set_sorted.push(_bottom);
-            }
             var sea = genesis_1.seed_points(this.enviroment.tile_count);
             var _iteratorNormalCompletion = true;
             var _didIteratorError = false;
@@ -178,10 +162,10 @@ var Geography = function () {
                         x_str = _coord$split2[0],
                         y_str = _coord$split2[1];
 
-                    var _x = parseInt(x_str);
-                    var _y = parseInt(y_str);
-                    var tile = this.get_tile({ x: _x, y: _y });
-                    console.assert(tile !== null, { x: _x, y: _y, tile: tile });
+                    var x = parseInt(x_str);
+                    var y = parseInt(y_str);
+                    var tile = this.get_tile({ x: x, y: y });
+                    console.assert(tile !== null, { x: x, y: y, tile: tile });
                     tile.height = 0;
                     this.open_set_sorted.push(tile);
                 }
@@ -225,14 +209,6 @@ var Geography = function () {
             }
             //this.enviroment.sealevel = this.enviroment.highest_point / (1.5 + Math.random() * 4);
             this.enviroment.sealevel = this.enviroment.highest_point / (1.5 + Math.random() * 10);
-            for (var y = 0; y < this.enviroment.tile_count; y += 2) {
-                for (var x = 0; x < this.enviroment.tile_count; x += 2) {
-                    var _tile = this.get_tile({ x: x, y: y });
-                    _tile.height -= this.enviroment.sealevel;
-                    //console.log(tile.toString());
-                }
-            }
-            this.enviroment.highest_point -= this.enviroment.sealevel;
         }
         // Calculate the number of uphill tiles draining into each tile on the
         // map. High tile.dampness values indicate a river runs through that tile.
@@ -245,13 +221,11 @@ var Geography = function () {
             this.open_set_sorted.clear();
             for (var y = 0; y < this.enviroment.tile_count; y += 2) {
                 for (var x = 0; x < this.enviroment.tile_count; x += 2) {
-                    var _tile2 = this.get_tile({ x: x, y: y });
+                    var _tile = this.get_tile({ x: x, y: y });
                     // If we don't consider the heights below sealevel we get isolated pools
                     // along the coastline when drawing 3D views due to the averaging of
                     // heights at the meeting points of tiles in the `diamond()` method.
-                    if (_tile2.height > -this.enviroment.sealevel) {
-                        this.open_set_sorted.push(_tile2);
-                    }
+                    this.open_set_sorted.push(_tile);
                 }
             }
             // Work through all tiles from the highest on the map downwards.
@@ -259,6 +233,9 @@ var Geography = function () {
 
             var _loop2 = function _loop2() {
                 var tile = _this2.open_set_sorted.pop();
+                if (tile.height === 0) {
+                    return "continue";
+                }
                 var lowest_neighbour = null;
                 _this2.get_neighbours(tile, 2).forEach(function (neighbour) {
                     if (neighbour !== null && neighbour.height < tile.height) {
@@ -277,7 +254,9 @@ var Geography = function () {
             };
 
             while (this.open_set_sorted.length > 0) {
-                _loop2();
+                var _ret2 = _loop2();
+
+                if (_ret2 === "continue") continue;
             }
         }
         // Use Diamond-Square algorithm to fill intermediate heights for corners of
@@ -316,7 +295,7 @@ var Geography = function () {
                     var tiles_set = new Set(tiles);
                     var drain_from = [];
                     var drain_to = null;
-                    var highest = -_this3.enviroment.sealevel;
+                    var highest = -1;
                     var lowest = _this3.enviroment.highest_point;
                     var lowest_drain_from = _this3.enviroment.highest_point;
                     tiles.forEach(function (tile_from) {
@@ -368,24 +347,24 @@ var Geography = function () {
             for (var y = 0; y <= this.enviroment.tile_count; y += 2) {
                 for (var x = 0; x <= this.enviroment.tile_count; x += 2) {
                     // Already configured tiles to be averaged.
-                    var _tile3 = this.get_tile({ x: x + 0, y: y + 0 });
+                    var _tile2 = this.get_tile({ x: x + 0, y: y + 0 });
                     var tile20 = this.get_tile({ x: x + 2, y: y + 0 });
                     var tile02 = this.get_tile({ x: x + 0, y: y + 2 });
                     // Un-configured tiles to be updated.
-                    var _tile4 = this.get_tile({ x: x + 1, y: y + 0 });
-                    var _tile5 = this.get_tile({ x: x + 0, y: y + 1 });
-                    if (_tile3 === null) {
+                    var _tile3 = this.get_tile({ x: x + 1, y: y + 0 });
+                    var _tile4 = this.get_tile({ x: x + 0, y: y + 1 });
+                    if (_tile2 === null) {
                         continue;
                     }
                     if (tile20 !== null) {
-                        _tile4.height = (_tile3.height + tile20.height) / 2;
+                        _tile3.height = (_tile2.height + tile20.height) / 2;
                     } else {
-                        _tile4.height = _tile3.height;
+                        _tile3.height = _tile2.height;
                     }
                     if (tile02 !== null) {
-                        _tile5.height = (_tile3.height + tile02.height) / 2;
+                        _tile4.height = (_tile2.height + tile02.height) / 2;
                     } else {
-                        _tile5.height = _tile3.height;
+                        _tile4.height = _tile2.height;
                     }
                 }
             }
@@ -430,9 +409,9 @@ var DisplayBase = function () {
             this.draw_start();
             for (var y = 0; y < this.enviroment.tile_count; y += 2) {
                 for (var x = 0; x < this.enviroment.tile_count; x += 2) {
-                    var _tile6 = this.geography.get_tile({ x: x, y: y });
-                    this.draw_tile(_tile6);
-                    this.draw_river(_tile6, _tile6.lowest_neighbour);
+                    var _tile5 = this.geography.get_tile({ x: x, y: y });
+                    this.draw_tile(_tile5);
+                    //this.draw_river(tile, tile.lowest_neighbour);
                 }
             }
             this.draw_end();
@@ -576,6 +555,7 @@ function seed_points(tile_count) {
         _loop();
     }
     // Display the seed area in the console.
+    console.log("Seed points:");
     var line = "   ";
     for (var i = 0; i < tile_count; i += 2) {
         if (i % 10 == 0) {
@@ -642,6 +622,8 @@ function _possibleConstructorReturn(self, call) { if (!self) { throw new Referen
 function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
 
 Object.defineProperty(exports, "__esModule", { value: true });
+/* A sample frontend for the algorithm described at
+ * https://github.com/mrdunk/flowing-terrain */
 var BABYLON = require("babylonjs");
 var flowing_terrain_1 = require("./flowing_terrain");
 
@@ -654,17 +636,19 @@ var Display = function (_flowing_terrain_1$Di) {
         var _this = _possibleConstructorReturn(this, (Display.__proto__ || Object.getPrototypeOf(Display)).call(this, geography));
 
         _this.tile_size = 1;
+        _this.river_threshold = 3;
         _this.positions = [];
         _this.indices = [];
         _this.normals = [];
         _this.rivers = [];
+        _this.update_rivers_timer = 0;
         var mapsize = _this.tile_size * _this.enviroment.tile_count;
         var renderCanvas = document.getElementById("renderCanvas");
         _this.engine = new BABYLON.Engine(renderCanvas, true);
         _this.scene = new BABYLON.Scene(_this.engine);
-        _this.camera = new BABYLON.UniversalCamera("UniversalCamera",
-        //new BABYLON.Vector3(-mapsize / 4, mapsize / 4, -mapsize / 4),
-        new BABYLON.Vector3(mapsize / 2, mapsize, mapsize / 2), _this.scene);
+        _this.camera = new BABYLON.UniversalCamera("UniversalCamera", new BABYLON.Vector3(-mapsize / 4, mapsize / 4, -mapsize / 4),
+        //new BABYLON.Vector3(mapsize / 2, mapsize, mapsize / 2),
+        _this.scene);
         _this.camera.checkCollisions = true;
         _this.camera.ellipsoid = new BABYLON.Vector3(0.5, 0.5, 0.5);
         _this.camera.attachControl(renderCanvas);
@@ -688,6 +672,9 @@ var Display = function (_flowing_terrain_1$Di) {
     }, {
         key: "draw_start",
         value: function draw_start() {
+            console.assert(this.positions.length === 0);
+            console.assert(this.indices.length === 0);
+            console.assert(this.rivers.length === 0);
             for (var y = 0; y < this.enviroment.tile_count; y++) {
                 for (var x = 0; x < this.enviroment.tile_count; x++) {
                     var tile = this.geography.get_tile({ x: x, y: y });
@@ -699,6 +686,8 @@ var Display = function (_flowing_terrain_1$Di) {
                 }
             }
         }
+        // Called once per tile.
+
     }, {
         key: "draw_tile",
         value: function draw_tile(tile) {
@@ -716,7 +705,7 @@ var Display = function (_flowing_terrain_1$Di) {
             var offset02 = this.coordinate_to_index({ x: x - 1, y: y + 1 });
             var offset12 = this.coordinate_to_index({ x: x + 0, y: y + 1 });
             var offset22 = this.coordinate_to_index({ x: x + 1, y: y + 1 });
-            if (this.positions[offset00 * 3 + 1] === -this.geography.enviroment.sealevel && this.positions[offset10 * 3 + 1] === -this.geography.enviroment.sealevel && this.positions[offset20 * 3 + 1] === -this.geography.enviroment.sealevel && this.positions[offset01 * 3 + 1] === -this.geography.enviroment.sealevel && this.positions[offset11 * 3 + 1] === -this.geography.enviroment.sealevel && this.positions[offset21 * 3 + 1] === -this.geography.enviroment.sealevel && this.positions[offset02 * 3 + 1] === -this.geography.enviroment.sealevel && this.positions[offset12 * 3 + 1] === -this.geography.enviroment.sealevel && this.positions[offset22 * 3 + 1] === -this.geography.enviroment.sealevel) {
+            if (this.positions[offset00 * 3 + 1] === 0 && this.positions[offset10 * 3 + 1] === 0 && this.positions[offset20 * 3 + 1] === 0 && this.positions[offset01 * 3 + 1] === 0 && this.positions[offset11 * 3 + 1] === 0 && this.positions[offset21 * 3 + 1] === 0 && this.positions[offset02 * 3 + 1] === 0 && this.positions[offset12 * 3 + 1] === 0 && this.positions[offset22 * 3 + 1] === 0) {
                 console.log();
                 return;
             }
@@ -745,60 +734,59 @@ var Display = function (_flowing_terrain_1$Di) {
             this.indices.push(offset01);
             this.indices.push(offset00);
         }
-        // Draw drainage between 2 points.
+        // Draw river between 2 points.
 
     }, {
         key: "draw_river",
         value: function draw_river(highest, lowest) {
+            var sealevel = this.enviroment.sealevel;
             if (highest === null || lowest === null) {
                 return;
             }
-            if (highest.height < 0.0) {
-                // Whole thing below sealevel.
+            if (highest.height < sealevel) {
                 return;
             }
-            // Only draw rivers in the wettest tiles.
-            if (highest.dampness <= this.geography.enviroment.dampest / 16) {
+            if (highest.dampness <= this.river_threshold) {
                 return;
             }
-            var mid = this.geography.get_tile({ x: (highest.pos.x + lowest.pos.x) / 2, y: (highest.pos.y + lowest.pos.y) / 2 });
             // Offset to prevent height fighting during render.
             // Make rivers slightly above land.
             var offset = 0.01;
+            var mid = this.geography.get_tile({ x: (highest.pos.x + lowest.pos.x) / 2, y: (highest.pos.y + lowest.pos.y) / 2 });
             // Prove river is indeed flowing down hill.
             console.assert(highest.height >= mid.height, { errormessage: "river flows uphill" });
             console.assert(mid.height >= lowest.height, { errormessage: "river flows uphill" });
             var river = [];
-            river.push(new BABYLON.Vector3(highest.pos.x * this.tile_size, highest.height + offset, highest.pos.y * this.tile_size));
             // River section from highest to mid-point.
-            if (mid.height >= 0.0) {
+            river.push(new BABYLON.Vector3(highest.pos.x * this.tile_size, highest.height + offset, highest.pos.y * this.tile_size));
+            if (mid.height >= sealevel) {
                 river.push(new BABYLON.Vector3(mid.pos.x * this.tile_size, mid.height + offset, mid.pos.y * this.tile_size));
             } else {
                 // Stop at shoreline.
                 var ratio_x = (highest.pos.x - mid.pos.x) / (highest.height - mid.height);
                 var ratio_y = (highest.pos.y - mid.pos.y) / (highest.height - mid.height);
-                var x = highest.pos.x - highest.height * ratio_x;
-                var y = highest.pos.y - highest.height * ratio_y;
-                river.push(new BABYLON.Vector3(x, 0 + offset, y));
+                var x = highest.pos.x - (highest.height - sealevel) * ratio_x;
+                var y = highest.pos.y - (highest.height - sealevel) * ratio_y;
+                river.push(new BABYLON.Vector3(x, sealevel + offset, y));
             }
             // River section from mid-point to lowest.
-            if (lowest.height >= 0.0) {
+            if (lowest.height >= sealevel) {
                 river.push(new BABYLON.Vector3(lowest.pos.x * this.tile_size, lowest.height + offset, lowest.pos.y * this.tile_size));
-            } else if (mid.height >= 0.0) {
+            } else if (mid.height >= sealevel) {
                 // Stop at shoreline.
                 var _ratio_x = (mid.pos.x - lowest.pos.x) / (mid.height - lowest.height);
                 var _ratio_y = (mid.pos.y - lowest.pos.y) / (mid.height - lowest.height);
-                var _x = mid.pos.x - mid.height * _ratio_x;
-                var _y = mid.pos.y - mid.height * _ratio_y;
-                river.push(new BABYLON.Vector3(_x, 0 + offset, _y));
+                var _x = mid.pos.x - (mid.height - sealevel) * _ratio_x;
+                var _y = mid.pos.y - (mid.height - sealevel) * _ratio_y;
+                river.push(new BABYLON.Vector3(_x, sealevel + offset, _y));
             }
             this.rivers.push(river);
         }
+        // Called as the last stage of the render.
+
     }, {
         key: "draw_end",
         value: function draw_end() {
-            var _this2 = this;
-
             var land_material = new BABYLON.StandardMaterial("land_material", this.scene);
             land_material.diffuseColor = new BABYLON.Color3(0.3, 0.7, 0.2);
             land_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
@@ -825,23 +813,76 @@ var Display = function (_flowing_terrain_1$Di) {
             land.checkCollisions = true;
             //land.convertToFlatShadedMesh();
             // Rivers
-            this.rivers.forEach(function (river) {
-                var mesh = BABYLON.MeshBuilder.CreateLines("river", { points: river }, _this2.scene);
-                mesh.enableEdgesRendering();
-                mesh.edgesWidth = 6.0;
-            });
+            this.set_rivers(3);
             // Generate seabed.
             var mapsize = this.tile_size * this.enviroment.tile_count;
             var seabed = BABYLON.MeshBuilder.CreateGround("seabed", { width: mapsize * 2, height: mapsize * 2 });
-            seabed.position = new BABYLON.Vector3(mapsize / 2, -this.enviroment.sealevel - 0.01, mapsize / 2);
+            seabed.position = new BABYLON.Vector3(mapsize / 2, -0.01, mapsize / 2);
             seabed.material = seabed_material;
             seabed.checkCollisions = true;
             // Generate sea.
-            var sea = BABYLON.MeshBuilder.CreateGround("sea", { width: mapsize * 2, height: mapsize * 2 });
-            sea.position = new BABYLON.Vector3(mapsize / 2, 0, mapsize / 2);
-            sea.material = sea_material;
-            sea.checkCollisions = false;
+            this.sea_mesh = BABYLON.MeshBuilder.CreateGround("sea", { width: mapsize * 2, height: mapsize * 2 });
+            this.sea_mesh.material = sea_material;
+            this.sea_mesh.checkCollisions = false;
+            this.set_sealevel(this.enviroment.sealevel);
             this.camera.setTarget(new BABYLON.Vector3(mapsize / 2, 0, mapsize / 2));
+        }
+        // Move the height of the sea mesh on the Z axis.
+
+    }, {
+        key: "set_sealevel",
+        value: function set_sealevel(sealevel) {
+            console.log("sealevel: ", sealevel);
+            this.enviroment.sealevel = sealevel;
+            var mapsize = this.tile_size * this.enviroment.tile_count;
+            this.sea_mesh.position = new BABYLON.Vector3(mapsize / 2, sealevel + 0.02, mapsize / 2);
+            // Now recalculate the rivers as they now meet the sea at a different height
+            // so length will be different.
+            this.schedule_update_rivers();
+        }
+        // Set what Tile.dampness value to display rivers at.
+
+    }, {
+        key: "set_rivers",
+        value: function set_rivers(value) {
+            this.river_threshold = value;
+            console.log("set_rivers", value, this.geography.enviroment.dampest);
+            this.schedule_update_rivers();
+        }
+        // Delete existing rivers mesh and replace with one up to date for the current
+        // river_threshold and sealevel values.
+
+    }, {
+        key: "schedule_update_rivers",
+        value: function schedule_update_rivers() {
+            var _this2 = this;
+
+            if (this.update_rivers_timer === 0) {
+                this.update_rivers_timer = setTimeout(function () {
+                    _this2.update_rivers();
+                }, 100);
+            }
+        }
+    }, {
+        key: "update_rivers",
+        value: function update_rivers() {
+            console.log("update_rivers", this.update_rivers_timer);
+            this.update_rivers_timer = 0;
+            if (this.rivers.length > 0) {
+                this.rivers = [];
+            }
+            if (this.rivers_mesh !== undefined) {
+                this.rivers_mesh.dispose();
+            }
+            for (var y = 0; y < this.enviroment.tile_count; y += 2) {
+                for (var x = 0; x < this.enviroment.tile_count; x += 2) {
+                    var tile = this.geography.get_tile({ x: x, y: y });
+                    this.draw_river(tile, tile.lowest_neighbour);
+                }
+            }
+            if (this.rivers.length > 0) {
+                this.rivers_mesh = BABYLON.MeshBuilder.CreateLineSystem("rivers", { lines: this.rivers }, this.scene);
+            }
         }
     }]);
 
@@ -857,6 +898,36 @@ display.engine.runRenderLoop(function () {
 window.addEventListener("resize", function () {
     display.engine.resize();
 });
+// UI components below this point.
+var menu_config = document.getElementById("config");
+menu_config.getElementsByClassName("expandButton")[0].addEventListener("click", function (event) {
+    var content = menu_config.getElementsByClassName("content")[0];
+    if (content.classList.contains("hidden")) {
+        content.classList.remove("hidden");
+    } else {
+        content.classList.add("hidden");
+    }
+});
+function menu_sealevel_handler(event) {
+    var target = event.target;
+    display.set_sealevel(parseFloat(menu_sealevel.value));
+}
+var menu_sealevel = document.getElementById("seaLevel");
+menu_sealevel.addEventListener("change", menu_sealevel_handler);
+//menu_sealevel.addEventListener("click", menu_sealevel_handler);
+menu_sealevel.addEventListener("input", menu_sealevel_handler);
+function menu_rivers_handler(event) {
+    display.set_rivers(parseFloat(menu_rivers.value));
+}
+var menu_rivers = document.getElementById("rivers");
+menu_rivers.addEventListener("change", menu_rivers_handler);
+//menu_rivers.addEventListener("click", menu_rivers_handler);
+menu_rivers.addEventListener("input", menu_rivers_handler);
+function menu_inspector_handler(event) {
+    display.scene.debugLayer.show({ embedMode: true });
+}
+var menu_inspector = document.getElementById("inspector");
+menu_inspector.addEventListener("click", menu_inspector_handler);
 document.getElementById('renderCanvas').focus();
 
 },{"./flowing_terrain":2,"babylonjs":1}],5:[function(require,module,exports){
