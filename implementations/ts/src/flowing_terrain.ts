@@ -107,27 +107,8 @@ export class Geography {
   }
 
   // Set seed heights on map to start the height generation algorithm at.
+  // These points will be at height===0.
   starting_points(): void {
-    // Make tiles around the edges of the map low seed points.
-    for(let x = 0; x < this.enviroment.tile_count; x += 2) {
-      const top = this.get_tile({x, y: 0});
-      top.height = 0;
-      this.open_set_sorted.push(top);
-
-      const bottom = this.get_tile({x, y: (this.enviroment.tile_count - 2)});
-      bottom.height = 0;
-      this.open_set_sorted.push(bottom);
-    }
-    for(let y = 0; y < this.enviroment.tile_count; y += 2) {
-      const top = this.get_tile({x: 0, y});
-      top.height = 0;
-      this.open_set_sorted.push(top);
-
-      const bottom = this.get_tile({x: (this.enviroment.tile_count - 2), y});
-      bottom.height = 0;
-      this.open_set_sorted.push(bottom);
-    }
-
     const sea = seed_points(this.enviroment.tile_count);
     for(let coord of sea) {
       const [x_str, y_str] = coord.split(",");
@@ -157,15 +138,6 @@ export class Geography {
 
     //this.enviroment.sealevel = this.enviroment.highest_point / (1.5 + Math.random() * 4);
     this.enviroment.sealevel = this.enviroment.highest_point / (1.5 + Math.random() * 10);
-
-    for(let y = 0; y < this.enviroment.tile_count; y += 2) {
-      for(let x = 0; x < this.enviroment.tile_count; x += 2) {
-        let tile = this.get_tile({x, y});
-        tile.height -= this.enviroment.sealevel;
-        //console.log(tile.toString());
-      }
-    }
-    this.enviroment.highest_point -= this.enviroment.sealevel;
   }
 
   // Calculate the number of uphill tiles draining into each tile on the
@@ -178,9 +150,7 @@ export class Geography {
         // If we don't consider the heights below sealevel we get isolated pools
         // along the coastline when drawing 3D views due to the averaging of
         // heights at the meeting points of tiles in the `diamond()` method.
-        if(tile.height > -this.enviroment.sealevel) {
-          this.open_set_sorted.push(tile);
-        }
+        this.open_set_sorted.push(tile);
       }
     }
 
@@ -188,6 +158,9 @@ export class Geography {
     this.enviroment.dampest = 0;
     while(this.open_set_sorted.length > 0) {
       const tile = this.open_set_sorted.pop();
+      if(tile.height === 0) {
+        continue;
+      }
       let lowest_neighbour: Tile = null;
       this.get_neighbours(tile, 2).forEach((neighbour) => {
         if(neighbour !== null && neighbour.height < tile.height) {
@@ -196,7 +169,7 @@ export class Geography {
           }
         }
       });
-      console.assert(lowest_neighbour !== null);
+      console.assert(lowest_neighbour !== null );
       lowest_neighbour.dampness += tile.dampness;
       tile.lowest_neighbour = lowest_neighbour;
 
@@ -241,7 +214,7 @@ export class Geography {
         const tiles_set = new Set(tiles);
         const drain_from: Array<Tile> = [];
         let drain_to: Tile = null;
-        let highest = -this.enviroment.sealevel;
+        let highest = -1;
         let lowest = this.enviroment.highest_point;
         let lowest_drain_from = this.enviroment.highest_point;
 
@@ -359,7 +332,7 @@ export class DisplayBase {
       for(let x = 0; x < this.enviroment.tile_count; x += 2) {
         const tile = this.geography.get_tile({x, y});
         this.draw_tile(tile);
-        this.draw_river(tile, tile.lowest_neighbour);
+        //this.draw_river(tile, tile.lowest_neighbour);
       }
     }
     this.draw_end();
