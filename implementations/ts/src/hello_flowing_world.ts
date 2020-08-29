@@ -89,10 +89,11 @@ class Display extends DisplayBase {
 
     for(let y = 0; y < this.enviroment.tile_count; y++) {
       for(let x = 0; x < this.enviroment.tile_count; x++) {
-        const tile = this.geography.get_tile({x, y});
-
         // TODO: Some of these positions are not actually used.
         // Tiles at the height of the seabed are not drawn.
+        // Not populating these at this time would make calculating indexes into
+        // the this.positions array much more challenging though.
+        const tile = this.geography.get_tile({x, y});
         this.positions.push(tile.pos.x * this.tile_size);
         this.positions.push(tile.height);
         this.positions.push(tile.pos.y * this.tile_size);
@@ -104,10 +105,15 @@ class Display extends DisplayBase {
   draw_tile(tile: Tile): void {
     const x = tile.pos.x;
     const y = tile.pos.y;
-    if( x < 1 || x >= this.enviroment.tile_count ||
-        y < 1 || y >= this.enviroment.tile_count) {
+    if( x < 0 || x >= this.enviroment.tile_count ||
+        y < 0 || y >= this.enviroment.tile_count) {
       return;
     }
+
+    // All vertex position information ahs already been entered into
+    // this.positions.
+    // Here we create polygons to add to the main mesh from indexes into
+    // this.positions.
 
     const offset00 = this.coordinate_to_index({x: x - 1, y: y - 1});
     const offset10 = this.coordinate_to_index({x: x + 0, y: y - 1});
@@ -128,41 +134,60 @@ class Display extends DisplayBase {
        (this.positions[offset02 * 3 + 1]) === 0 &&
        (this.positions[offset12 * 3 + 1]) === 0 &&
        (this.positions[offset22 * 3 + 1]) === 0) {
-      console.log();
+      // This tile is one of the seed points.
+      // Since it is flat, at the lowest height on the map (0) and otherwise
+      // uninteresting, lets not draw them separately. Instead we can just
+      // create a single large "seabed" tile later which spans the whole map.
       return;
     }
 
-    this.indices.push(offset11);
-    this.indices.push(offset00);
-    this.indices.push(offset10);
+    if(x >= 1 && y >=1) {
+      this.indices.push(offset11);
+      this.indices.push(offset00);
+      this.indices.push(offset10);
+    }
 
-    this.indices.push(offset11);
-    this.indices.push(offset10);
-    this.indices.push(offset20);
+    if(x <= this.enviroment.tile_count - 1 && y >= 1) {
+      this.indices.push(offset11);
+      this.indices.push(offset10);
+      this.indices.push(offset20);
+    }
 
-    this.indices.push(offset11);
-    this.indices.push(offset20);
-    this.indices.push(offset21);
+    if(x <= this.enviroment.tile_count - 1 && y >= 1) {
+      this.indices.push(offset11);
+      this.indices.push(offset20);
+      this.indices.push(offset21);
+    }
 
-    this.indices.push(offset11);
-    this.indices.push(offset21);
-    this.indices.push(offset22);
+    if(x <= this.enviroment.tile_count - 1 && y <= this.enviroment.tile_count - 1) {
+      this.indices.push(offset11);
+      this.indices.push(offset21);
+      this.indices.push(offset22);
+    }
 
-    this.indices.push(offset11);
-    this.indices.push(offset22);
-    this.indices.push(offset12);
+    if(x <= this.enviroment.tile_count - 1 && y <= this.enviroment.tile_count - 1) {
+      this.indices.push(offset11);
+      this.indices.push(offset22);
+      this.indices.push(offset12);
+    }
 
-    this.indices.push(offset11);
-    this.indices.push(offset12);
-    this.indices.push(offset02);
+    if(x >= 1 && y <= this.enviroment.tile_count - 1) {
+      this.indices.push(offset11);
+      this.indices.push(offset12);
+      this.indices.push(offset02);
+    }
 
-    this.indices.push(offset11);
-    this.indices.push(offset02);
-    this.indices.push(offset01);
+    if(x >= 1 && y <= this.enviroment.tile_count - 1) {
+      this.indices.push(offset11);
+      this.indices.push(offset02);
+      this.indices.push(offset01);
+    }
 
-    this.indices.push(offset11);
-    this.indices.push(offset01);
-    this.indices.push(offset00);
+    if(x >= 1 && y >= 1) {
+      this.indices.push(offset11);
+      this.indices.push(offset01);
+      this.indices.push(offset00);
+    }
   }
   
   // Draw river between 2 points.

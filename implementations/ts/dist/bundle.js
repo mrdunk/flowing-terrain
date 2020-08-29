@@ -63,7 +63,7 @@ var Enviroment = function Enviroment() {
     _classCallCheck(this, Enviroment);
 
     this.highest_point = 0;
-    this.sealevel = 0;
+    this.sealevel = 1;
     this.dampest = 0;
     this.tile_count = 100;
 };
@@ -207,8 +207,6 @@ var Geography = function () {
             while (this.open_set_sorted.length) {
                 _loop();
             }
-            //this.enviroment.sealevel = this.enviroment.highest_point / (1.5 + Math.random() * 4);
-            this.enviroment.sealevel = this.enviroment.highest_point / (1.5 + Math.random() * 10);
         }
         // Calculate the number of uphill tiles draining into each tile on the
         // map. High tile.dampness values indicate a river runs through that tile.
@@ -222,9 +220,11 @@ var Geography = function () {
             for (var y = 0; y < this.enviroment.tile_count; y += 2) {
                 for (var x = 0; x < this.enviroment.tile_count; x += 2) {
                     var _tile = this.get_tile({ x: x, y: y });
-                    // If we don't consider the heights below sealevel we get isolated pools
-                    // along the coastline when drawing 3D views due to the averaging of
-                    // heights at the meeting points of tiles in the `diamond()` method.
+                    // Note:
+                    // If we don't consider the heights below sealevel as well we get
+                    // isolated pools along the coastline when drawing 3D views due to the
+                    // averaging of heights at the meeting points of tiles in the
+                    // `diamond()` method.
                     this.open_set_sorted.push(_tile);
                 }
             }
@@ -677,9 +677,11 @@ var Display = function (_flowing_terrain_1$Di) {
             console.assert(this.rivers.length === 0);
             for (var y = 0; y < this.enviroment.tile_count; y++) {
                 for (var x = 0; x < this.enviroment.tile_count; x++) {
-                    var tile = this.geography.get_tile({ x: x, y: y });
                     // TODO: Some of these positions are not actually used.
                     // Tiles at the height of the seabed are not drawn.
+                    // Not populating these at this time would make calculating indexes into
+                    // the this.positions array much more challenging though.
+                    var tile = this.geography.get_tile({ x: x, y: y });
                     this.positions.push(tile.pos.x * this.tile_size);
                     this.positions.push(tile.height);
                     this.positions.push(tile.pos.y * this.tile_size);
@@ -693,9 +695,13 @@ var Display = function (_flowing_terrain_1$Di) {
         value: function draw_tile(tile) {
             var x = tile.pos.x;
             var y = tile.pos.y;
-            if (x < 1 || x >= this.enviroment.tile_count || y < 1 || y >= this.enviroment.tile_count) {
+            if (x < 0 || x >= this.enviroment.tile_count || y < 0 || y >= this.enviroment.tile_count) {
                 return;
             }
+            // All vertex position information ahs already been entered into
+            // this.positions.
+            // Here we create polygons to add to the main mesh from indexes into
+            // this.positions.
             var offset00 = this.coordinate_to_index({ x: x - 1, y: y - 1 });
             var offset10 = this.coordinate_to_index({ x: x + 0, y: y - 1 });
             var offset20 = this.coordinate_to_index({ x: x + 1, y: y - 1 });
@@ -706,33 +712,52 @@ var Display = function (_flowing_terrain_1$Di) {
             var offset12 = this.coordinate_to_index({ x: x + 0, y: y + 1 });
             var offset22 = this.coordinate_to_index({ x: x + 1, y: y + 1 });
             if (this.positions[offset00 * 3 + 1] === 0 && this.positions[offset10 * 3 + 1] === 0 && this.positions[offset20 * 3 + 1] === 0 && this.positions[offset01 * 3 + 1] === 0 && this.positions[offset11 * 3 + 1] === 0 && this.positions[offset21 * 3 + 1] === 0 && this.positions[offset02 * 3 + 1] === 0 && this.positions[offset12 * 3 + 1] === 0 && this.positions[offset22 * 3 + 1] === 0) {
-                console.log();
+                // This tile is one of the seed points.
+                // Since it is flat, at the lowest height on the map (0) and otherwise
+                // uninteresting, lets not draw them separately. Instead we can just
+                // create a single large "seabed" tile later which spans the whole map.
                 return;
             }
-            this.indices.push(offset11);
-            this.indices.push(offset00);
-            this.indices.push(offset10);
-            this.indices.push(offset11);
-            this.indices.push(offset10);
-            this.indices.push(offset20);
-            this.indices.push(offset11);
-            this.indices.push(offset20);
-            this.indices.push(offset21);
-            this.indices.push(offset11);
-            this.indices.push(offset21);
-            this.indices.push(offset22);
-            this.indices.push(offset11);
-            this.indices.push(offset22);
-            this.indices.push(offset12);
-            this.indices.push(offset11);
-            this.indices.push(offset12);
-            this.indices.push(offset02);
-            this.indices.push(offset11);
-            this.indices.push(offset02);
-            this.indices.push(offset01);
-            this.indices.push(offset11);
-            this.indices.push(offset01);
-            this.indices.push(offset00);
+            if (x >= 1 && y >= 1) {
+                this.indices.push(offset11);
+                this.indices.push(offset00);
+                this.indices.push(offset10);
+            }
+            if (x <= this.enviroment.tile_count - 1 && y >= 1) {
+                this.indices.push(offset11);
+                this.indices.push(offset10);
+                this.indices.push(offset20);
+            }
+            if (x <= this.enviroment.tile_count - 1 && y >= 1) {
+                this.indices.push(offset11);
+                this.indices.push(offset20);
+                this.indices.push(offset21);
+            }
+            if (x <= this.enviroment.tile_count - 1 && y <= this.enviroment.tile_count - 1) {
+                this.indices.push(offset11);
+                this.indices.push(offset21);
+                this.indices.push(offset22);
+            }
+            if (x <= this.enviroment.tile_count - 1 && y <= this.enviroment.tile_count - 1) {
+                this.indices.push(offset11);
+                this.indices.push(offset22);
+                this.indices.push(offset12);
+            }
+            if (x >= 1 && y <= this.enviroment.tile_count - 1) {
+                this.indices.push(offset11);
+                this.indices.push(offset12);
+                this.indices.push(offset02);
+            }
+            if (x >= 1 && y <= this.enviroment.tile_count - 1) {
+                this.indices.push(offset11);
+                this.indices.push(offset02);
+                this.indices.push(offset01);
+            }
+            if (x >= 1 && y >= 1) {
+                this.indices.push(offset11);
+                this.indices.push(offset01);
+                this.indices.push(offset00);
+            }
         }
         // Draw river between 2 points.
 
