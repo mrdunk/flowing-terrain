@@ -1,6 +1,6 @@
 # TLDR
-Web version:
-https://mrdunk.github.io/flowing-terrain/implementations/ts/dist/flowing_terrain.html
+Web version:  
+https://mrdunk.github.io/flowing-terrain/implementations/ts/dist/flowing_terrain.html  
 Mouse and cursor keys to move around.
 
 # flowing-terrain
@@ -54,13 +54,13 @@ at heights determined by this algorithm without blocking rivers is a bit harder
 than it would first appear.
 
 ### Python
-`./implementations/python/map.py`
+`./implementations/python/map.py`  
 This example code written in Python3 and was my first proof of concept after
-realising this approach would work.
-It is not heavily optimized; I wrote and tested it in 2 evenings.
-It requires the following libraries to be installed:
-https://pyglet.readthedocs.io/en/latest/index.html
-http://www.grantjenks.com/docs/sortedcontainers/sortedset.html
+realising this approach would work.  
+It is not heavily optimized; I wrote and tested it in 2 evenings.  
+It requires the following libraries to be installed:  
+https://pyglet.readthedocs.io/en/latest/index.html  
+http://www.grantjenks.com/docs/sortedcontainers/sortedset.html  
 
 On my Ubuntu system the following installs these:
 ```
@@ -73,14 +73,14 @@ deliberately lower a random number of points on the map to create more
 interesting land. This will result in some large, sea-level lakes.
 
 ### Typescript
-`./implementations/ts/`
-I also created a nice Web version so people can play without installing.
-There's a compiled version here:
-https://mrdunk.github.io/flowing-terrain/implementations/ts/dist/flowing_terrain.html
+`./implementations/ts/`  
+I also created a nice Web version so people can play without installing.  
+There's a compiled version here:  
+https://mrdunk.github.io/flowing-terrain/implementations/ts/dist/flowing_terrain.html  
 Mouse and cursor keys to move around.
 
 I'll presume anyone wanting to build this for themselves can make use of the
-`npm` and `gulp` config files in that directory.
+`npm` and `gulp` config files in that directory.  
 Otherwise raise a bug and i'll try my best but i'm not particularly proficient with
 Typescript and Web technology in general.
 
