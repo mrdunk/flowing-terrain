@@ -37,7 +37,7 @@ export interface Coordinate {
 // State to be shared between all classes.
 class Enviroment {
   highest_point: number = 0;
-  sealevel: number = 0;
+  sealevel: number = 1;
   dampest: number = 0;
   tile_count: number = 100;
 }
@@ -135,9 +135,6 @@ export class Geography {
         }
       });
     }
-
-    //this.enviroment.sealevel = this.enviroment.highest_point / (1.5 + Math.random() * 4);
-    this.enviroment.sealevel = this.enviroment.highest_point / (1.5 + Math.random() * 10);
   }
 
   // Calculate the number of uphill tiles draining into each tile on the
@@ -147,9 +144,11 @@ export class Geography {
     for(let y = 0; y < this.enviroment.tile_count; y += 2) {
       for(let x = 0; x < this.enviroment.tile_count; x += 2) {
         const tile = this.get_tile({x, y});
-        // If we don't consider the heights below sealevel we get isolated pools
-        // along the coastline when drawing 3D views due to the averaging of
-        // heights at the meeting points of tiles in the `diamond()` method.
+        // Note:
+        // If we don't consider the heights below sealevel as well we get
+        // isolated pools along the coastline when drawing 3D views due to the
+        // averaging of heights at the meeting points of tiles in the
+        // `diamond()` method.
         this.open_set_sorted.push(tile);
       }
     }

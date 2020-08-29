@@ -1,3 +1,8 @@
+# TLDR
+Web version:  
+https://mrdunk.github.io/flowing-terrain/implementations/ts/dist/flowing_terrain.html  
+Mouse and cursor keys to move around.
+
 # flowing-terrain
 This project is intended to document a simple algorithm for creating 3
 dimensional terrain maps and their likely watercourses.
@@ -41,11 +46,21 @@ neighbour. Larger drainage indexes indicate more upstream tiles have drained
 into this one.
 
 ## The code:
-The example code written in Python3.
-It is not heavily optimized; I wrote and tested it in 2 evenings.
-It requires the following libraries to be installed:
-https://pyglet.readthedocs.io/en/latest/index.html
-http://www.grantjenks.com/docs/sortedcontainers/sortedset.html
+If you just want to understand how the algorithm works, i recommend looking at
+the `./implementations/python/map.py` code.
+If you want to see some of the issues you'll run into if you implement this in
+3d, Look at the Typescript example. TLDR: Creating polygon faces between points
+at heights determined by this algorithm without blocking rivers is a bit harder
+than it would first appear.
+
+### Python
+`./implementations/python/map.py`  
+This example code written in Python3 and was my first proof of concept after
+realising this approach would work.  
+It is not heavily optimized; I wrote and tested it in 2 evenings.  
+It requires the following libraries to be installed:  
+https://pyglet.readthedocs.io/en/latest/index.html  
+http://www.grantjenks.com/docs/sortedcontainers/sortedset.html  
 
 On my Ubuntu system the following installs these:
 ```
@@ -53,16 +68,21 @@ On my Ubuntu system the following installs these:
 # pip3 install pyglet --user
 ```
 
-You have a choice of a static 2D map: `map.py` or a 3D view: `map_3d.py`.
-(In the 3D view, use mouse to look around, cursor keys to move and [SHIFT] with
- cursor keys to change height.)
+Disclaimer: I promised you "no lakes/basins/lowbits/etc" but in this example i
+deliberately lower a random number of points on the map to create more
+interesting land. This will result in some large, sea-level lakes.
 
-If you just want to understand how the algorithm works, i recommend looking at
-the `map.py` code.
-If you want to run the code and view the results, `map_3d.py` is more fun.
+### Typescript
+`./implementations/ts/`  
+I also created a nice Web version so people can play without installing.  
+There's a compiled version here:  
+https://mrdunk.github.io/flowing-terrain/implementations/ts/dist/flowing_terrain.html  
+Mouse and cursor keys to move around.
 
-Disclaimer: I promised you "no lakes/basins/lowbits/etc" but in the code i
-deliberately lower a random number of points to create more interesting land.
+I'll presume anyone wanting to build this for themselves can make use of the
+`npm` and `gulp` config files in that directory.  
+Otherwise raise a bug and i'll try my best but i'm not particularly proficient with
+Typescript and Web technology in general.
 
 ## The heights algorithm:
 The main algorithm is run first and generates the height map of the terrain. The
@@ -129,6 +149,5 @@ with a higher value.
 ## Some more screenshots:
 ![lizard](https://github.com/mrdunk/flowing-terrain/blob/master/assets/lizard.png)
 ![lagoon](https://github.com/mrdunk/flowing-terrain/blob/master/assets/lagoon.png)
-![3d_downhill_to_the_sea](https://github.com/mrdunk/flowing-terrain/blob/master/assets/3d_downhill_to_the_sea.png)
-![3d_mountain_top](https://github.com/mrdunk/flowing-terrain/blob/master/assets/3d_mountain_top.png)
-![3d_watersheds](https://github.com/mrdunk/flowing-terrain/blob/master/assets/3d_watersheds.png)
+![web_island1](https://github.com/mrdunk/flowing-terrain/blob/master/assets/web1.png)
+![web_island2](https://github.com/mrdunk/flowing-terrain/blob/master/assets/web2.png)
