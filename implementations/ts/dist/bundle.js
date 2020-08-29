@@ -865,7 +865,7 @@ var Display = function (_flowing_terrain_1$Di) {
             // so length will be different.
             this.schedule_update_rivers();
         }
-        // Set what Tile.dampness value to display rivers at.
+        // Set what Tile.dampness value to display rivers at and schedule a re-draw.
 
     }, {
         key: "set_rivers",
@@ -874,8 +874,9 @@ var Display = function (_flowing_terrain_1$Di) {
             console.log("set_rivers", value, this.geography.enviroment.dampest);
             this.schedule_update_rivers();
         }
-        // Delete existing rivers mesh and replace with one up to date for the current
-        // river_threshold and sealevel values.
+        // Since the `update_rivers()` method is quite CPU intensive, let's not
+        // run it for every small update.
+        // Every ~100ms will be good enough.
 
     }, {
         key: "schedule_update_rivers",
@@ -888,6 +889,9 @@ var Display = function (_flowing_terrain_1$Di) {
                 }, 100);
             }
         }
+        // Delete existing rivers mesh and replace with one up to date for the current
+        // river_threshold and sealevel values.
+
     }, {
         key: "update_rivers",
         value: function update_rivers() {

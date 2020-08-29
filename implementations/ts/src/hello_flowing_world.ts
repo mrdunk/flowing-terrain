@@ -315,15 +315,16 @@ class Display extends DisplayBase {
     this.schedule_update_rivers();
   }
 
-  // Set what Tile.dampness value to display rivers at.
+  // Set what Tile.dampness value to display rivers at and schedule a re-draw.
   set_rivers(value: number): void {
     this.river_threshold = value;
     console.log("set_rivers", value, this.geography.enviroment.dampest);
     this.schedule_update_rivers();
   }
 
-  // Delete existing rivers mesh and replace with one up to date for the current
-  // river_threshold and sealevel values.
+  // Since the `update_rivers()` method is quite CPU intensive, let's not
+  // run it for every small update.
+  // Every ~100ms will be good enough.
   schedule_update_rivers(): void {
     if(this.update_rivers_timer === 0) {
       this.update_rivers_timer = setTimeout(() => {
@@ -332,6 +333,8 @@ class Display extends DisplayBase {
     }
   }
 
+  // Delete existing rivers mesh and replace with one up to date for the current
+  // river_threshold and sealevel values.
   update_rivers(): void {
     console.log("update_rivers", this.update_rivers_timer);
     this.update_rivers_timer = 0;
