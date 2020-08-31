@@ -65,7 +65,7 @@ var Enviroment = function Enviroment() {
     this.highest_point = 0;
     this.sealevel = 1;
     this.dampest = 0;
-    this.tile_count = 100;
+    this.tile_count = 300;
 };
 // A single point on the map.
 
@@ -415,11 +415,8 @@ exports.Geography = Geography;
 // Example to iterate over a Geography object.
 
 var DisplayBase = function () {
-    function DisplayBase(geography) {
+    function DisplayBase() {
         _classCallCheck(this, DisplayBase);
-
-        this.geography = geography;
-        this.enviroment = geography.enviroment;
     }
     // Access all points in Geography and call `draw_tile(...)` method on each.
 
@@ -427,6 +424,8 @@ var DisplayBase = function () {
     _createClass(DisplayBase, [{
         key: "draw",
         value: function draw() {
+            this.geography = new Geography();
+            this.enviroment = this.geography.enviroment;
             this.draw_start();
             for (var y = 0; y < this.enviroment.tile_count; y += 2) {
                 for (var x = 0; x < this.enviroment.tile_count; x += 2) {
@@ -652,10 +651,10 @@ var flowing_terrain_1 = require("./flowing_terrain");
 var Display = function (_flowing_terrain_1$Di) {
     _inherits(Display, _flowing_terrain_1$Di);
 
-    function Display(geography) {
+    function Display() {
         _classCallCheck(this, Display);
 
-        var _this = _possibleConstructorReturn(this, (Display.__proto__ || Object.getPrototypeOf(Display)).call(this, geography));
+        var _this = _possibleConstructorReturn(this, (Display.__proto__ || Object.getPrototypeOf(Display)).call(this));
 
         _this.tile_size = 1;
         _this.river_threshold = 3;
@@ -664,24 +663,32 @@ var Display = function (_flowing_terrain_1$Di) {
         _this.normals = [];
         _this.rivers = [];
         _this.update_rivers_timer = 0;
-        var mapsize = _this.tile_size * _this.enviroment.tile_count;
         var renderCanvas = document.getElementById("renderCanvas");
         _this.engine = new BABYLON.Engine(renderCanvas, true);
         _this.scene = new BABYLON.Scene(_this.engine);
-        _this.camera = new BABYLON.UniversalCamera("UniversalCamera", new BABYLON.Vector3(-mapsize / 4, mapsize / 4, -mapsize / 4),
-        //new BABYLON.Vector3(mapsize / 2, mapsize, mapsize / 2),
-        _this.scene);
-        _this.camera.checkCollisions = true;
-        _this.camera.ellipsoid = new BABYLON.Vector3(0.5, 0.5, 0.5);
-        _this.camera.attachControl(renderCanvas);
-        _this.camera.updateUpVectorFromRotation = true;
-        var light_1 = new BABYLON.HemisphericLight("light_1", new BABYLON.Vector3(1, 0.5, 0), _this.scene);
-        light_1.diffuse = new BABYLON.Color3(1, 0, 1);
-        light_1.specular = new BABYLON.Color3(0, 0, 0);
-        var light_2 = new BABYLON.HemisphericLight("light_2", new BABYLON.Vector3(0, 0.5, 1), _this.scene);
-        light_2.diffuse = new BABYLON.Color3(0, 1, 1);
-        light_2.specular = new BABYLON.Color3(0.3, 0.3, 0.3);
-        _this.scene.ambientColor = new BABYLON.Color3(0.2, 0.2, 0.3);
+        _this.camera = new BABYLON.UniversalCamera("UniversalCamera", new BABYLON.Vector3(0, 0, 0), _this.scene);
+        // Hide the HTML loader.
+        document.getElementById("loader").style.display = "none";
+        // Display Babylon progress indicator
+        _this.engine.displayLoadingUI();
+        setTimeout(function () {
+            _this.geography = new flowing_terrain_1.Geography();
+            _this.enviroment = _this.geography.enviroment;
+            var mapsize = _this.tile_size * _this.enviroment.tile_count;
+            _this.camera.position = new BABYLON.Vector3(-mapsize / 4, mapsize / 4, -mapsize / 4);
+            _this.camera.checkCollisions = true;
+            _this.camera.ellipsoid = new BABYLON.Vector3(0.5, 0.5, 0.5);
+            _this.camera.attachControl(renderCanvas);
+            _this.camera.updateUpVectorFromRotation = true;
+            var light_1 = new BABYLON.HemisphericLight("light_1", new BABYLON.Vector3(1, 0.5, 0), _this.scene);
+            light_1.diffuse = new BABYLON.Color3(1, 0, 1);
+            light_1.specular = new BABYLON.Color3(0, 0, 0);
+            var light_2 = new BABYLON.HemisphericLight("light_2", new BABYLON.Vector3(0, 0.5, 1), _this.scene);
+            light_2.diffuse = new BABYLON.Color3(0, 1, 1);
+            light_2.specular = new BABYLON.Color3(0.3, 0.3, 0.3);
+            _this.scene.ambientColor = new BABYLON.Color3(0.2, 0.2, 0.3);
+            _this.draw();
+        }, 0);
         return _this;
     }
     // Move camera to overhead view. Middle of map, looking straight down.
@@ -887,6 +894,8 @@ var Display = function (_flowing_terrain_1$Di) {
             this.sea_mesh.checkCollisions = false;
             this.set_sealevel(this.enviroment.sealevel);
             this.camera.setTarget(new BABYLON.Vector3(mapsize / 2, 0, mapsize / 2));
+            // hide progress indicator
+            this.engine.hideLoadingUI();
         }
         // Move the height of the sea mesh on the Z axis.
 
@@ -954,9 +963,7 @@ var Display = function (_flowing_terrain_1$Di) {
     return Display;
 }(flowing_terrain_1.DisplayBase);
 
-var geography = new flowing_terrain_1.Geography();
-var display = new Display(geography);
-display.draw();
+var display = new Display();
 display.engine.runRenderLoop(function () {
     display.scene.render();
 });

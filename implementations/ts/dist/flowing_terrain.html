@@ -47,6 +47,23 @@
               animation-duration: 2s;
               display: none;
             }
+
+            #loader {
+              position: relative;
+              height: 100%;
+            }
+            #loader_content {
+              width: 200px;
+              height: 50px;
+              background-color: green;
+              display: block;
+              text-align: center;
+              font-size: xx-large;
+              position: absolute;
+              top: 50%;
+              left: 50%;
+              margin: -25px 0 0 -25px;
+            }
     </style>
   </head>
   <body>
@@ -79,6 +96,7 @@
         </div>
       </div>
     </div>
+    <div id="loader"><div id="loader_content">Loading...</div></div>
     <canvas id="renderCanvas" touch-action="none"></canvas>
     <script src="bundle.js"></script>
   </body>
