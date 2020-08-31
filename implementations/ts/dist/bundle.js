@@ -262,6 +262,25 @@ var Geography = function () {
         // Use Diamond-Square algorithm to fill intermediate heights for corners of
         // map tiles when drawing in 3D.
         // https://en.wikipedia.org/wiki/Diamond-square_algorithm
+        //
+        // This is needed because when we come to tile the 3D mesh triangle edges do
+        // not always run between a point and it's lowest neighbour.
+        // Consider the points:
+        // A B
+        // C D
+        //
+        // A.height = 2
+        // B.height = 2
+        // C.height = 2
+        // D.height = 2
+        //
+        // Note that:
+        // Point "A" has the lowest neighbour "D".
+        // Point "B" and "C" have the same height as "A".
+        //
+        // If we tile this section in 2 triangles: "ABC" and "BCD", the triangle "ABC"
+        // will be a parallel to the horizontal plane and be at height === 2.
+        // This will obscure any river drawn directly between "A" and "D".
 
     }, {
         key: "diamond",
@@ -340,6 +359,8 @@ var Geography = function () {
         // tiling. https://en.wikipedia.org/wiki/Diamond-square_algorithm
         // This is not the "classic" square stage as we only need to consider
         // the original heights, not those calculated in the "diamond" stage.
+        //
+        // See explanation in comment for `diamond()` function why this is required.
 
     }, {
         key: "square",
@@ -518,6 +539,7 @@ function compare_floods(a, b) {
 function seed_points(tile_count) {
     var sea = new Set();
     var open = new ordered_set_1.SortedSet([], compare_floods);
+    // Edge tiles on map should always be seed points.
     for (var x = 0; x < tile_count; x += 2) {
         var dx = Math.abs(x - tile_count / 2);
         var dy = tile_count / 2;
@@ -652,6 +674,7 @@ var Display = function (_flowing_terrain_1$Di) {
         _this.camera.checkCollisions = true;
         _this.camera.ellipsoid = new BABYLON.Vector3(0.5, 0.5, 0.5);
         _this.camera.attachControl(renderCanvas);
+        _this.camera.updateUpVectorFromRotation = true;
         var light_1 = new BABYLON.HemisphericLight("light_1", new BABYLON.Vector3(1, 0.5, 0), _this.scene);
         light_1.diffuse = new BABYLON.Color3(1, 0, 1);
         light_1.specular = new BABYLON.Color3(0, 0, 0);
@@ -661,8 +684,21 @@ var Display = function (_flowing_terrain_1$Di) {
         _this.scene.ambientColor = new BABYLON.Color3(0.2, 0.2, 0.3);
         return _this;
     }
+    // Move camera to overhead view. Middle of map, looking straight down.
+
 
     _createClass(Display, [{
+        key: "overhead_view",
+        value: function overhead_view() {
+            var mapsize = this.tile_size * this.enviroment.tile_count;
+            var position = new BABYLON.Vector3(mapsize / 2, mapsize, mapsize / 2);
+            var rotation = new BABYLON.Vector3(Math.PI / 2, Math.PI, 0.001);
+            var ease = new BABYLON.CubicEase();
+            ease.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEINOUT);
+            BABYLON.Animation.CreateAndStartAnimation("camPos", this.camera, "position", 10, 10, this.camera.position, position, 0, ease);
+            BABYLON.Animation.CreateAndStartAnimation("camRot", this.camera, "rotation", 10, 10, this.camera.rotation, rotation, 0, ease);
+        }
+    }, {
         key: "coordinate_to_index",
         value: function coordinate_to_index(coordinate) {
             return coordinate.y * this.enviroment.tile_count + coordinate.x;
@@ -952,6 +988,11 @@ var menu_rivers = document.getElementById("rivers");
 menu_rivers.addEventListener("change", menu_rivers_handler);
 //menu_rivers.addEventListener("click", menu_rivers_handler);
 menu_rivers.addEventListener("input", menu_rivers_handler);
+function menu_overhead_view(event) {
+    display.overhead_view();
+}
+var overhead_view = document.getElementById("overhead_view");
+overhead_view.addEventListener("click", menu_overhead_view);
 function menu_inspector_handler(event) {
     display.scene.debugLayer.show({ embedMode: true });
 }

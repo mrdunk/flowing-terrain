@@ -183,6 +183,25 @@ export class Geography {
   // Use Diamond-Square algorithm to fill intermediate heights for corners of
   // map tiles when drawing in 3D.
   // https://en.wikipedia.org/wiki/Diamond-square_algorithm
+  //
+  // This is needed because when we come to tile the 3D mesh triangle edges do
+  // not always run between a point and it's lowest neighbour.
+  // Consider the points:
+  // A B
+  // C D
+  //
+  // A.height = 2
+  // B.height = 2
+  // C.height = 2
+  // D.height = 2
+  //
+  // Note that:
+  // Point "A" has the lowest neighbour "D".
+  // Point "B" and "C" have the same height as "A".
+  //
+  // If we tile this section in 2 triangles: "ABC" and "BCD", the triangle "ABC"
+  // will be a parallel to the horizontal plane and be at height === 2.
+  // This will obscure any river drawn directly between "A" and "D".
   diamond(): void {
     for(let y = 1; y < this.enviroment.tile_count; y += 2) {
       for(let x = 1; x < this.enviroment.tile_count; x += 2) {
@@ -257,6 +276,8 @@ export class Geography {
   // tiling. https://en.wikipedia.org/wiki/Diamond-square_algorithm
   // This is not the "classic" square stage as we only need to consider
   // the original heights, not those calculated in the "diamond" stage.
+  //
+  // See explanation in comment for `diamond()` function why this is required.
   square(): void {
     for(let y = 0; y <= this.enviroment.tile_count; y += 2) {
       for(let x = 0; x <= this.enviroment.tile_count; x += 2) {
