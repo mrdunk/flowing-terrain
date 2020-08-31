@@ -44,38 +44,52 @@ class Display extends DisplayBase {
   scene: BABYLON.Scene;
   camera: BABYLON.UniversalCamera;
 
-  constructor(geography: Geography) {
-    super(geography);
-    const mapsize = this.tile_size * this.enviroment.tile_count;
+  constructor() {
+    super();
 
     const renderCanvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
     this.engine = new BABYLON.Engine(renderCanvas, true);
     this.scene = new BABYLON.Scene(this.engine);
     this.camera = new BABYLON.UniversalCamera(
       "UniversalCamera",
-      new BABYLON.Vector3(-mapsize / 4, mapsize / 4, -mapsize / 4),
-      //new BABYLON.Vector3(mapsize / 2, mapsize, mapsize / 2),
+      new BABYLON.Vector3(0, 0, 0),
       this.scene);
-    this.camera.checkCollisions = true;
-    this.camera.ellipsoid = new BABYLON.Vector3(0.5, 0.5, 0.5);
-    this.camera.attachControl(renderCanvas);
-    this.camera.updateUpVectorFromRotation = true;
 
-    const light_1 = new BABYLON.HemisphericLight(
-      "light_1",
-      new BABYLON.Vector3(1, 0.5, 0),
-      this.scene);
-    light_1.diffuse = new BABYLON.Color3(1, 0, 1);
-    light_1.specular = new BABYLON.Color3(0, 0, 0);
+    // Hide the HTML loader.
+    document.getElementById("loader").style.display = "none";
+    // Display Babylon progress indicator
+    this.engine.displayLoadingUI();
 
-    const light_2 = new BABYLON.HemisphericLight(
-      "light_2",
-      new BABYLON.Vector3(0, 0.5, 1),
-      this.scene);
-    light_2.diffuse = new BABYLON.Color3(0, 1, 1);
-    light_2.specular = new BABYLON.Color3(0.3, 0.3, 0.3);
+    // Yield the main thread to allow progress indicator to get scheduled.
+    setTimeout(() => {
+      this.geography = new Geography();
+      this.enviroment = this.geography.enviroment;
 
-    this.scene.ambientColor = new BABYLON.Color3(0.2, 0.2, 0.3);
+      const mapsize = this.tile_size * this.enviroment.tile_count;
+      this.camera.position = new BABYLON.Vector3(-mapsize / 4, mapsize / 4, -mapsize / 4);
+      this.camera.checkCollisions = true;
+      this.camera.ellipsoid = new BABYLON.Vector3(0.5, 0.5, 0.5);
+      this.camera.attachControl(renderCanvas);
+      this.camera.updateUpVectorFromRotation = true;
+
+      const light_1 = new BABYLON.HemisphericLight(
+        "light_1",
+        new BABYLON.Vector3(1, 0.5, 0),
+        this.scene);
+      light_1.diffuse = new BABYLON.Color3(1, 0, 1);
+      light_1.specular = new BABYLON.Color3(0, 0, 0);
+
+      const light_2 = new BABYLON.HemisphericLight(
+        "light_2",
+        new BABYLON.Vector3(0, 0.5, 1),
+        this.scene);
+      light_2.diffuse = new BABYLON.Color3(0, 1, 1);
+      light_2.specular = new BABYLON.Color3(0.3, 0.3, 0.3);
+
+      this.scene.ambientColor = new BABYLON.Color3(0.2, 0.2, 0.3);
+
+      this.draw();
+    }, 0);
   }
 
   // Move camera to overhead view. Middle of map, looking straight down.
@@ -317,6 +331,9 @@ class Display extends DisplayBase {
     this.set_sealevel(this.enviroment.sealevel);
 
     this.camera.setTarget(new BABYLON.Vector3(mapsize / 2, 0, mapsize / 2));
+
+    // hide progress indicator
+		this.engine.hideLoadingUI();
   }
 
   // Move the height of the sea mesh on the Z axis.
@@ -374,9 +391,7 @@ class Display extends DisplayBase {
   }
 }
 
-const geography = new Geography();
-const display = new Display(geography);
-display.draw();
+const display = new Display();
 
 display.engine.runRenderLoop(() => {
   display.scene.render();

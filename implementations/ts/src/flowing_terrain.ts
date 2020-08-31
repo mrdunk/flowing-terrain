@@ -340,13 +340,14 @@ export class DisplayBase {
   geography: Geography;
   enviroment: Enviroment;
 
-  constructor(geography: Geography) {
-    this.geography = geography;
-    this.enviroment = geography.enviroment;
+  constructor() {
   }
 
   // Access all points in Geography and call `draw_tile(...)` method on each.
   draw(): void {
+    this.geography = new Geography();
+    this.enviroment = this.geography.enviroment;
+
     this.draw_start();
     for(let y = 0; y < this.enviroment.tile_count; y += 2) {
       for(let x = 0; x < this.enviroment.tile_count; x += 2) {
