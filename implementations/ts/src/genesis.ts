@@ -77,6 +77,7 @@ export function seed_points(tile_count: number): Set<string> {
   const sea: Set<string> = new Set();
   const open: SortedSet = new SortedSet([], compare_floods);
 
+  // Edge tiles on map should always be seed points.
   for(let x = 0; x < tile_count; x += 2){
     let dx = Math.abs(x - tile_count / 2);
     let dy = tile_count / 2;
@@ -95,7 +96,7 @@ export function seed_points(tile_count: number): Set<string> {
 
     let x = 0;
     open.push(new Flood({x, y}, dist_from_center));
-    
+
     x = tile_count -2;
     open.push(new Flood({x, y}, dist_from_center));
   }

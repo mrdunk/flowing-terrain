@@ -59,6 +59,7 @@ class Display extends DisplayBase {
     this.camera.checkCollisions = true;
     this.camera.ellipsoid = new BABYLON.Vector3(0.5, 0.5, 0.5);
     this.camera.attachControl(renderCanvas);
+    this.camera.updateUpVectorFromRotation = true;
 
     const light_1 = new BABYLON.HemisphericLight(
       "light_1",
@@ -76,11 +77,26 @@ class Display extends DisplayBase {
 
     this.scene.ambientColor = new BABYLON.Color3(0.2, 0.2, 0.3);
   }
-  
+
+  // Move camera to overhead view. Middle of map, looking straight down.
+  overhead_view() {
+    const mapsize = this.tile_size * this.enviroment.tile_count;
+    const position = new BABYLON.Vector3(mapsize / 2, mapsize, mapsize / 2);
+    const rotation = new BABYLON.Vector3(Math.PI / 2, Math.PI, 0.001);
+
+    var ease = new BABYLON.CubicEase();
+    ease.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEINOUT);
+
+    BABYLON.Animation.CreateAndStartAnimation(
+      "camPos", this.camera, "position", 10, 10, this.camera.position, position, 0, ease);
+    BABYLON.Animation.CreateAndStartAnimation(
+      "camRot", this.camera, "rotation", 10, 10, this.camera.rotation, rotation, 0, ease);
+  }
+
   coordinate_to_index(coordinate: Coordinate): number {
     return (coordinate.y * this.enviroment.tile_count + coordinate.x);
   }
-  
+
   // Called before iteration through map's points.
   draw_start(): void {
     console.assert(this.positions.length === 0)
@@ -189,7 +205,7 @@ class Display extends DisplayBase {
       this.indices.push(offset00);
     }
   }
-  
+
   // Draw river between 2 points.
   draw_river(highest: Tile, lowest: Tile): void {
     const sealevel = this.enviroment.sealevel;
@@ -209,13 +225,13 @@ class Display extends DisplayBase {
 
     const mid = this.geography.get_tile(
       {x: (highest.pos.x + lowest.pos.x) / 2, y: (highest.pos.y + lowest.pos.y) / 2});
-    
+
     // Prove river is indeed flowing down hill.
     console.assert( highest.height >= mid.height, {errormessage: "river flows uphill"});
     console.assert( mid.height >= lowest.height, {errormessage: "river flows uphill"});
 
     const river: Array<BABYLON.Vector3> = [];
-    
+
     // River section from highest to mid-point.
     river.push(new BABYLON.Vector3(
       highest.pos.x * this.tile_size, highest.height + offset, highest.pos.y * this.tile_size));
@@ -283,7 +299,7 @@ class Display extends DisplayBase {
 
     // Rivers
     this.set_rivers(3);
-    
+
     // Generate seabed.
     const mapsize = this.tile_size * this.enviroment.tile_count;
     const seabed = BABYLON.MeshBuilder.CreateGround(
@@ -401,10 +417,17 @@ menu_rivers.addEventListener("change", menu_rivers_handler);
 //menu_rivers.addEventListener("click", menu_rivers_handler);
 menu_rivers.addEventListener("input", menu_rivers_handler);
 
+function menu_overhead_view(event: Event) {
+  display.overhead_view();
+}
+const overhead_view = document.getElementById("overhead_view") as HTMLInputElement;
+overhead_view.addEventListener("click", menu_overhead_view);
+
 function menu_inspector_handler(event: Event) {
     display.scene.debugLayer.show({embedMode:true});
 }
 const menu_inspector = document.getElementById("inspector") as HTMLInputElement;
 menu_inspector.addEventListener("click", menu_inspector_handler);
+
 
 document.getElementById('renderCanvas').focus();
