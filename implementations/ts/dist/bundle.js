@@ -65,7 +65,7 @@ var Enviroment = function Enviroment() {
     this.highest_point = 0;
     this.sealevel = 1;
     this.dampest = 0;
-    this.tile_count = 300;
+    this.tile_count = 100;
 };
 // A single point on the map.
 
@@ -671,6 +671,7 @@ var Display = function (_flowing_terrain_1$Di) {
         document.getElementById("loader").style.display = "none";
         // Display Babylon progress indicator
         _this.engine.displayLoadingUI();
+        // Yield the main thread to allow progress indicator to get scheduled.
         setTimeout(function () {
             _this.geography = new flowing_terrain_1.Geography();
             _this.enviroment = _this.geography.enviroment;

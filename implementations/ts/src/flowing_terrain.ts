@@ -39,7 +39,7 @@ class Enviroment {
   highest_point: number = 0;
   sealevel: number = 1;
   dampest: number = 0;
-  tile_count: number = 300;
+  tile_count: number = 100;
 }
 
 // A single point on the map.
