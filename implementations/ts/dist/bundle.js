@@ -51,7 +51,7 @@ var _createClass = function () { function defineProperties(target, props) { for 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DisplayBase = exports.Geography = exports.Tile = void 0;
+exports.DisplayBase = exports.Geography = exports.Tile = exports.Enviroment = void 0;
 /* An algorithm for generating procedurally generated terrain where there is
  * always a downhill path to the sea from any tile.
  * See https://github.com/mrdunk/flowing-terrain for more information. */
@@ -67,8 +67,9 @@ var Enviroment = function Enviroment() {
     this.dampest = 0;
     this.tile_count = 100;
 };
-// A single point on the map.
 
+exports.Enviroment = Enviroment;
+// A single point on the map.
 
 var Tile = function () {
     function Tile(pos, enviroment) {
@@ -120,8 +121,6 @@ var Geography = function () {
         this.starting_points();
         this.heights_algorithm();
         this.drainage_algorithm();
-        this.diamond();
-        this.square();
         var t1 = performance.now();
         console.log("Generating Geography took: " + (t1 - t0) + "ms");
     }
@@ -193,7 +192,7 @@ var Geography = function () {
 
             var _loop = function _loop() {
                 var tile = _this.open_set_sorted.shift();
-                _this.get_neighbours(tile, 2).forEach(function (neighbour) {
+                _this.get_neighbours(tile, 1).forEach(function (neighbour) {
                     if (neighbour.height === null) {
                         neighbour.height = tile.height + 0.1 + Math.random() * 1;
                         _this.open_set_sorted.push(neighbour);
@@ -217,14 +216,9 @@ var Geography = function () {
             var _this2 = this;
 
             this.open_set_sorted.clear();
-            for (var y = 0; y < this.enviroment.tile_count; y += 2) {
-                for (var x = 0; x < this.enviroment.tile_count; x += 2) {
+            for (var y = 0; y < this.enviroment.tile_count; y++) {
+                for (var x = 0; x < this.enviroment.tile_count; x++) {
                     var _tile = this.get_tile({ x: x, y: y });
-                    // Note:
-                    // If we don't consider the heights below sealevel as well we get
-                    // isolated pools along the coastline when drawing 3D views due to the
-                    // averaging of heights at the meeting points of tiles in the
-                    // `diamond()` method.
                     this.open_set_sorted.push(_tile);
                 }
             }
@@ -237,7 +231,7 @@ var Geography = function () {
                     return "continue";
                 }
                 var lowest_neighbour = null;
-                _this2.get_neighbours(tile, 2).forEach(function (neighbour) {
+                _this2.get_neighbours(tile, 1).forEach(function (neighbour) {
                     if (neighbour !== null && neighbour.height < tile.height) {
                         if (lowest_neighbour === null || neighbour.height < lowest_neighbour.height) {
                             lowest_neighbour = neighbour;
@@ -257,137 +251,6 @@ var Geography = function () {
                 var _ret2 = _loop2();
 
                 if (_ret2 === "continue") continue;
-            }
-        }
-        // Use Diamond-Square algorithm to fill intermediate heights for corners of
-        // map tiles when drawing in 3D.
-        // https://en.wikipedia.org/wiki/Diamond-square_algorithm
-        //
-        // This is needed because when we come to tile the 3D mesh triangle edges do
-        // not always run between a point and it's lowest neighbour.
-        // Consider the points:
-        // A B
-        // C D
-        //
-        // A.height = 2
-        // B.height = 2
-        // C.height = 2
-        // D.height = 2
-        //
-        // Note that:
-        // Point "A" has the lowest neighbour "D".
-        // Point "B" and "C" have the same height as "A".
-        //
-        // If we tile this section in 2 triangles: "ABC" and "BCD", the triangle "ABC"
-        // will be a parallel to the horizontal plane and be at height === 2.
-        // This will obscure any river drawn directly between "A" and "D".
-
-    }, {
-        key: "diamond",
-        value: function diamond() {
-            var _this3 = this;
-
-            for (var y = 1; y < this.enviroment.tile_count; y += 2) {
-                var _loop3 = function _loop3(x) {
-                    var tile = _this3.get_tile({ x: x, y: y });
-                    if (tile === null) {
-                        return "continue";
-                    }
-                    // Diagonal neighbours.
-                    var tile00 = _this3.get_tile({ x: x - 1, y: y - 1 });
-                    var tile10 = _this3.get_tile({ x: x + 1, y: y - 1 });
-                    var tile01 = _this3.get_tile({ x: x - 1, y: y + 1 });
-                    var tile11 = _this3.get_tile({ x: x + 1, y: y + 1 });
-                    var tiles = [];
-                    if (tile00 !== null) {
-                        tiles.push(tile00);
-                    }
-                    if (tile10 !== null) {
-                        tiles.push(tile10);
-                    }
-                    if (tile01 !== null) {
-                        tiles.push(tile01);
-                    }
-                    if (tile11 !== null) {
-                        tiles.push(tile11);
-                    }
-                    var tiles_set = new Set(tiles);
-                    var drain_from = [];
-                    var drain_to = null;
-                    var highest = -1;
-                    var lowest = _this3.enviroment.highest_point;
-                    var lowest_drain_from = _this3.enviroment.highest_point;
-                    tiles.forEach(function (tile_from) {
-                        if (tile_from.lowest_neighbour !== null) {
-                            if (tiles_set.has(tile_from.lowest_neighbour)) {
-                                drain_from.push(tile_from);
-                                console.assert(drain_to === null || drain_to === tile_from.lowest_neighbour);
-                                drain_to = tile_from.lowest_neighbour;
-                                if (tile_from.height < lowest_drain_from) {
-                                    lowest_drain_from = tile_from.height;
-                                }
-                            }
-                        }
-                        if (tile_from.height > highest) {
-                            highest = tile_from.height;
-                        }
-                        if (tile_from.height < lowest) {
-                            lowest = tile_from.height;
-                        }
-                    });
-                    if (drain_from.length <= 0) {
-                        // No complicated rivers to worry about. Set height to whatever we
-                        // want (as long as it doesn't create a depression).
-                        tile.height = Math.random() * (highest - lowest) + lowest;
-                        //tile.height = highest;
-                        //tile.height = lowest;
-                    } else {
-                        console.assert(lowest_drain_from >= lowest);
-                        tile.height = Math.random() * (lowest_drain_from - lowest) + lowest;
-                        //tile.height = lowest;
-                    }
-                };
-
-                for (var x = 1; x < this.enviroment.tile_count; x += 2) {
-                    var _ret3 = _loop3(x);
-
-                    if (_ret3 === "continue") continue;
-                }
-            }
-        }
-        // Use Diamond-Square algorithm to fill intermediate heights to aid in 3D
-        // tiling. https://en.wikipedia.org/wiki/Diamond-square_algorithm
-        // This is not the "classic" square stage as we only need to consider
-        // the original heights, not those calculated in the "diamond" stage.
-        //
-        // See explanation in comment for `diamond()` function why this is required.
-
-    }, {
-        key: "square",
-        value: function square() {
-            for (var y = 0; y <= this.enviroment.tile_count; y += 2) {
-                for (var x = 0; x <= this.enviroment.tile_count; x += 2) {
-                    // Already configured tiles to be averaged.
-                    var _tile2 = this.get_tile({ x: x + 0, y: y + 0 });
-                    var tile20 = this.get_tile({ x: x + 2, y: y + 0 });
-                    var tile02 = this.get_tile({ x: x + 0, y: y + 2 });
-                    // Un-configured tiles to be updated.
-                    var _tile3 = this.get_tile({ x: x + 1, y: y + 0 });
-                    var _tile4 = this.get_tile({ x: x + 0, y: y + 1 });
-                    if (_tile2 === null) {
-                        continue;
-                    }
-                    if (tile20 !== null) {
-                        _tile3.height = (_tile2.height + tile20.height) / 2;
-                    } else {
-                        _tile3.height = _tile2.height;
-                    }
-                    if (tile02 !== null) {
-                        _tile4.height = (_tile2.height + tile02.height) / 2;
-                    } else {
-                        _tile4.height = _tile2.height;
-                    }
-                }
             }
         }
     }, {
@@ -427,10 +290,10 @@ var DisplayBase = function () {
             this.geography = new Geography();
             this.enviroment = this.geography.enviroment;
             this.draw_start();
-            for (var y = 0; y < this.enviroment.tile_count; y += 2) {
-                for (var x = 0; x < this.enviroment.tile_count; x += 2) {
-                    var _tile5 = this.geography.get_tile({ x: x, y: y });
-                    this.draw_tile(_tile5);
+            for (var y = 0; y < this.enviroment.tile_count; y += 1) {
+                for (var x = 0; x < this.enviroment.tile_count; x += 1) {
+                    var _tile2 = this.geography.get_tile({ x: x, y: y });
+                    this.draw_tile(_tile2);
                     //this.draw_river(tile, tile.lowest_neighbour);
                 }
             }
@@ -506,14 +369,14 @@ function coord_to_str(coord) {
 /* Generate coordinates of neighbouring tiles. */
 function get_neighbours(coordinate) {
     var neighbours = [];
-    neighbours.push({ x: coordinate.x - 2, y: coordinate.y - 2 });
-    neighbours.push({ x: coordinate.x - 2, y: coordinate.y });
-    neighbours.push({ x: coordinate.x - 2, y: coordinate.y + 2 });
-    neighbours.push({ x: coordinate.x + 2, y: coordinate.y - 2 });
-    neighbours.push({ x: coordinate.x + 2, y: coordinate.y });
-    neighbours.push({ x: coordinate.x + 2, y: coordinate.y + 2 });
-    neighbours.push({ x: coordinate.x, y: coordinate.y - 2 });
-    neighbours.push({ x: coordinate.x, y: coordinate.y + 2 });
+    neighbours.push({ x: coordinate.x - 1, y: coordinate.y - 1 });
+    neighbours.push({ x: coordinate.x - 1, y: coordinate.y });
+    neighbours.push({ x: coordinate.x - 1, y: coordinate.y + 1 });
+    neighbours.push({ x: coordinate.x + 1, y: coordinate.y - 1 });
+    neighbours.push({ x: coordinate.x + 1, y: coordinate.y });
+    neighbours.push({ x: coordinate.x + 1, y: coordinate.y + 1 });
+    neighbours.push({ x: coordinate.x, y: coordinate.y - 1 });
+    neighbours.push({ x: coordinate.x, y: coordinate.y + 1 });
     return neighbours;
 }
 
@@ -539,22 +402,22 @@ function seed_points(tile_count) {
     var sea = new Set();
     var open = new ordered_set_1.SortedSet([], compare_floods);
     // Edge tiles on map should always be seed points.
-    for (var x = 0; x < tile_count; x += 2) {
-        var dx = Math.abs(x - tile_count / 2);
+    for (var x = 0; x < tile_count; x++) {
+        var dx = x - tile_count / 2;
         var dy = tile_count / 2;
         var dist_from_center = dx * dx + dy * dy;
         var y = 0;
         open.push(new Flood({ x: x, y: y }, dist_from_center));
-        y = tile_count - 2;
+        y = tile_count - 1;
         open.push(new Flood({ x: x, y: y }, dist_from_center));
     }
-    for (var _y = 0; _y < tile_count; _y += 2) {
+    for (var _y = 0; _y < tile_count; _y++) {
         var _dx = tile_count / 2;
-        var _dy = Math.abs(_y - tile_count / 2);
+        var _dy = _y - tile_count / 2;
         var _dist_from_center = _dx * _dx + _dy * _dy;
         var _x = 0;
         open.push(new Flood({ x: _x, y: _y }, _dist_from_center));
-        _x = tile_count - 2;
+        _x = tile_count - 1;
         open.push(new Flood({ x: _x, y: _y }, _dist_from_center));
     }
 
@@ -563,7 +426,7 @@ function seed_points(tile_count) {
         sea.add(coord_to_str(tile.coordinate));
         get_neighbours(tile.coordinate).forEach(function (neighbour) {
             if (neighbour.x >= 0 && neighbour.x < tile_count && neighbour.y >= 0 && neighbour.y < tile_count) {
-                if (Math.random() < 0.21) {
+                if (Math.random() < 0.22) {
                     if (!sea.has(coord_to_str(neighbour))) {
                         open.push(new Flood(neighbour, tile.value));
                     }
@@ -578,7 +441,7 @@ function seed_points(tile_count) {
     // Display the seed area in the console.
     console.log("Seed points:");
     var line = "   ";
-    for (var i = 0; i < tile_count; i += 2) {
+    for (var i = 0; i < tile_count; i++) {
         if (i % 10 == 0) {
             line += "" + i;
             if (i < 10) {
@@ -589,12 +452,12 @@ function seed_points(tile_count) {
         }
     }
     console.log(line);
-    for (var _y2 = 0; _y2 < tile_count; _y2 += 2) {
+    for (var _y2 = 0; _y2 < tile_count; _y2++) {
         line = _y2 + " ";
         if (_y2 < 10) {
             line += " ";
         }
-        for (var _x2 = tile_count - 2; _x2 >= 0; _x2 -= 2) {
+        for (var _x2 = tile_count - 1; _x2 >= 0; _x2--) {
             var key = coord_to_str({ x: _x2, y: _y2 });
             if (sea.has(key)) {
                 line += "~ ";
@@ -656,7 +519,7 @@ var Display = function (_flowing_terrain_1$Di) {
 
         var _this = _possibleConstructorReturn(this, (Display.__proto__ || Object.getPrototypeOf(Display)).call(this));
 
-        _this.tile_size = 1;
+        _this.tile_size = 2;
         _this.river_threshold = 3;
         _this.positions = [];
         _this.indices = [];
@@ -667,29 +530,22 @@ var Display = function (_flowing_terrain_1$Di) {
         _this.engine = new BABYLON.Engine(renderCanvas, true);
         _this.scene = new BABYLON.Scene(_this.engine);
         _this.camera = new BABYLON.UniversalCamera("UniversalCamera", new BABYLON.Vector3(0, 0, 0), _this.scene);
+        var mapsize = _this.tile_size * new flowing_terrain_1.Enviroment().tile_count;
+        _this.camera.position = new BABYLON.Vector3(-mapsize / 4, mapsize / 4, -mapsize / 4);
+        _this.camera.checkCollisions = true;
+        _this.camera.ellipsoid = new BABYLON.Vector3(0.5, 0.5, 0.5);
+        _this.camera.attachControl(renderCanvas);
+        _this.camera.updateUpVectorFromRotation = true;
+        var light_1 = new BABYLON.HemisphericLight("light_1", new BABYLON.Vector3(1, 0.5, 0), _this.scene);
+        light_1.diffuse = new BABYLON.Color3(1, 0, 1);
+        light_1.specular = new BABYLON.Color3(0, 0, 0);
+        var light_2 = new BABYLON.HemisphericLight("light_2", new BABYLON.Vector3(0, 0.5, 1), _this.scene);
+        light_2.diffuse = new BABYLON.Color3(0, 1, 1);
+        light_2.specular = new BABYLON.Color3(0.3, 0.3, 0.3);
+        _this.scene.ambientColor = new BABYLON.Color3(0.2, 0.2, 0.3);
+        _this.draw();
         // Hide the HTML loader.
         document.getElementById("loader").style.display = "none";
-        // Display Babylon progress indicator
-        _this.engine.displayLoadingUI();
-        // Yield the main thread to allow progress indicator to get scheduled.
-        setTimeout(function () {
-            _this.geography = new flowing_terrain_1.Geography();
-            _this.enviroment = _this.geography.enviroment;
-            var mapsize = _this.tile_size * _this.enviroment.tile_count;
-            _this.camera.position = new BABYLON.Vector3(-mapsize / 4, mapsize / 4, -mapsize / 4);
-            _this.camera.checkCollisions = true;
-            _this.camera.ellipsoid = new BABYLON.Vector3(0.5, 0.5, 0.5);
-            _this.camera.attachControl(renderCanvas);
-            _this.camera.updateUpVectorFromRotation = true;
-            var light_1 = new BABYLON.HemisphericLight("light_1", new BABYLON.Vector3(1, 0.5, 0), _this.scene);
-            light_1.diffuse = new BABYLON.Color3(1, 0, 1);
-            light_1.specular = new BABYLON.Color3(0, 0, 0);
-            var light_2 = new BABYLON.HemisphericLight("light_2", new BABYLON.Vector3(0, 0.5, 1), _this.scene);
-            light_2.diffuse = new BABYLON.Color3(0, 1, 1);
-            light_2.specular = new BABYLON.Color3(0.3, 0.3, 0.3);
-            _this.scene.ambientColor = new BABYLON.Color3(0.2, 0.2, 0.3);
-            _this.draw();
-        }, 0);
         return _this;
     }
     // Move camera to overhead view. Middle of map, looking straight down.
@@ -699,7 +555,7 @@ var Display = function (_flowing_terrain_1$Di) {
         key: "overhead_view",
         value: function overhead_view() {
             var mapsize = this.tile_size * this.enviroment.tile_count;
-            var position = new BABYLON.Vector3(mapsize / 2, mapsize, mapsize / 2);
+            var position = new BABYLON.Vector3(mapsize / 2, mapsize * 2, mapsize / 2);
             var rotation = new BABYLON.Vector3(Math.PI / 2, Math.PI, 0.001);
             var ease = new BABYLON.CubicEase();
             ease.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEINOUT);
@@ -739,65 +595,72 @@ var Display = function (_flowing_terrain_1$Di) {
         value: function draw_tile(tile) {
             var x = tile.pos.x;
             var y = tile.pos.y;
-            if (x < 0 || x >= this.enviroment.tile_count || y < 0 || y >= this.enviroment.tile_count) {
+            if (x < 0 || x >= this.enviroment.tile_count - 1 || y < 0 || y >= this.enviroment.tile_count - 1) {
                 return;
             }
-            // All vertex position information ahs already been entered into
+            // All vertex position information has already been entered into
             // this.positions.
             // Here we create polygons to add to the main mesh from indexes into
             // this.positions.
-            var offset00 = this.coordinate_to_index({ x: x - 1, y: y - 1 });
-            var offset10 = this.coordinate_to_index({ x: x + 0, y: y - 1 });
-            var offset20 = this.coordinate_to_index({ x: x + 1, y: y - 1 });
-            var offset01 = this.coordinate_to_index({ x: x - 1, y: y + 0 });
-            var offset11 = this.coordinate_to_index({ x: x + 0, y: y + 0 });
-            var offset21 = this.coordinate_to_index({ x: x + 1, y: y + 0 });
-            var offset02 = this.coordinate_to_index({ x: x - 1, y: y + 1 });
-            var offset12 = this.coordinate_to_index({ x: x + 0, y: y + 1 });
-            var offset22 = this.coordinate_to_index({ x: x + 1, y: y + 1 });
-            if (this.positions[offset00 * 3 + 1] === 0 && this.positions[offset10 * 3 + 1] === 0 && this.positions[offset20 * 3 + 1] === 0 && this.positions[offset01 * 3 + 1] === 0 && this.positions[offset11 * 3 + 1] === 0 && this.positions[offset21 * 3 + 1] === 0 && this.positions[offset02 * 3 + 1] === 0 && this.positions[offset12 * 3 + 1] === 0 && this.positions[offset22 * 3 + 1] === 0) {
-                // This tile is one of the seed points.
-                // Since it is flat, at the lowest height on the map (0) and otherwise
-                // uninteresting, lets not draw them separately. Instead we can just
-                // create a single large "seabed" tile later which spans the whole map.
+            var offset00 = this.coordinate_to_index({ x: x + 0, y: y + 0 });
+            var offset10 = this.coordinate_to_index({ x: x + 1, y: y + 0 });
+            var offset01 = this.coordinate_to_index({ x: x + 0, y: y + 1 });
+            var offset11 = this.coordinate_to_index({ x: x + 1, y: y + 1 });
+            var height00 = this.positions[offset00 * 3 + 1];
+            var height10 = this.positions[offset10 * 3 + 1];
+            var height01 = this.positions[offset01 * 3 + 1];
+            var height11 = this.positions[offset11 * 3 + 1];
+            if (height00 === 0 && height10 === 0 && height01 === 0 && height11 === 0) {
+                // The tile we are considering drawing is at the same height as the seabed.
+                // More efficient to just draw a single "seabed" tile under the whole map.
                 return;
             }
-            if (x >= 1 && y >= 1) {
+            var height_lowest = Math.min(Math.min(Math.min(height00, height10), height01), height11);
+            // Each square on the map is tiled with 2 triangles. It is important to
+            // orientate these triangles with any river we may draw.
+            // Consider the points:
+            // A B
+            // C D
+            //
+            // A.height = 2
+            // B.height = 2
+            // C.height = 2
+            // D.height = 1
+            //
+            // Note that:
+            // Point "A" has the lowest neighbour "D".
+            // Point "B" and "C" have the same height as "A".
+            //
+            // If we tile this section in 2 triangles: "ABC" and "BCD", the triangle "ABC"
+            // will be a parallel to the horizontal plane and be at height === 2.
+            // This will obscure any river drawn directly between "A" and "D".
+            // Instead we should tile with triangles "ADC" and "ACB" so the edge of both
+            // triangles is the same vertex as the river.
+            if (height00 === height_lowest) {
+                this.indices.push(offset00);
+                this.indices.push(offset11);
+                this.indices.push(offset01);
+                this.indices.push(offset00);
+                this.indices.push(offset10);
+                this.indices.push(offset11);
+            } else if (height10 === height_lowest) {
+                this.indices.push(offset10);
+                this.indices.push(offset01);
+                this.indices.push(offset00);
+                this.indices.push(offset10);
+                this.indices.push(offset11);
+                this.indices.push(offset01);
+            } else if (height01 === height_lowest) {
+                this.indices.push(offset01);
+                this.indices.push(offset00);
+                this.indices.push(offset10);
+                this.indices.push(offset01);
+                this.indices.push(offset10);
+                this.indices.push(offset11);
+            } else {
                 this.indices.push(offset11);
                 this.indices.push(offset00);
                 this.indices.push(offset10);
-            }
-            if (x <= this.enviroment.tile_count - 1 && y >= 1) {
-                this.indices.push(offset11);
-                this.indices.push(offset10);
-                this.indices.push(offset20);
-            }
-            if (x <= this.enviroment.tile_count - 1 && y >= 1) {
-                this.indices.push(offset11);
-                this.indices.push(offset20);
-                this.indices.push(offset21);
-            }
-            if (x <= this.enviroment.tile_count - 1 && y <= this.enviroment.tile_count - 1) {
-                this.indices.push(offset11);
-                this.indices.push(offset21);
-                this.indices.push(offset22);
-            }
-            if (x <= this.enviroment.tile_count - 1 && y <= this.enviroment.tile_count - 1) {
-                this.indices.push(offset11);
-                this.indices.push(offset22);
-                this.indices.push(offset12);
-            }
-            if (x >= 1 && y <= this.enviroment.tile_count - 1) {
-                this.indices.push(offset11);
-                this.indices.push(offset12);
-                this.indices.push(offset02);
-            }
-            if (x >= 1 && y <= this.enviroment.tile_count - 1) {
-                this.indices.push(offset11);
-                this.indices.push(offset02);
-                this.indices.push(offset01);
-            }
-            if (x >= 1 && y >= 1) {
                 this.indices.push(offset11);
                 this.indices.push(offset01);
                 this.indices.push(offset00);
@@ -821,33 +684,19 @@ var Display = function (_flowing_terrain_1$Di) {
             // Offset to prevent height fighting during render.
             // Make rivers slightly above land.
             var offset = 0.01;
-            var mid = this.geography.get_tile({ x: (highest.pos.x + lowest.pos.x) / 2, y: (highest.pos.y + lowest.pos.y) / 2 });
-            // Prove river is indeed flowing down hill.
-            console.assert(highest.height >= mid.height, { errormessage: "river flows uphill" });
-            console.assert(mid.height >= lowest.height, { errormessage: "river flows uphill" });
+            console.assert(highest.height >= lowest.height, { errormessage: "river flows uphill" });
             var river = [];
             // River section from highest to mid-point.
             river.push(new BABYLON.Vector3(highest.pos.x * this.tile_size, highest.height + offset, highest.pos.y * this.tile_size));
-            if (mid.height >= sealevel) {
-                river.push(new BABYLON.Vector3(mid.pos.x * this.tile_size, mid.height + offset, mid.pos.y * this.tile_size));
-            } else {
-                // Stop at shoreline.
-                var ratio_x = (highest.pos.x - mid.pos.x) / (highest.height - mid.height);
-                var ratio_y = (highest.pos.y - mid.pos.y) / (highest.height - mid.height);
-                var x = highest.pos.x - (highest.height - sealevel) * ratio_x;
-                var y = highest.pos.y - (highest.height - sealevel) * ratio_y;
-                river.push(new BABYLON.Vector3(x, sealevel + offset, y));
-            }
-            // River section from mid-point to lowest.
             if (lowest.height >= sealevel) {
                 river.push(new BABYLON.Vector3(lowest.pos.x * this.tile_size, lowest.height + offset, lowest.pos.y * this.tile_size));
-            } else if (mid.height >= sealevel) {
+            } else {
                 // Stop at shoreline.
-                var _ratio_x = (mid.pos.x - lowest.pos.x) / (mid.height - lowest.height);
-                var _ratio_y = (mid.pos.y - lowest.pos.y) / (mid.height - lowest.height);
-                var _x = mid.pos.x - (mid.height - sealevel) * _ratio_x;
-                var _y = mid.pos.y - (mid.height - sealevel) * _ratio_y;
-                river.push(new BABYLON.Vector3(_x, sealevel + offset, _y));
+                var ratio_x = (highest.pos.x - lowest.pos.x) / (highest.height - lowest.height);
+                var ratio_y = (highest.pos.y - lowest.pos.y) / (highest.height - lowest.height);
+                var x = highest.pos.x - (highest.height - sealevel) * ratio_x;
+                var y = highest.pos.y - (highest.height - sealevel) * ratio_y;
+                river.push(new BABYLON.Vector3(x * this.tile_size, sealevel + offset, y * this.tile_size));
             }
             this.rivers.push(river);
         }
@@ -895,8 +744,6 @@ var Display = function (_flowing_terrain_1$Di) {
             this.sea_mesh.checkCollisions = false;
             this.set_sealevel(this.enviroment.sealevel);
             this.camera.setTarget(new BABYLON.Vector3(mapsize / 2, 0, mapsize / 2));
-            // hide progress indicator
-            this.engine.hideLoadingUI();
         }
         // Move the height of the sea mesh on the Z axis.
 
@@ -949,8 +796,8 @@ var Display = function (_flowing_terrain_1$Di) {
             if (this.rivers_mesh !== undefined) {
                 this.rivers_mesh.dispose();
             }
-            for (var y = 0; y < this.enviroment.tile_count; y += 2) {
-                for (var x = 0; x < this.enviroment.tile_count; x += 2) {
+            for (var y = 0; y < this.enviroment.tile_count; y++) {
+                for (var x = 0; x < this.enviroment.tile_count; x++) {
                     var tile = this.geography.get_tile({ x: x, y: y });
                     this.draw_river(tile, tile.lowest_neighbour);
                 }

@@ -35,7 +35,7 @@ export interface Coordinate {
 }
 
 // State to be shared between all classes.
-class Enviroment {
+export class Enviroment {
   highest_point: number = 0;
   sealevel: number = 1;
   dampest: number = 0;
@@ -85,8 +85,6 @@ export class Geography {
     this.starting_points();
     this.heights_algorithm();
     this.drainage_algorithm();
-    this.diamond();
-    this.square();
 
     const t1 = performance.now();
     console.log(`Generating Geography took: ${t1 - t0}ms`);
@@ -125,7 +123,7 @@ export class Geography {
   heights_algorithm(): void {
     while(this.open_set_sorted.length) {
       let tile = this.open_set_sorted.shift();
-      this.get_neighbours(tile, 2).forEach((neighbour) => {
+      this.get_neighbours(tile, 1).forEach((neighbour) => {
         if(neighbour.height === null) {
           neighbour.height = tile.height + 0.1 + Math.random() * 1;
           this.open_set_sorted.push(neighbour);
@@ -141,14 +139,9 @@ export class Geography {
   // map. High tile.dampness values indicate a river runs through that tile.
   drainage_algorithm(): void {
     this.open_set_sorted.clear();
-    for(let y = 0; y < this.enviroment.tile_count; y += 2) {
-      for(let x = 0; x < this.enviroment.tile_count; x += 2) {
+    for(let y = 0; y < this.enviroment.tile_count; y++) {
+      for(let x = 0; x < this.enviroment.tile_count; x++) {
         const tile = this.get_tile({x, y});
-        // Note:
-        // If we don't consider the heights below sealevel as well we get
-        // isolated pools along the coastline when drawing 3D views due to the
-        // averaging of heights at the meeting points of tiles in the
-        // `diamond()` method.
         this.open_set_sorted.push(tile);
       }
     }
@@ -161,7 +154,7 @@ export class Geography {
         continue;
       }
       let lowest_neighbour: Tile = null;
-      this.get_neighbours(tile, 2).forEach((neighbour) => {
+      this.get_neighbours(tile, 1).forEach((neighbour) => {
         if(neighbour !== null && neighbour.height < tile.height) {
           if(lowest_neighbour === null || neighbour.height < lowest_neighbour.height) {
             lowest_neighbour = neighbour;
@@ -177,135 +170,6 @@ export class Geography {
         this.enviroment.dampest = lowest_neighbour.dampness;
       }
       console.assert(lowest_neighbour.dampness > tile.dampness);
-    }
-  }
-
-  // Use Diamond-Square algorithm to fill intermediate heights for corners of
-  // map tiles when drawing in 3D.
-  // https://en.wikipedia.org/wiki/Diamond-square_algorithm
-  //
-  // This is needed because when we come to tile the 3D mesh triangle edges do
-  // not always run between a point and it's lowest neighbour.
-  // Consider the points:
-  // A B
-  // C D
-  //
-  // A.height = 2
-  // B.height = 2
-  // C.height = 2
-  // D.height = 2
-  //
-  // Note that:
-  // Point "A" has the lowest neighbour "D".
-  // Point "B" and "C" have the same height as "A".
-  //
-  // If we tile this section in 2 triangles: "ABC" and "BCD", the triangle "ABC"
-  // will be a parallel to the horizontal plane and be at height === 2.
-  // This will obscure any river drawn directly between "A" and "D".
-  diamond(): void {
-    for(let y = 1; y < this.enviroment.tile_count; y += 2) {
-      for(let x = 1; x < this.enviroment.tile_count; x += 2) {
-        const tile = this.get_tile({x, y});
-        if(tile === null) {
-          continue;
-        }
-
-        // Diagonal neighbours.
-        const tile00 = this.get_tile({x: x - 1, y: y - 1});
-        const tile10 = this.get_tile({x: x + 1, y: y - 1});
-        const tile01 = this.get_tile({x: x - 1, y: y + 1});
-        const tile11 = this.get_tile({x: x + 1, y: y + 1});
-        const tiles = [];
-        if(tile00 !== null) {
-          tiles.push(tile00);
-        }
-        if(tile10 !== null) {
-          tiles.push(tile10);
-        }
-        if(tile01 !== null) {
-          tiles.push(tile01);
-        }
-        if(tile11 !== null) {
-          tiles.push(tile11);
-        }
-
-        const tiles_set = new Set(tiles);
-        const drain_from: Array<Tile> = [];
-        let drain_to: Tile = null;
-        let highest = -1;
-        let lowest = this.enviroment.highest_point;
-        let lowest_drain_from = this.enviroment.highest_point;
-
-        tiles.forEach((tile_from) => {
-          if(tile_from.lowest_neighbour !== null) {
-            if(tiles_set.has(tile_from.lowest_neighbour)) {
-              drain_from.push(tile_from);
-
-              console.assert(drain_to === null || drain_to === tile_from.lowest_neighbour);
-              drain_to = tile_from.lowest_neighbour;
-
-              if(tile_from.height < lowest_drain_from) {
-                lowest_drain_from = tile_from.height;
-              }
-            }
-          }
-          if(tile_from.height > highest) {
-            highest = tile_from.height;
-          }
-          if(tile_from.height < lowest) {
-            lowest = tile_from.height;
-          }
-        });
-
-        if(drain_from.length <= 0) {
-          // No complicated rivers to worry about. Set height to whatever we
-          // want (as long as it doesn't create a depression).
-          tile.height = Math.random() * (highest - lowest) + lowest;
-          //tile.height = highest;
-          //tile.height = lowest;
-        } else {
-          console.assert(lowest_drain_from >= lowest);
-          tile.height = Math.random() * (lowest_drain_from - lowest) + lowest;
-          //tile.height = lowest;
-        }
-      }
-    }
-  }
-
-  // Use Diamond-Square algorithm to fill intermediate heights to aid in 3D
-  // tiling. https://en.wikipedia.org/wiki/Diamond-square_algorithm
-  // This is not the "classic" square stage as we only need to consider
-  // the original heights, not those calculated in the "diamond" stage.
-  //
-  // See explanation in comment for `diamond()` function why this is required.
-  square(): void {
-    for(let y = 0; y <= this.enviroment.tile_count; y += 2) {
-      for(let x = 0; x <= this.enviroment.tile_count; x += 2) {
-        // Already configured tiles to be averaged.
-        const tile00 = this.get_tile({x: x + 0, y: y + 0});
-        const tile20 = this.get_tile({x: x + 2, y: y + 0});
-        const tile02 = this.get_tile({x: x + 0, y: y + 2});
-
-        // Un-configured tiles to be updated.
-        const tile10 = this.get_tile({x: x + 1, y: y + 0});
-        const tile01 = this.get_tile({x: x + 0, y: y + 1});
-
-        if(tile00 === null) {
-          continue;
-        }
-
-        if(tile20 !== null) {
-          tile10.height = (tile00.height + tile20.height) / 2;
-        } else {
-          tile10.height = tile00.height;
-        }
-
-        if(tile02 !== null) {
-          tile01.height = (tile00.height + tile02.height) / 2;
-        } else {
-          tile01.height = tile00.height;
-        }
-      }
     }
   }
 
@@ -349,8 +213,8 @@ export class DisplayBase {
     this.enviroment = this.geography.enviroment;
 
     this.draw_start();
-    for(let y = 0; y < this.enviroment.tile_count; y += 2) {
-      for(let x = 0; x < this.enviroment.tile_count; x += 2) {
+    for(let y = 0; y < this.enviroment.tile_count; y += 1) {
+      for(let x = 0; x < this.enviroment.tile_count; x += 1) {
         const tile = this.geography.get_tile({x, y});
         this.draw_tile(tile);
         //this.draw_river(tile, tile.lowest_neighbour);

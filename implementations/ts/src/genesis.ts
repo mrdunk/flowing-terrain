@@ -39,14 +39,14 @@ function coord_to_str(coord: Coordinate): string {
 function get_neighbours(coordinate: Coordinate): Array<Coordinate> {
   const neighbours: Array<Coordinate> = [];
 
-  neighbours.push({x: coordinate.x - 2, y: coordinate.y - 2});
-  neighbours.push({x: coordinate.x - 2, y: coordinate.y});
-  neighbours.push({x: coordinate.x - 2, y: coordinate.y + 2});
-  neighbours.push({x: coordinate.x + 2, y: coordinate.y - 2});
-  neighbours.push({x: coordinate.x + 2, y: coordinate.y});
-  neighbours.push({x: coordinate.x + 2, y: coordinate.y + 2});
-  neighbours.push({x: coordinate.x, y: coordinate.y - 2});
-  neighbours.push({x: coordinate.x, y: coordinate.y + 2});
+  neighbours.push({x: coordinate.x - 1, y: coordinate.y - 1});
+  neighbours.push({x: coordinate.x - 1, y: coordinate.y});
+  neighbours.push({x: coordinate.x - 1, y: coordinate.y + 1});
+  neighbours.push({x: coordinate.x + 1, y: coordinate.y - 1});
+  neighbours.push({x: coordinate.x + 1, y: coordinate.y});
+  neighbours.push({x: coordinate.x + 1, y: coordinate.y + 1});
+  neighbours.push({x: coordinate.x, y: coordinate.y - 1});
+  neighbours.push({x: coordinate.x, y: coordinate.y + 1});
 
   return neighbours;
 }
@@ -78,26 +78,26 @@ export function seed_points(tile_count: number): Set<string> {
   const open: SortedSet = new SortedSet([], compare_floods);
 
   // Edge tiles on map should always be seed points.
-  for(let x = 0; x < tile_count; x += 2){
-    let dx = Math.abs(x - tile_count / 2);
+  for(let x = 0; x < tile_count; x++){
+    let dx = x - tile_count / 2;
     let dy = tile_count / 2;
     let dist_from_center = dx * dx + dy * dy;
 
     let y = 0;
     open.push(new Flood({x, y}, dist_from_center));
 
-    y = tile_count -2;
+    y = tile_count - 1;
     open.push(new Flood({x, y}, dist_from_center));
   }
-  for(let y = 0; y < tile_count; y += 2){
+  for(let y = 0; y < tile_count; y++){
     let dx = tile_count / 2;
-    let dy = Math.abs(y - tile_count / 2);
+    let dy = y - tile_count / 2;
     let dist_from_center = dx * dx + dy * dy;
 
     let x = 0;
     open.push(new Flood({x, y}, dist_from_center));
 
-    x = tile_count -2;
+    x = tile_count - 1;
     open.push(new Flood({x, y}, dist_from_center));
   }
 
@@ -108,7 +108,7 @@ export function seed_points(tile_count: number): Set<string> {
     get_neighbours(tile.coordinate).forEach((neighbour) => {
       if(neighbour.x >= 0 && neighbour.x < tile_count &&
          neighbour.y >= 0 && neighbour.y < tile_count) {
-        if(Math.random() < 0.21) {
+        if(Math.random() < 0.22) {
           if(! sea.has(coord_to_str(neighbour))) {
             open.push(new Flood(neighbour, tile.value));
           }
@@ -120,7 +120,7 @@ export function seed_points(tile_count: number): Set<string> {
   // Display the seed area in the console.
   console.log("Seed points:");
   let line = "   ";
-  for(let i = 0; i < tile_count; i += 2) {
+  for(let i = 0; i < tile_count; i++) {
     if(i % 10 == 0) {
       line += "" + i;
       if(i < 10) {
@@ -131,12 +131,12 @@ export function seed_points(tile_count: number): Set<string> {
     }
   }
   console.log(line);
-  for(let y = 0; y < tile_count; y += 2) {
+  for(let y = 0; y < tile_count; y++) {
     line = `${y} `;
     if(y < 10) {
       line += " ";
     }
-    for(let x = tile_count - 2; x >= 0; x -= 2) {
+    for(let x = tile_count - 1; x >= 0; x--) {
       const key = coord_to_str({x, y});
       if(sea.has(key)) {
         line += "~ ";
