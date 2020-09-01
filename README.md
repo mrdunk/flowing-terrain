@@ -47,7 +47,7 @@ into this one.
 
 ## The code:
 If you just want to understand how the algorithm works, i recommend looking at
-the `./implementations/python/map.py` code.
+the `./implementations/python/map.py` code.  
 If you want to see some of the issues you'll run into if you implement this in
 3d, Look at the Typescript example. TLDR: Care is required when tiling the mesh
 so faces don't obscure low points where rivers may flow.
@@ -73,10 +73,13 @@ interesting land. This will result in some large, sea-level lakes.
 
 ### Typescript
 `./implementations/ts/`  
-I also created a nice Web version so people can play without installing.  
+I also created a nice [Typescript](https://www.typescriptlang.org/) Web version
+so people can play without installing. I like Typescript. It's like Javascript
+without the crazy.  
+It uses the excellent https://www.babylonjs.com/ for the shiny 3D web view.  
 There's a compiled version here:  
 https://mrdunk.github.io/flowing-terrain/implementations/ts/dist/flowing_terrain.html  
-Mouse and cursor keys to move around.
+Mouse and cursor keys to move around.  
 
 I'll presume anyone wanting to build this for themselves can make use of the
 `npm` and `gulp` config files in that directory.  
