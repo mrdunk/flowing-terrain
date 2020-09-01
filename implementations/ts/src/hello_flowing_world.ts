@@ -26,11 +26,11 @@
  * https://github.com/mrdunk/flowing-terrain */
 
 import * as BABYLON from 'babylonjs';
-import {Geography, Tile, DisplayBase, Coordinate} from "./flowing_terrain"
+import {Enviroment, Geography, Tile, DisplayBase, Coordinate} from "./flowing_terrain"
 
 
 class Display extends DisplayBase {
-  tile_size: number = 1;
+  tile_size: number = 2;
   river_threshold = 3;
   positions: Array<number> = [];
   indices: Array<number> = [];
@@ -55,47 +55,39 @@ class Display extends DisplayBase {
       new BABYLON.Vector3(0, 0, 0),
       this.scene);
 
+    const mapsize = this.tile_size * new Enviroment().tile_count;
+    this.camera.position = new BABYLON.Vector3(-mapsize / 4, mapsize / 4, -mapsize / 4);
+    this.camera.checkCollisions = true;
+    this.camera.ellipsoid = new BABYLON.Vector3(0.5, 0.5, 0.5);
+    this.camera.attachControl(renderCanvas);
+    this.camera.updateUpVectorFromRotation = true;
+
+    const light_1 = new BABYLON.HemisphericLight(
+      "light_1",
+      new BABYLON.Vector3(1, 0.5, 0),
+      this.scene);
+    light_1.diffuse = new BABYLON.Color3(1, 0, 1);
+    light_1.specular = new BABYLON.Color3(0, 0, 0);
+
+    const light_2 = new BABYLON.HemisphericLight(
+      "light_2",
+      new BABYLON.Vector3(0, 0.5, 1),
+      this.scene);
+    light_2.diffuse = new BABYLON.Color3(0, 1, 1);
+    light_2.specular = new BABYLON.Color3(0.3, 0.3, 0.3);
+
+    this.scene.ambientColor = new BABYLON.Color3(0.2, 0.2, 0.3);
+
+    this.draw();
+
     // Hide the HTML loader.
     document.getElementById("loader").style.display = "none";
-    // Display Babylon progress indicator
-    this.engine.displayLoadingUI();
-
-    // Yield the main thread to allow progress indicator to get scheduled.
-    setTimeout(() => {
-      this.geography = new Geography();
-      this.enviroment = this.geography.enviroment;
-
-      const mapsize = this.tile_size * this.enviroment.tile_count;
-      this.camera.position = new BABYLON.Vector3(-mapsize / 4, mapsize / 4, -mapsize / 4);
-      this.camera.checkCollisions = true;
-      this.camera.ellipsoid = new BABYLON.Vector3(0.5, 0.5, 0.5);
-      this.camera.attachControl(renderCanvas);
-      this.camera.updateUpVectorFromRotation = true;
-
-      const light_1 = new BABYLON.HemisphericLight(
-        "light_1",
-        new BABYLON.Vector3(1, 0.5, 0),
-        this.scene);
-      light_1.diffuse = new BABYLON.Color3(1, 0, 1);
-      light_1.specular = new BABYLON.Color3(0, 0, 0);
-
-      const light_2 = new BABYLON.HemisphericLight(
-        "light_2",
-        new BABYLON.Vector3(0, 0.5, 1),
-        this.scene);
-      light_2.diffuse = new BABYLON.Color3(0, 1, 1);
-      light_2.specular = new BABYLON.Color3(0.3, 0.3, 0.3);
-
-      this.scene.ambientColor = new BABYLON.Color3(0.2, 0.2, 0.3);
-
-      this.draw();
-    }, 0);
   }
 
   // Move camera to overhead view. Middle of map, looking straight down.
   overhead_view() {
     const mapsize = this.tile_size * this.enviroment.tile_count;
-    const position = new BABYLON.Vector3(mapsize / 2, mapsize, mapsize / 2);
+    const position = new BABYLON.Vector3(mapsize / 2, mapsize * 2, mapsize / 2);
     const rotation = new BABYLON.Vector3(Math.PI / 2, Math.PI, 0.001);
 
     var ease = new BABYLON.CubicEase();
@@ -135,85 +127,79 @@ class Display extends DisplayBase {
   draw_tile(tile: Tile): void {
     const x = tile.pos.x;
     const y = tile.pos.y;
-    if( x < 0 || x >= this.enviroment.tile_count ||
-        y < 0 || y >= this.enviroment.tile_count) {
+    if( x < 0 || x >= this.enviroment.tile_count -1||
+        y < 0 || y >= this.enviroment.tile_count -1) {
       return;
     }
 
-    // All vertex position information ahs already been entered into
+    // All vertex position information has already been entered into
     // this.positions.
     // Here we create polygons to add to the main mesh from indexes into
     // this.positions.
 
-    const offset00 = this.coordinate_to_index({x: x - 1, y: y - 1});
-    const offset10 = this.coordinate_to_index({x: x + 0, y: y - 1});
-    const offset20 = this.coordinate_to_index({x: x + 1, y: y - 1});
-    const offset01 = this.coordinate_to_index({x: x - 1, y: y + 0});
-    const offset11 = this.coordinate_to_index({x: x + 0, y: y + 0});
-    const offset21 = this.coordinate_to_index({x: x + 1, y: y + 0});
-    const offset02 = this.coordinate_to_index({x: x - 1, y: y + 1});
-    const offset12 = this.coordinate_to_index({x: x + 0, y: y + 1});
-    const offset22 = this.coordinate_to_index({x: x + 1, y: y + 1});
+    const offset00 = this.coordinate_to_index({x: x + 0, y: y + 0});
+    const offset10 = this.coordinate_to_index({x: x + 1, y: y + 0});
+    const offset01 = this.coordinate_to_index({x: x + 0, y: y + 1});
+    const offset11 = this.coordinate_to_index({x: x + 1, y: y + 1});
 
-    if((this.positions[offset00 * 3 + 1]) === 0 &&
-       (this.positions[offset10 * 3 + 1]) === 0 &&
-       (this.positions[offset20 * 3 + 1]) === 0 &&
-       (this.positions[offset01 * 3 + 1]) === 0 &&
-       (this.positions[offset11 * 3 + 1]) === 0 &&
-       (this.positions[offset21 * 3 + 1]) === 0 &&
-       (this.positions[offset02 * 3 + 1]) === 0 &&
-       (this.positions[offset12 * 3 + 1]) === 0 &&
-       (this.positions[offset22 * 3 + 1]) === 0) {
-      // This tile is one of the seed points.
-      // Since it is flat, at the lowest height on the map (0) and otherwise
-      // uninteresting, lets not draw them separately. Instead we can just
-      // create a single large "seabed" tile later which spans the whole map.
+    const height00 = this.positions[offset00 * 3 + 1];
+    const height10 = this.positions[offset10 * 3 + 1];
+    const height01 = this.positions[offset01 * 3 + 1];
+    const height11 = this.positions[offset11 * 3 + 1];
+
+    if(height00 === 0 && height10 === 0 && height01 === 0 && height11 === 0) {
+      // The tile we are considering drawing is at the same height as the seabed.
+      // More efficient to just draw a single "seabed" tile under the whole map.
       return;
     }
 
-    if(x >= 1 && y >=1) {
+    const height_lowest = Math.min(Math.min(Math.min(height00, height10), height01), height11);
+
+    // Each square on the map is tiled with 2 triangles. It is important to
+    // orientate these triangles with any river we may draw.
+    // Consider the points:
+    // A B
+    // C D
+    //
+    // A.height = 2
+    // B.height = 2
+    // C.height = 2
+    // D.height = 1
+    //
+    // Note that:
+    // Point "A" has the lowest neighbour "D".
+    // Point "B" and "C" have the same height as "A".
+    //
+    // If we tile this section in 2 triangles: "ABC" and "BCD", the triangle "ABC"
+    // will be a parallel to the horizontal plane and be at height === 2.
+    // This will obscure any river drawn directly between "A" and "D".
+    // Instead we should tile with triangles "ADC" and "ACB" so the edge of both
+    // triangles is the same vertex as the river.
+    if(height00 === height_lowest) {
+      this.indices.push(offset00);
+      this.indices.push(offset11);
+      this.indices.push(offset01);
+      this.indices.push(offset00);
+      this.indices.push(offset10);
+      this.indices.push(offset11);
+    } else if(height10 === height_lowest) {
+      this.indices.push(offset10);
+      this.indices.push(offset01);
+      this.indices.push(offset00);
+      this.indices.push(offset10);
+      this.indices.push(offset11);
+      this.indices.push(offset01);
+    } else if(height01 === height_lowest) {
+      this.indices.push(offset01);
+      this.indices.push(offset00);
+      this.indices.push(offset10);
+      this.indices.push(offset01);
+      this.indices.push(offset10);
+      this.indices.push(offset11);
+    } else {
       this.indices.push(offset11);
       this.indices.push(offset00);
       this.indices.push(offset10);
-    }
-
-    if(x <= this.enviroment.tile_count - 1 && y >= 1) {
-      this.indices.push(offset11);
-      this.indices.push(offset10);
-      this.indices.push(offset20);
-    }
-
-    if(x <= this.enviroment.tile_count - 1 && y >= 1) {
-      this.indices.push(offset11);
-      this.indices.push(offset20);
-      this.indices.push(offset21);
-    }
-
-    if(x <= this.enviroment.tile_count - 1 && y <= this.enviroment.tile_count - 1) {
-      this.indices.push(offset11);
-      this.indices.push(offset21);
-      this.indices.push(offset22);
-    }
-
-    if(x <= this.enviroment.tile_count - 1 && y <= this.enviroment.tile_count - 1) {
-      this.indices.push(offset11);
-      this.indices.push(offset22);
-      this.indices.push(offset12);
-    }
-
-    if(x >= 1 && y <= this.enviroment.tile_count - 1) {
-      this.indices.push(offset11);
-      this.indices.push(offset12);
-      this.indices.push(offset02);
-    }
-
-    if(x >= 1 && y <= this.enviroment.tile_count - 1) {
-      this.indices.push(offset11);
-      this.indices.push(offset02);
-      this.indices.push(offset01);
-    }
-
-    if(x >= 1 && y >= 1) {
       this.indices.push(offset11);
       this.indices.push(offset01);
       this.indices.push(offset00);
@@ -237,43 +223,25 @@ class Display extends DisplayBase {
     // Make rivers slightly above land.
     const offset = 0.01;
 
-    const mid = this.geography.get_tile(
-      {x: (highest.pos.x + lowest.pos.x) / 2, y: (highest.pos.y + lowest.pos.y) / 2});
-
-    // Prove river is indeed flowing down hill.
-    console.assert( highest.height >= mid.height, {errormessage: "river flows uphill"});
-    console.assert( mid.height >= lowest.height, {errormessage: "river flows uphill"});
+    console.assert( highest.height >= lowest.height, {errormessage: "river flows uphill"});
 
     const river: Array<BABYLON.Vector3> = [];
 
     // River section from highest to mid-point.
     river.push(new BABYLON.Vector3(
       highest.pos.x * this.tile_size, highest.height + offset, highest.pos.y * this.tile_size));
-    if(mid.height >= sealevel) {
-      river.push(new BABYLON.Vector3(
-        mid.pos.x * this.tile_size, mid.height + offset, mid.pos.y * this.tile_size));
-    } else {
-      // Stop at shoreline.
-      const ratio_x = (highest.pos.x - mid.pos.x) /
-                      (highest.height - mid.height);
-      const ratio_y = (highest.pos.y - mid.pos.y) /
-                      (highest.height - mid.height);
-      let x = highest.pos.x - ((highest.height - sealevel) * ratio_x);
-      let y = highest.pos.y - ((highest.height - sealevel) * ratio_y);
-      river.push(new BABYLON.Vector3(x, sealevel + offset, y));
-    }
-
-    // River section from mid-point to lowest.
     if(lowest.height >= sealevel) {
       river.push(new BABYLON.Vector3(
         lowest.pos.x * this.tile_size, lowest.height + offset, lowest.pos.y * this.tile_size));
-    } else if(mid.height >= sealevel) {
+    } else {
       // Stop at shoreline.
-      const ratio_x = (mid.pos.x - lowest.pos.x) / (mid.height - lowest.height);
-      const ratio_y = (mid.pos.y - lowest.pos.y) / (mid.height - lowest.height);
-      let x = mid.pos.x - ((mid.height - sealevel) * ratio_x);
-      let y = mid.pos.y - ((mid.height - sealevel) * ratio_y);
-      river.push(new BABYLON.Vector3(x, sealevel + offset, y));
+      const ratio_x = (highest.pos.x - lowest.pos.x) /
+                      (highest.height - lowest.height);
+      const ratio_y = (highest.pos.y - lowest.pos.y) /
+                      (highest.height - lowest.height);
+      let x = highest.pos.x - ((highest.height - sealevel) * ratio_x);
+      let y = highest.pos.y - ((highest.height - sealevel) * ratio_y);
+      river.push(new BABYLON.Vector3(x * this.tile_size, sealevel + offset, y * this.tile_size));
     }
 
     this.rivers.push(river);
@@ -331,9 +299,6 @@ class Display extends DisplayBase {
     this.set_sealevel(this.enviroment.sealevel);
 
     this.camera.setTarget(new BABYLON.Vector3(mapsize / 2, 0, mapsize / 2));
-
-    // hide progress indicator
-		this.engine.hideLoadingUI();
   }
 
   // Move the height of the sea mesh on the Z axis.
@@ -378,8 +343,8 @@ class Display extends DisplayBase {
       this.rivers_mesh.dispose();
     }
 
-    for(let y = 0; y < this.enviroment.tile_count; y += 2) {
-      for(let x = 0; x < this.enviroment.tile_count; x += 2) {
+    for(let y = 0; y < this.enviroment.tile_count; y++) {
+      for(let x = 0; x < this.enviroment.tile_count; x++) {
         const tile = this.geography.get_tile({x, y});
         this.draw_river(tile, tile.lowest_neighbour);
       }

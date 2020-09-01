@@ -49,9 +49,8 @@ into this one.
 If you just want to understand how the algorithm works, i recommend looking at
 the `./implementations/python/map.py` code.
 If you want to see some of the issues you'll run into if you implement this in
-3d, Look at the Typescript example. TLDR: Creating polygon faces between points
-at heights determined by this algorithm without blocking rivers is a bit harder
-than it would first appear.
+3d, Look at the Typescript example. TLDR: Care is required when tiling the mesh
+so faces don't obscure low points where rivers may flow.
 
 ### Python
 `./implementations/python/map.py`  
@@ -149,5 +148,5 @@ with a higher value.
 ## Some more screenshots:
 ![lizard](https://github.com/mrdunk/flowing-terrain/blob/master/assets/lizard.png)
 ![lagoon](https://github.com/mrdunk/flowing-terrain/blob/master/assets/lagoon.png)
-![web_island1](https://github.com/mrdunk/flowing-terrain/blob/master/assets/web1.png)
-![web_island2](https://github.com/mrdunk/flowing-terrain/blob/master/assets/web2.png)
+![web_demo_perspective](https://github.com/mrdunk/flowing-terrain/blob/master/assets/web_demo_perspective.png)
+![web_demo_overhead](https://github.com/mrdunk/flowing-terrain/blob/master/assets/web_demo_overhead.png)
