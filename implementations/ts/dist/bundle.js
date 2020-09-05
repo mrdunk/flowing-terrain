@@ -21,27 +21,27 @@ var n=function(e,t){return(n=Object.setPrototypeOf||{__proto__:[]}instanceof Arr
 },{}],2:[function(require,module,exports){
 "use strict";
 /*
-# MIT License
-#
-# Copyright (c) 2020 duncan law
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
+ * MIT License
+ *
+ * Copyright (c) 2020 duncan law
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  */
 
 var _slicedToArray = function () { function sliceIterator(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"]) _i["return"](); } finally { if (_d) throw _e; } } return _arr; } return function (arr, i) { if (Array.isArray(arr)) { return arr; } else if (Symbol.iterator in Object(arr)) { return sliceIterator(arr, i); } else { throw new TypeError("Invalid attempt to destructure non-iterable instance"); } }; }();
@@ -190,11 +190,25 @@ var Geography = function () {
         value: function heights_algorithm() {
             var _this = this;
 
+            this.slopes = genesis_1.slope_data(this.enviroment.tile_count);
+
             var _loop = function _loop() {
                 var tile = _this.open_set_sorted.shift();
-                _this.get_neighbours(tile, 1).forEach(function (neighbour) {
+                _this.get_neighbours(tile).forEach(function (neighbour) {
                     if (neighbour.height === null) {
-                        neighbour.height = tile.height + 0.1 + Math.random() * 1;
+                        var x = tile.pos.x;
+                        var y = tile.pos.y;
+                        var nx = neighbour.pos.x;
+                        var ny = neighbour.pos.y;
+                        // Diagonal neighbours will affect twice as many tiles as opposite
+                        // ones so halve their effect.
+                        var orientation_mod = x !== nx && y !== ny ? 1.414 : 1;
+                        var height_diff = Math.max(_this.slopes[x][y], 0);
+                        var unevenness = Math.max(_this.slopes[x][y] - _this.slopes[nx][ny] + 0.03, 0);
+                        neighbour.height = tile.height + 0.1;
+                        neighbour.height += orientation_mod * Math.pow(height_diff, 6) * 2;
+                        neighbour.height += orientation_mod * unevenness;
+                        neighbour.height += orientation_mod * Math.random() * 0.2;
                         _this.open_set_sorted.push(neighbour);
                     }
                     if (neighbour.height > _this.enviroment.highest_point) {
@@ -230,21 +244,25 @@ var Geography = function () {
                 if (tile.height === 0) {
                     return "continue";
                 }
-                var lowest_neighbour = null;
-                _this2.get_neighbours(tile, 1).forEach(function (neighbour) {
+                var lowest_neighbours = [];
+                _this2.get_neighbours(tile).forEach(function (neighbour) {
                     if (neighbour !== null && neighbour.height < tile.height) {
-                        if (lowest_neighbour === null || neighbour.height < lowest_neighbour.height) {
-                            lowest_neighbour = neighbour;
+                        if (lowest_neighbours.length === 0) {
+                            lowest_neighbours = [neighbour];
+                        } else if (neighbour.height < lowest_neighbours[0].height) {
+                            lowest_neighbours = [neighbour];
+                        } else if (neighbour.height === lowest_neighbours[0].height) {
+                            lowest_neighbours.push(neighbour);
                         }
                     }
                 });
-                console.assert(lowest_neighbour !== null);
-                lowest_neighbour.dampness += tile.dampness;
-                tile.lowest_neighbour = lowest_neighbour;
-                if (lowest_neighbour.dampness > _this2.enviroment.dampest && lowest_neighbour.height > 0) {
-                    _this2.enviroment.dampest = lowest_neighbour.dampness;
+                console.assert(lowest_neighbours.length !== 0);
+                tile.lowest_neighbour = lowest_neighbours[Math.floor(Math.random() * lowest_neighbours.length)];
+                tile.lowest_neighbour.dampness += tile.dampness;
+                if (tile.lowest_neighbour.dampness > _this2.enviroment.dampest && tile.lowest_neighbour.height > 0) {
+                    _this2.enviroment.dampest = tile.lowest_neighbour.dampness;
                 }
-                console.assert(lowest_neighbour.dampness > tile.dampness);
+                console.assert(tile.lowest_neighbour.dampness > tile.dampness);
             };
 
             while (this.open_set_sorted.length > 0) {
@@ -263,8 +281,8 @@ var Geography = function () {
         }
     }, {
         key: "get_neighbours",
-        value: function get_neighbours(tile, offset) {
-            var neighbours = [this.get_tile({ x: tile.pos.x - offset, y: tile.pos.y - offset }), this.get_tile({ x: tile.pos.x - offset, y: tile.pos.y }), this.get_tile({ x: tile.pos.x - offset, y: tile.pos.y + offset }), this.get_tile({ x: tile.pos.x, y: tile.pos.y - offset }), this.get_tile({ x: tile.pos.x, y: tile.pos.y + offset }), this.get_tile({ x: tile.pos.x + offset, y: tile.pos.y - offset }), this.get_tile({ x: tile.pos.x + offset, y: tile.pos.y }), this.get_tile({ x: tile.pos.x + offset, y: tile.pos.y + offset })];
+        value: function get_neighbours(tile) {
+            var neighbours = [this.get_tile({ x: tile.pos.x - 1, y: tile.pos.y - 1 }), this.get_tile({ x: tile.pos.x - 1, y: tile.pos.y }), this.get_tile({ x: tile.pos.x - 1, y: tile.pos.y + 1 }), this.get_tile({ x: tile.pos.x, y: tile.pos.y - 1 }), this.get_tile({ x: tile.pos.x, y: tile.pos.y + 1 }), this.get_tile({ x: tile.pos.x + 1, y: tile.pos.y - 1 }), this.get_tile({ x: tile.pos.x + 1, y: tile.pos.y }), this.get_tile({ x: tile.pos.x + 1, y: tile.pos.y + 1 })];
             return neighbours.filter(function (neighbour) {
                 return neighbour !== null;
             });
@@ -334,33 +352,33 @@ exports.DisplayBase = DisplayBase;
 },{"./genesis":3,"./ordered_set":5}],3:[function(require,module,exports){
 "use strict";
 /*
-# MIT License
-#
-# Copyright (c) 2020 duncan law
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
+ * MIT License
+ *
+ * Copyright (c) 2020 duncan law
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  */
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.seed_points = void 0;
+exports.slope_data = exports.seed_points = void 0;
 var ordered_set_1 = require("./ordered_set");
 /* Convert Coordinate into something that can be used as a key in a Set(). */
 function coord_to_str(coord) {
@@ -470,31 +488,94 @@ function seed_points(tile_count) {
     return sea;
 }
 exports.seed_points = seed_points;
+function slope_data(tile_count) {
+    var seed = [];
+    for (var i = 0; i < 0xFF; i++) {
+        seed.push(Math.sin(i * Math.PI / 0x7F));
+    }
+    var pass_x = [];
+    var pass_y = [];
+    var multiplier = [];
+    for (var _i = 0; _i < 3; _i++) {
+        pass_x.push(Math.random() * 20 - 10);
+        pass_y.push(Math.random() * 20 - 10);
+        multiplier.push(1);
+    }
+    for (var _i2 = 0; _i2 < 4; _i2++) {
+        pass_x.push(Math.random() * 50 - 25);
+        pass_y.push(Math.random() * 50 - 25);
+        multiplier.push(0.5);
+    }
+    for (var _i3 = 0; _i3 < 3; _i3++) {
+        pass_x.push(Math.random() * 100 - 50);
+        pass_y.push(Math.random() * 100 - 50);
+        multiplier.push(0.5);
+    }
+    var data = [];
+    var min = 99999999999;
+    var max = -99999999999;
+
+    var _loop2 = function _loop2(y) {
+        var row = [];
+
+        var _loop3 = function _loop3(_x3) {
+            var val = 0;
+            pass_x.forEach(function (mod, index) {
+                val += multiplier[index] * seed[Math.round(mod * _x3 + pass_y[index] * y) & 0xff - 1];
+            });
+            row.push(val);
+            if (val > max) {
+                max = val;
+            } else if (val < min) {
+                min = val;
+            }
+        };
+
+        for (var _x3 = 0; _x3 < tile_count; _x3++) {
+            _loop3(_x3);
+        }
+        data.push(row);
+    };
+
+    for (var y = 0; y < tile_count; y++) {
+        _loop2(y);
+    }
+    // Normalize data.
+    var range = max - min;
+    for (var x = 0; x < tile_count; x++) {
+        for (var y = 0; y < tile_count; y++) {
+            data[x][y] -= min;
+            data[x][y] /= range;
+        }
+    }
+    return data;
+}
+exports.slope_data = slope_data;
 
 },{"./ordered_set":5}],4:[function(require,module,exports){
 "use strict";
 /*
-# MIT License
-#
-# Copyright (c) 2020 duncan law
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
+ * MIT License
+ *
+ * Copyright (c) 2020 duncan law
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  */
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
@@ -522,6 +603,7 @@ var Display = function (_flowing_terrain_1$Di) {
         _this.tile_size = 2;
         _this.river_threshold = 3;
         _this.positions = [];
+        _this.colors = [];
         _this.indices = [];
         _this.normals = [];
         _this.rivers = [];
@@ -585,6 +667,10 @@ var Display = function (_flowing_terrain_1$Di) {
                     this.positions.push(tile.pos.x * this.tile_size);
                     this.positions.push(tile.height);
                     this.positions.push(tile.pos.y * this.tile_size);
+                    this.colors.push(this.geography.slopes[x][y]);
+                    this.colors.push(this.geography.slopes[x][y]);
+                    this.colors.push(this.geography.slopes[x][y]);
+                    this.colors.push(1);
                 }
             }
         }
@@ -725,6 +811,7 @@ var Display = function (_flowing_terrain_1$Di) {
             vertexData.positions = this.positions;
             vertexData.indices = this.indices;
             vertexData.normals = this.normals;
+            //vertexData.colors = this.colors;
             var land = new BABYLON.Mesh("land");
             land.material = land_material;
             vertexData.applyToMesh(land, true);

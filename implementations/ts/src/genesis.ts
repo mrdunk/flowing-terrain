@@ -1,25 +1,25 @@
 /*
-# MIT License
-#
-# Copyright (c) 2020 duncan law
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
+ * MIT License
+ *
+ * Copyright (c) 2020 duncan law
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  */
 
 import {SortedSet} from "./ordered_set"
@@ -149,4 +149,60 @@ export function seed_points(tile_count: number): Set<string> {
   return sea;
 }
 
+export function slope_data(tile_count: number): Array<Array<number>> {
+  let seed: Array<number> = [];
+  for(let i = 0; i < 0xFF; i++) {
+    seed.push(Math.sin(i * Math.PI / 0x7F));
+  }
 
+  let pass_x: Array<number> = [];
+  let pass_y: Array<number> = [];
+  let multiplier: Array<number> = [];
+  for(let i = 0; i < 3; i++) {
+    pass_x.push(Math.random() * 20 - 10);
+    pass_y.push(Math.random() * 20 - 10);
+    multiplier.push(1);
+  }
+  for(let i = 0; i < 4; i++) {
+    pass_x.push(Math.random() * 50 - 25);
+    pass_y.push(Math.random() * 50 - 25);
+    multiplier.push(0.5);
+  }
+  for(let i = 0; i < 3; i++) {
+    pass_x.push(Math.random() * 100 - 50);
+    pass_y.push(Math.random() * 100 - 50);
+    multiplier.push(0.5);
+  }
+
+  let data: Array<Array<number>> = [];
+  let min = 99999999999;
+  let max = -99999999999;
+  for(let y = 0; y < tile_count; y++){
+    let row: Array<number> = [];
+    for(let x = 0; x < tile_count; x++){
+      let val = 0;
+      pass_x.forEach((mod, index) => {
+        val += multiplier[index] * seed[Math.round(mod * x + pass_y[index] * y) & 0xff - 1];
+      });
+      row.push(val);
+
+      if(val > max) {
+        max = val;
+      } else if(val < min) {
+        min = val;
+      }
+    }
+    data.push(row);
+  }
+
+  // Normalize data.
+  const range = max - min;
+  for(let x = 0; x < tile_count; x++){
+    for(let y = 0; y < tile_count; y++){
+      data[x][y] -= min;
+      data[x][y] /= range;
+    }
+  }
+
+  return data;
+}

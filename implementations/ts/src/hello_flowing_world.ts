@@ -1,25 +1,25 @@
 /*
-# MIT License
-#
-# Copyright (c) 2020 duncan law
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
+ * MIT License
+ *
+ * Copyright (c) 2020 duncan law
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  */
 
 /* A sample frontend for the algorithm described at
@@ -33,6 +33,7 @@ class Display extends DisplayBase {
   tile_size: number = 2;
   river_threshold = 3;
   positions: Array<number> = [];
+  colors: Array<number> = [];
   indices: Array<number> = [];
   normals: Array<number> = [];
   rivers: Array<Array<BABYLON.Vector3>> = [];
@@ -119,6 +120,11 @@ class Display extends DisplayBase {
         this.positions.push(tile.pos.x * this.tile_size);
         this.positions.push(tile.height);
         this.positions.push(tile.pos.y * this.tile_size);
+
+        this.colors.push(this.geography.slopes[x][y]);
+        this.colors.push(this.geography.slopes[x][y]);
+        this.colors.push(this.geography.slopes[x][y]);
+        this.colors.push(1);
       }
     }
   }
@@ -272,6 +278,7 @@ class Display extends DisplayBase {
     vertexData.positions = this.positions;
     vertexData.indices = this.indices;
     vertexData.normals = this.normals;
+    //vertexData.colors = this.colors;
 
     const land = new BABYLON.Mesh("land");
     land.material = land_material;

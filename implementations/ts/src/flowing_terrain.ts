@@ -1,25 +1,25 @@
 /*
-# MIT License
-#
-# Copyright (c) 2020 duncan law
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
+ * MIT License
+ *
+ * Copyright (c) 2020 duncan law
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  */
 
 /* An algorithm for generating procedurally generated terrain where there is
@@ -27,7 +27,7 @@
  * See https://github.com/mrdunk/flowing-terrain for more information. */
 
 import {SortedSet} from "./ordered_set"
-import {seed_points} from "./genesis"
+import {seed_points, slope_data} from "./genesis"
 
 export interface Coordinate {
   x: number;
@@ -69,6 +69,7 @@ export class Geography {
   tiles: Array<Array<Tile>> = [];
   enviroment: Enviroment = new Enviroment();
   open_set_sorted: SortedSet = new SortedSet([], this.compare_tiles);
+  slopes: Array<Array<number>>;
 
   constructor() {
     const t0 = performance.now();
@@ -121,13 +122,33 @@ export class Geography {
 
   // Populate all tiles with height data. Also set the sealevel.
   heights_algorithm(): void {
+    this.slopes = slope_data(this.enviroment.tile_count);
+
     while(this.open_set_sorted.length) {
       let tile = this.open_set_sorted.shift();
-      this.get_neighbours(tile, 1).forEach((neighbour) => {
+      this.get_neighbours(tile).forEach((neighbour) => {
         if(neighbour.height === null) {
-          neighbour.height = tile.height + 0.1 + Math.random() * 1;
+
+          const x = tile.pos.x;
+          const y = tile.pos.y;
+          const nx = neighbour.pos.x;
+          const ny = neighbour.pos.y;
+
+          // Diagonal neighbours will affect twice as many tiles as opposite
+          // ones so halve their effect.
+          const orientation_mod = (x !== nx && y !== ny) ? 1.414 : 1;
+
+          const height_diff = Math.max(this.slopes[x][y], 0);
+          const unevenness = Math.max((this.slopes[x][y] - this.slopes[nx][ny]) + 0.03, 0);
+
+          neighbour.height = tile.height + 0.1;
+          neighbour.height += orientation_mod * Math.pow(height_diff, 6) * 2;
+          neighbour.height += orientation_mod * unevenness;
+          neighbour.height += orientation_mod * Math.random() * 0.2;
+          
           this.open_set_sorted.push(neighbour);
         }
+
         if(neighbour.height > this.enviroment.highest_point) {
           this.enviroment.highest_point = neighbour.height;
         }
@@ -153,23 +174,28 @@ export class Geography {
       if(tile.height === 0) {
         continue;
       }
-      let lowest_neighbour: Tile = null;
-      this.get_neighbours(tile, 1).forEach((neighbour) => {
+      let lowest_neighbours: Array<Tile> = [];
+      this.get_neighbours(tile).forEach((neighbour) => {
         if(neighbour !== null && neighbour.height < tile.height) {
-          if(lowest_neighbour === null || neighbour.height < lowest_neighbour.height) {
-            lowest_neighbour = neighbour;
+          if(lowest_neighbours.length === 0) {
+            lowest_neighbours = [neighbour];
+          } else if(neighbour.height < lowest_neighbours[0].height) {
+            lowest_neighbours = [neighbour];
+          } else if(neighbour.height === lowest_neighbours[0].height) {
+            lowest_neighbours.push(neighbour);
           }
         }
       });
-      console.assert(lowest_neighbour !== null );
-      lowest_neighbour.dampness += tile.dampness;
-      tile.lowest_neighbour = lowest_neighbour;
+      console.assert(lowest_neighbours.length !== 0 );
+      tile.lowest_neighbour = lowest_neighbours[
+        Math.floor(Math.random() * lowest_neighbours.length)];
+      tile.lowest_neighbour.dampness += tile.dampness;
 
-      if(lowest_neighbour.dampness > this.enviroment.dampest &&
-         lowest_neighbour.height > 0) {
-        this.enviroment.dampest = lowest_neighbour.dampness;
+      if(tile.lowest_neighbour.dampness > this.enviroment.dampest &&
+         tile.lowest_neighbour.height > 0) {
+        this.enviroment.dampest = tile.lowest_neighbour.dampness;
       }
-      console.assert(lowest_neighbour.dampness > tile.dampness);
+      console.assert(tile.lowest_neighbour.dampness > tile.dampness);
     }
   }
 
@@ -183,16 +209,16 @@ export class Geography {
     return this.tiles[coordinate.y][coordinate.x];
   }
 
-  get_neighbours(tile: Tile, offset: number): Array<Tile> {
+  get_neighbours(tile: Tile): Array<Tile> {
     let neighbours = [
-      this.get_tile({x: tile.pos.x - offset, y: tile.pos.y - offset}),
-      this.get_tile({x: tile.pos.x - offset, y: tile.pos.y}),
-      this.get_tile({x: tile.pos.x - offset, y: tile.pos.y + offset}),
-      this.get_tile({x: tile.pos.x, y: tile.pos.y - offset}),
-      this.get_tile({x: tile.pos.x, y: tile.pos.y + offset}),
-      this.get_tile({x: tile.pos.x + offset, y: tile.pos.y - offset}),
-      this.get_tile({x: tile.pos.x + offset, y: tile.pos.y}),
-      this.get_tile({x: tile.pos.x + offset, y: tile.pos.y + offset}),
+      this.get_tile({x: tile.pos.x - 1, y: tile.pos.y - 1}),
+      this.get_tile({x: tile.pos.x - 1, y: tile.pos.y}),
+      this.get_tile({x: tile.pos.x - 1, y: tile.pos.y + 1}),
+      this.get_tile({x: tile.pos.x, y: tile.pos.y - 1}),
+      this.get_tile({x: tile.pos.x, y: tile.pos.y + 1}),
+      this.get_tile({x: tile.pos.x + 1, y: tile.pos.y - 1}),
+      this.get_tile({x: tile.pos.x + 1, y: tile.pos.y}),
+      this.get_tile({x: tile.pos.x + 1, y: tile.pos.y + 1}),
     ];
 
     return neighbours.filter((neighbour) => neighbour !== null);
