@@ -71,6 +71,20 @@ function compare_floods(a: Flood, b: Flood): number {
   return a.coordinate.y - b.coordinate.y;
 }
 
+export function seed_points_to_array(
+  tile_count: number, sea: Set<string>): Array<Array<number>> {
+    let sea_array = [];
+    for(let x = 0; x < tile_count; x++) {
+      let row: Array<number> = [];
+      for(let y = 0; y < tile_count; y++) {
+        row.push(sea.has(coord_to_str({x, y}))? 1 : 0);
+      }
+      sea_array.push(row);
+    }
+
+    return sea_array;
+}
+
 /* Function to generate an area of the seabed from which to generate height.
  * Areas not in the returned set will never be above the base seabed height. */
 export function seed_points(tile_count: number): Set<string> {
@@ -117,35 +131,6 @@ export function seed_points(tile_count: number): Set<string> {
     });
   }
 
-  // Display the seed area in the console.
-  console.log("Seed points:");
-  let line = "   ";
-  for(let i = 0; i < tile_count; i++) {
-    if(i % 10 == 0) {
-      line += "" + i;
-      if(i < 10) {
-        line += " ";
-      }
-    } else {
-      line += "  ";
-    }
-  }
-  console.log(line);
-  for(let y = 0; y < tile_count; y++) {
-    line = `${y} `;
-    if(y < 10) {
-      line += " ";
-    }
-    for(let x = tile_count - 1; x >= 0; x--) {
-      const key = coord_to_str({x, y});
-      if(sea.has(key)) {
-        line += "~ ";
-      } else {
-        line += "# ";
-      }
-    }
-    console.log(line);
-  }
   return sea;
 }
 
@@ -164,14 +149,24 @@ export function slope_data(tile_count: number): Array<Array<number>> {
     multiplier.push(1);
   }
   for(let i = 0; i < 4; i++) {
-    pass_x.push(Math.random() * 50 - 25);
-    pass_y.push(Math.random() * 50 - 25);
-    multiplier.push(0.5);
+    //pass_x.push(Math.random() * 50 - 25);
+    //pass_y.push(Math.random() * 50 - 25);
+    //multiplier.push(0.5);
   }
-  for(let i = 0; i < 3; i++) {
-    pass_x.push(Math.random() * 100 - 50);
-    pass_y.push(Math.random() * 100 - 50);
-    multiplier.push(0.5);
+  for(let i = 0; i < 30; i++) {
+    //pass_x.push(Math.random() * 100 - 50);
+    //pass_y.push(Math.random() * 100 - 50);
+    //multiplier.push(0.2);
+  }
+  for(let i = 0; i < 30; i++) {
+    //pass_x.push(Math.random() * 400 - 200);
+    //pass_y.push(Math.random() * 400 - 200);
+    //multiplier.push(0.2);
+  }
+  for(let i = 0; i < 30; i++) {
+    pass_x.push(Math.random() * 800 - 400);
+    pass_y.push(Math.random() * 800 - 400);
+    multiplier.push(0.2);
   }
 
   let data: Array<Array<number>> = [];

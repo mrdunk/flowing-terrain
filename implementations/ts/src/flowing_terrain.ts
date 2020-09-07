@@ -27,7 +27,8 @@
  * See https://github.com/mrdunk/flowing-terrain for more information. */
 
 import {SortedSet} from "./ordered_set"
-import {seed_points, slope_data} from "./genesis"
+import {seed_points, seed_points_to_array, slope_data} from "./genesis"
+import {draw_2d} from "./2d_view"
 
 export interface Coordinate {
   x: number;
@@ -109,6 +110,8 @@ export class Geography {
   // These points will be at height===0.
   starting_points(): void {
     const sea = seed_points(this.enviroment.tile_count);
+    draw_2d("2d_seed", seed_points_to_array(this.enviroment.tile_count, sea));
+
     for(let coord of sea) {
       const [x_str, y_str] = coord.split(",");
       const x = parseInt(x_str);
@@ -123,7 +126,10 @@ export class Geography {
   // Populate all tiles with height data. Also set the sealevel.
   heights_algorithm(): void {
     this.slopes = slope_data(this.enviroment.tile_count);
+    draw_2d("2d_heights", this.slopes);
 
+    let max_jitter = -999999999999;
+    let min_jitter = 999999999999;
     while(this.open_set_sorted.length) {
       let tile = this.open_set_sorted.shift();
       this.get_neighbours(tile).forEach((neighbour) => {
@@ -140,11 +146,19 @@ export class Geography {
 
           const height_diff = Math.max(this.slopes[x][y], 0);
           const unevenness = Math.max((this.slopes[x][y] - this.slopes[nx][ny]) + 0.03, 0);
+          const jitter = this.slopes[x][y] - this.slopes[nx][ny] + 0.3;
+          if(max_jitter < jitter) {
+            max_jitter = jitter;
+          } else if(min_jitter > jitter) {
+            min_jitter = jitter;
+          }
+          //console.log(height_diff, unevenness, jitter);
 
           neighbour.height = tile.height + 0.1;
           neighbour.height += orientation_mod * Math.pow(height_diff, 6) * 2;
           neighbour.height += orientation_mod * unevenness;
-          neighbour.height += orientation_mod * Math.random() * 0.2;
+          //neighbour.height += orientation_mod * jitter;
+          //neighbour.height += orientation_mod * Math.random() * 0.2;
           
           this.open_set_sorted.push(neighbour);
         }
@@ -154,6 +168,7 @@ export class Geography {
         }
       });
     }
+    console.log(min_jitter, max_jitter);
   }
 
   // Calculate the number of uphill tiles draining into each tile on the

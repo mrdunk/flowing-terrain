@@ -378,12 +378,14 @@ window.addEventListener("resize", function () {
 
 const menu_config = document.getElementById("config");
 menu_config.getElementsByClassName("expandButton")[0].addEventListener("click", (event) => {
-  const content = menu_config.getElementsByClassName("content")[0] as HTMLElement;
-  if(content.classList.contains("hidden")) {
-    content.classList.remove("hidden");
-  }
-  else {
-    content.classList.add("hidden");
+  for(let content of menu_config.getElementsByClassName("content")) {
+    //const content = menu_config.getElementsByClassName("content")[0] as HTMLElement;
+    if(content.classList.contains("hidden")) {
+      content.classList.remove("hidden");
+    }
+    else {
+      content.classList.add("hidden");
+    }
   }
 });
 

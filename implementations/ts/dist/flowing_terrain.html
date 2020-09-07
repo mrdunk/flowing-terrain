@@ -16,6 +16,12 @@
               font-size: 1em;
             }
 
+            span {
+              display: inline-block;
+              vertical-align: top;
+              padding-right: 1em;
+            }
+
             #renderCanvas {
                 width: 100%;
                 height: 100%;
@@ -80,32 +86,42 @@
     <div class="collapse" id="config">
       <div class="expandButton">+</div>
       <div class="content">
-        <div>This project is intended to document a simple algorithm for creating 3 dimensional terrain maps and their likely watercourses.</div>
-        <div>The map you see is randomly generated. Refresh for a new map. Cursor keys and mouse to move around.</div>
-        <div>An explanation of the algorithm can be found here:
-          <a href="https://github.com/mrdunk/flowing-terrain">https://github.com/mrdunk/flowing-terrain</a>
-        </div>
-        <div>This demonstration was made with the excellent
-          <a href="https://www.babylonjs.com/">Babylon.js</a> web rendering library.
-          <a href="https://www.babylonjs.com/">
-            <img src="https://raw.githubusercontent.com/BabylonJS/Brand-Toolkit/master/babylonjs_identity/fullColor/babylonjs_identity_color.svg" alt="Bablyon.js logo">
-          </a>
-        </div>
-        <div>
-          <input type="range" id="seaLevel" name="seaLevel"
-           min="0" max="10" step="0.1" value="1">
-          <label for="seaLevel">Sea Level</label>
-        </div>
-        <div>
-          <input type="range" id="rivers" name="rivers" min="0" max="10" value="3">
-          <label for="rivers">River Likelihood</label>
-        </div>
-        <div>
-          <input type="button" id="overhead_view" name="overhead_view" value="Overhead View">
-        </div>
-        <div>
-          <input type="button" id="inspector" name="inspector" value="Launch Inspector">
-        </div>
+        <span>
+          <div>This project is intended to document a simple algorithm for creating 3 dimensional terrain maps and their likely watercourses.</div>
+          <div>The map you see is randomly generated. Refresh for a new map. Cursor keys and mouse to move around.</div>
+          <div>An explanation of the algorithm can be found here:
+            <a href="https://github.com/mrdunk/flowing-terrain">https://github.com/mrdunk/flowing-terrain</a>
+          </div>
+          <div>This demonstration was made with the excellent
+            <a href="https://www.babylonjs.com/">Babylon.js</a> web rendering library.
+            <a href="https://www.babylonjs.com/">
+              <img src="https://raw.githubusercontent.com/BabylonJS/Brand-Toolkit/master/babylonjs_identity/fullColor/babylonjs_identity_color.svg" alt="Bablyon.js logo">
+            </a>
+          </div>
+          <div>
+            <input type="range" id="seaLevel" name="seaLevel"
+                                              min="0" max="10" step="0.1" value="1">
+            <label for="seaLevel">Sea Level</label>
+          </div>
+          <div>
+            <input type="range" id="rivers" name="rivers" min="0" max="10" value="3">
+            <label for="rivers">River Likelihood</label>
+          </div>
+          <div>
+            <input type="button" id="overhead_view" name="overhead_view" value="Overhead View">
+          </div>
+          <div>
+            <input type="button" id="inspector" name="inspector" value="Launch Inspector">
+          </div>
+        </span>
+        <span>
+          Seed points:<br/>
+          <canvas id="2d_seed"></canvas>
+        </span>
+        <span>
+          Height noise input:<br/>
+          <canvas id="2d_heights"></canvas>
+        </span>
       </div>
     </div>
     <div id="loader"><div id="loader_content">Loading...</div></div>

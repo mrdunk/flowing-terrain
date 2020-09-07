@@ -44,6 +44,55 @@ var n=function(e,t){return(n=Object.setPrototypeOf||{__proto__:[]}instanceof Arr
  * SOFTWARE.
  */
 
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.draw_2d = void 0;
+function draw_2d(id, data) {
+    var size = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 2;
+
+    var canvas = document.getElementById(id);
+    console.assert(canvas !== undefined, "Can't find canvas element: " + id);
+    var ctx = canvas.getContext('2d');
+    console.assert(data.length > 0, "Invalid data");
+    var y_len = data[0].length;
+    ctx.canvas.width = y_len * size;
+    ctx.canvas.height = data.length * size;
+    for (var x = 0; x < data.length; x++) {
+        console.assert(y_len === data[x].length, "Mismatched data lengths");
+        for (var y = 0; y < data[x].length; y++) {
+            var val = data[x][y] * 255;
+            ctx.fillStyle = "rgba(" + val + ", " + val + ", " + val + ", 1";
+            ctx.fillRect((data.length - x - 1) * size, y * size, size, size);
+        }
+    }
+}
+exports.draw_2d = draw_2d;
+
+},{}],3:[function(require,module,exports){
+"use strict";
+/*
+ * MIT License
+ *
+ * Copyright (c) 2020 duncan law
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 var _slicedToArray = function () { function sliceIterator(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"]) _i["return"](); } finally { if (_d) throw _e; } } return _arr; } return function (arr, i) { if (Array.isArray(arr)) { return arr; } else if (Symbol.iterator in Object(arr)) { return sliceIterator(arr, i); } else { throw new TypeError("Invalid attempt to destructure non-iterable instance"); } }; }();
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
@@ -57,6 +106,7 @@ exports.DisplayBase = exports.Geography = exports.Tile = exports.Enviroment = vo
  * See https://github.com/mrdunk/flowing-terrain for more information. */
 var ordered_set_1 = require("./ordered_set");
 var genesis_1 = require("./genesis");
+var _2d_view_1 = require("./2d_view");
 // State to be shared between all classes.
 
 var Enviroment = function Enviroment() {
@@ -148,6 +198,7 @@ var Geography = function () {
         key: "starting_points",
         value: function starting_points() {
             var sea = genesis_1.seed_points(this.enviroment.tile_count);
+            _2d_view_1.draw_2d("2d_seed", genesis_1.seed_points_to_array(this.enviroment.tile_count, sea));
             var _iteratorNormalCompletion = true;
             var _didIteratorError = false;
             var _iteratorError = undefined;
@@ -191,6 +242,9 @@ var Geography = function () {
             var _this = this;
 
             this.slopes = genesis_1.slope_data(this.enviroment.tile_count);
+            _2d_view_1.draw_2d("2d_heights", this.slopes);
+            var max_jitter = -999999999999;
+            var min_jitter = 999999999999;
 
             var _loop = function _loop() {
                 var tile = _this.open_set_sorted.shift();
@@ -205,10 +259,18 @@ var Geography = function () {
                         var orientation_mod = x !== nx && y !== ny ? 1.414 : 1;
                         var height_diff = Math.max(_this.slopes[x][y], 0);
                         var unevenness = Math.max(_this.slopes[x][y] - _this.slopes[nx][ny] + 0.03, 0);
+                        var jitter = _this.slopes[x][y] - _this.slopes[nx][ny] + 0.3;
+                        if (max_jitter < jitter) {
+                            max_jitter = jitter;
+                        } else if (min_jitter > jitter) {
+                            min_jitter = jitter;
+                        }
+                        //console.log(height_diff, unevenness, jitter);
                         neighbour.height = tile.height + 0.1;
                         neighbour.height += orientation_mod * Math.pow(height_diff, 6) * 2;
                         neighbour.height += orientation_mod * unevenness;
-                        neighbour.height += orientation_mod * Math.random() * 0.2;
+                        //neighbour.height += orientation_mod * jitter;
+                        //neighbour.height += orientation_mod * Math.random() * 0.2;
                         _this.open_set_sorted.push(neighbour);
                     }
                     if (neighbour.height > _this.enviroment.highest_point) {
@@ -220,6 +282,7 @@ var Geography = function () {
             while (this.open_set_sorted.length) {
                 _loop();
             }
+            console.log(min_jitter, max_jitter);
         }
         // Calculate the number of uphill tiles draining into each tile on the
         // map. High tile.dampness values indicate a river runs through that tile.
@@ -349,7 +412,7 @@ var DisplayBase = function () {
 
 exports.DisplayBase = DisplayBase;
 
-},{"./genesis":3,"./ordered_set":5}],3:[function(require,module,exports){
+},{"./2d_view":2,"./genesis":4,"./ordered_set":6}],4:[function(require,module,exports){
 "use strict";
 /*
  * MIT License
@@ -378,7 +441,7 @@ exports.DisplayBase = DisplayBase;
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.slope_data = exports.seed_points = void 0;
+exports.slope_data = exports.seed_points = exports.seed_points_to_array = void 0;
 var ordered_set_1 = require("./ordered_set");
 /* Convert Coordinate into something that can be used as a key in a Set(). */
 function coord_to_str(coord) {
@@ -414,6 +477,18 @@ function compare_floods(a, b) {
     }
     return a.coordinate.y - b.coordinate.y;
 }
+function seed_points_to_array(tile_count, sea) {
+    var sea_array = [];
+    for (var x = 0; x < tile_count; x++) {
+        var row = [];
+        for (var y = 0; y < tile_count; y++) {
+            row.push(sea.has(coord_to_str({ x: x, y: y })) ? 1 : 0);
+        }
+        sea_array.push(row);
+    }
+    return sea_array;
+}
+exports.seed_points_to_array = seed_points_to_array;
 /* Function to generate an area of the seabed from which to generate height.
  * Areas not in the returned set will never be above the base seabed height. */
 function seed_points(tile_count) {
@@ -456,35 +531,6 @@ function seed_points(tile_count) {
     while (open.length > 0) {
         _loop();
     }
-    // Display the seed area in the console.
-    console.log("Seed points:");
-    var line = "   ";
-    for (var i = 0; i < tile_count; i++) {
-        if (i % 10 == 0) {
-            line += "" + i;
-            if (i < 10) {
-                line += " ";
-            }
-        } else {
-            line += "  ";
-        }
-    }
-    console.log(line);
-    for (var _y2 = 0; _y2 < tile_count; _y2++) {
-        line = _y2 + " ";
-        if (_y2 < 10) {
-            line += " ";
-        }
-        for (var _x2 = tile_count - 1; _x2 >= 0; _x2--) {
-            var key = coord_to_str({ x: _x2, y: _y2 });
-            if (sea.has(key)) {
-                line += "~ ";
-            } else {
-                line += "# ";
-            }
-        }
-        console.log(line);
-    }
     return sea;
 }
 exports.seed_points = seed_points;
@@ -502,14 +548,24 @@ function slope_data(tile_count) {
         multiplier.push(1);
     }
     for (var _i2 = 0; _i2 < 4; _i2++) {
-        pass_x.push(Math.random() * 50 - 25);
-        pass_y.push(Math.random() * 50 - 25);
-        multiplier.push(0.5);
+        //pass_x.push(Math.random() * 50 - 25);
+        //pass_y.push(Math.random() * 50 - 25);
+        //multiplier.push(0.5);
     }
-    for (var _i3 = 0; _i3 < 3; _i3++) {
-        pass_x.push(Math.random() * 100 - 50);
-        pass_y.push(Math.random() * 100 - 50);
-        multiplier.push(0.5);
+    for (var _i3 = 0; _i3 < 30; _i3++) {
+        //pass_x.push(Math.random() * 100 - 50);
+        //pass_y.push(Math.random() * 100 - 50);
+        //multiplier.push(0.2);
+    }
+    for (var _i4 = 0; _i4 < 30; _i4++) {
+        //pass_x.push(Math.random() * 400 - 200);
+        //pass_y.push(Math.random() * 400 - 200);
+        //multiplier.push(0.2);
+    }
+    for (var _i5 = 0; _i5 < 30; _i5++) {
+        pass_x.push(Math.random() * 800 - 400);
+        pass_y.push(Math.random() * 800 - 400);
+        multiplier.push(0.2);
     }
     var data = [];
     var min = 99999999999;
@@ -518,10 +574,10 @@ function slope_data(tile_count) {
     var _loop2 = function _loop2(y) {
         var row = [];
 
-        var _loop3 = function _loop3(_x3) {
+        var _loop3 = function _loop3(_x2) {
             var val = 0;
             pass_x.forEach(function (mod, index) {
-                val += multiplier[index] * seed[Math.round(mod * _x3 + pass_y[index] * y) & 0xff - 1];
+                val += multiplier[index] * seed[Math.round(mod * _x2 + pass_y[index] * y) & 0xff - 1];
             });
             row.push(val);
             if (val > max) {
@@ -531,8 +587,8 @@ function slope_data(tile_count) {
             }
         };
 
-        for (var _x3 = 0; _x3 < tile_count; _x3++) {
-            _loop3(_x3);
+        for (var _x2 = 0; _x2 < tile_count; _x2++) {
+            _loop3(_x2);
         }
         data.push(row);
     };
@@ -552,7 +608,7 @@ function slope_data(tile_count) {
 }
 exports.slope_data = slope_data;
 
-},{"./ordered_set":5}],4:[function(require,module,exports){
+},{"./ordered_set":6}],5:[function(require,module,exports){
 "use strict";
 /*
  * MIT License
@@ -908,11 +964,34 @@ window.addEventListener("resize", function () {
 // UI components below this point.
 var menu_config = document.getElementById("config");
 menu_config.getElementsByClassName("expandButton")[0].addEventListener("click", function (event) {
-    var content = menu_config.getElementsByClassName("content")[0];
-    if (content.classList.contains("hidden")) {
-        content.classList.remove("hidden");
-    } else {
-        content.classList.add("hidden");
+    var _iteratorNormalCompletion = true;
+    var _didIteratorError = false;
+    var _iteratorError = undefined;
+
+    try {
+        for (var _iterator = menu_config.getElementsByClassName("content")[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+            var content = _step.value;
+
+            //const content = menu_config.getElementsByClassName("content")[0] as HTMLElement;
+            if (content.classList.contains("hidden")) {
+                content.classList.remove("hidden");
+            } else {
+                content.classList.add("hidden");
+            }
+        }
+    } catch (err) {
+        _didIteratorError = true;
+        _iteratorError = err;
+    } finally {
+        try {
+            if (!_iteratorNormalCompletion && _iterator.return) {
+                _iterator.return();
+            }
+        } finally {
+            if (_didIteratorError) {
+                throw _iteratorError;
+            }
+        }
     }
 });
 function menu_sealevel_handler(event) {
@@ -942,7 +1021,7 @@ var menu_inspector = document.getElementById("inspector");
 menu_inspector.addEventListener("click", menu_inspector_handler);
 document.getElementById('renderCanvas').focus();
 
-},{"./flowing_terrain":2,"babylonjs":1}],5:[function(require,module,exports){
+},{"./flowing_terrain":3,"babylonjs":1}],6:[function(require,module,exports){
 "use strict";
 /*
 # MIT License
@@ -1073,6 +1152,6 @@ var SortedSet = function () {
 
 exports.SortedSet = SortedSet;
 
-},{}]},{},[4])
+},{}]},{},[5])
 
 //# sourceMappingURL=bundle.js.map
