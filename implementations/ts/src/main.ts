@@ -40,34 +40,55 @@ function time(label: string, to_time: () => any) {
 }
 
 window.onload = () => {
-  // Create all the components, timing how long they take.
-  const enviroment = new Enviroment;
+  let enviroment: Enviroment = null;
+  let sea: Set<string> = null;
+  let noise: Array<Array<number>> = null;
+  let geography: Geography = null;
+  let display: Display_3d = null;
 
-  const sea = time("seed_points", () => {
-    return seed_points(enviroment.tile_count);
-  });
 
-  const noise = time("get_noise", () => {
-    return get_noise(enviroment.tile_count);
-  });
+  function setup() {
+    // Create all the components, timing how long they take.
+    enviroment = new Enviroment;
 
-  const geography = time("geography", () => {
-    return new Geography(enviroment, sea, noise);
-  });
+    sea = time("seed_points", () => {
+      return seed_points(enviroment.tile_count);
+    });
 
-  time("2d_display", () => {
-    draw_2d("2d_seed", seed_points_to_array(enviroment.tile_count, sea));
-    draw_2d("2d_heights", noise);
-    draw_2d("2d_output", 
-      geography.tiles,
-      (tile: Tile) => { return tile.height / enviroment.highest_point;});
-  });
+    noise = time("get_noise", () => {
+      return get_noise(enviroment.tile_count);
+    });
 
-  const display = time("3d_display", () => {
-    return new Display_3d(geography);
-  });
+    geography = time("geography", () => {
+      if(geography === null) {
+        return new Geography(enviroment, sea, noise);
+      } else {
+        geography.terraform(enviroment, sea, noise);
+        return geography;
+      }
+    });
 
-  console.log(stats);
+    time("2d_display", () => {
+      draw_2d("2d_seed", seed_points_to_array(enviroment.tile_count, sea));
+      draw_2d("2d_heights", noise);
+      draw_2d("2d_output", 
+        geography.tiles,
+        (tile: Tile) => { return tile.height / enviroment.highest_point;});
+    });
+
+    display = time("3d_display", () => {
+      if(display === null) {
+        return new Display_3d(geography);
+      } else {
+        display.draw();
+        return display;
+      }
+    });
+
+    console.log(stats);
+  }
+
+  setup();
 
   // Start drawing the 3d view.
   display.engine.runRenderLoop(() => {
@@ -116,6 +137,13 @@ window.onload = () => {
   }
   const overhead_view = document.getElementById("overhead_view") as HTMLInputElement;
   overhead_view.addEventListener("click", menu_overhead_view);
+
+  function menu_terraform_handler(event: Event) {
+    console.log("terraform");
+    setup();
+  }
+  const menu_terraform = document.getElementById("terraform") as HTMLInputElement;
+  menu_terraform.addEventListener("click", menu_terraform_handler);
 
   function menu_inspector_handler(event: Event) {
     display.scene.debugLayer.show({embedMode:true});

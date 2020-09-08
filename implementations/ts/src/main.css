@@ -23,7 +23,7 @@ span {
 }
 
 .collapse {
-  background: white;
+  background: rgba(255, 255, 255, 0.66);
   margin: 5px;
   border: solid;
   border-color: darkgrey;

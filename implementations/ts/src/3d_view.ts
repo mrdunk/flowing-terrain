@@ -105,9 +105,13 @@ export class Display_3d extends DisplayBase {
 
   // Called before iteration through map's points.
   draw_start(): void {
-    console.assert(this.positions.length === 0)
-    console.assert(this.indices.length === 0)
-    console.assert(this.rivers.length === 0)
+    this.scene.meshes.forEach((mesh) => {
+      mesh.dispose();
+    });
+
+    this.positions = [];
+    this.indices = [];
+    this.rivers = [];
 
     for(let y = 0; y < this.enviroment.tile_count; y++) {
       for(let x = 0; x < this.enviroment.tile_count; x++) {

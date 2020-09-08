@@ -143,29 +143,25 @@ export function get_noise(tile_count: number): Array<Array<number>> {
   let pass_x: Array<number> = [];
   let pass_y: Array<number> = [];
   let multiplier: Array<number> = [];
+
+  let coefficient = 1000 / tile_count;
   for(let i = 0; i < Math.round(Math.random() * 5); i++) {
-    pass_x.push(Math.random() * 20 - 10);
-    pass_y.push(Math.random() * 20 - 10);
+    pass_x.push(Math.random() * coefficient - coefficient / 2);
+    pass_y.push(Math.random() * coefficient - coefficient / 2);
     multiplier.push(1);
   }
-  for(let i = 0; i < 4; i++) {
-    //pass_x.push(Math.random() * 50 - 25);
-    //pass_y.push(Math.random() * 50 - 25);
-    //multiplier.push(0.5);
+
+  coefficient = 8000 / tile_count;
+  for(let i = 0; i < Math.round(Math.random() * 5); i++) {
+    pass_x.push(Math.random() * coefficient - coefficient / 2);
+    pass_y.push(Math.random() * coefficient - coefficient / 2);
+    multiplier.push(0.5);
   }
-  for(let i = 0; i < 30; i++) {
-    //pass_x.push(Math.random() * 100 - 50);
-    //pass_y.push(Math.random() * 100 - 50);
-    //multiplier.push(0.2);
-  }
-  for(let i = 0; i < 30; i++) {
-    //pass_x.push(Math.random() * 400 - 200);
-    //pass_y.push(Math.random() * 400 - 200);
-    //multiplier.push(0.2);
-  }
+
+  coefficient = 800;
   for(let i = 0; i < 10; i++) {
-    pass_x.push(Math.random() * 800 - 400);
-    pass_y.push(Math.random() * 800 - 400);
+    pass_x.push(Math.random() * coefficient - coefficient / 2);
+    pass_y.push(Math.random() * coefficient - coefficient / 2);
     multiplier.push(0.2);
   }
 

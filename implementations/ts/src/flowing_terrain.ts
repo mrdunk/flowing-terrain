@@ -73,9 +73,16 @@ export class Geography {
   open_set_sorted: SortedSet = new SortedSet([], this.compare_tiles);
 
   constructor(enviroment: Enviroment, seed_points: Set<string>, noise: Array<Array<number>>) {
+    this.terraform(enviroment, seed_points, noise);
+  }
+
+  terraform(enviroment: Enviroment, seed_points: Set<string>, noise: Array<Array<number>>) {
     this.enviroment = enviroment;
     this.seed_points = seed_points;
     this.noise = noise;
+
+    // Clear existing geography.
+    this.tiles = [];
 
     // Populate tile array with un-configured Tile elements.
     for(let x = 0; x < this.enviroment.tile_count; x++) {

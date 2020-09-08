@@ -172,9 +172,12 @@ var Display_3d = function (_flowing_terrain_1$Di) {
     }, {
         key: "draw_start",
         value: function draw_start() {
-            console.assert(this.positions.length === 0);
-            console.assert(this.indices.length === 0);
-            console.assert(this.rivers.length === 0);
+            this.scene.meshes.forEach(function (mesh) {
+                mesh.dispose();
+            });
+            this.positions = [];
+            this.indices = [];
+            this.rivers = [];
             for (var y = 0; y < this.enviroment.tile_count; y++) {
                 for (var x = 0; x < this.enviroment.tile_count; x++) {
                     // TODO: Some of these positions are not actually used.
@@ -501,26 +504,33 @@ var Geography = function () {
 
         this.tiles = [];
         this.open_set_sorted = new ordered_set_1.SortedSet([], this.compare_tiles);
-        this.enviroment = enviroment;
-        this.seed_points = seed_points;
-        this.noise = noise;
-        // Populate tile array with un-configured Tile elements.
-        for (var x = 0; x < this.enviroment.tile_count; x++) {
-            var row = [];
-            for (var y = 0; y < this.enviroment.tile_count; y++) {
-                var tile = new Tile({ x: x, y: y }, this.enviroment);
-                row.push(tile);
-            }
-            this.tiles.push(row);
-        }
-        this.starting_points();
-        this.heights_algorithm();
-        this.drainage_algorithm();
+        this.terraform(enviroment, seed_points, noise);
     }
-    // Used for sorting tiles according to height.
-
 
     _createClass(Geography, [{
+        key: "terraform",
+        value: function terraform(enviroment, seed_points, noise) {
+            this.enviroment = enviroment;
+            this.seed_points = seed_points;
+            this.noise = noise;
+            // Clear existing geography.
+            this.tiles = [];
+            // Populate tile array with un-configured Tile elements.
+            for (var x = 0; x < this.enviroment.tile_count; x++) {
+                var row = [];
+                for (var y = 0; y < this.enviroment.tile_count; y++) {
+                    var tile = new Tile({ x: x, y: y }, this.enviroment);
+                    row.push(tile);
+                }
+                this.tiles.push(row);
+            }
+            this.starting_points();
+            this.heights_algorithm();
+            this.drainage_algorithm();
+        }
+        // Used for sorting tiles according to height.
+
+    }, {
         key: "compare_tiles",
         value: function compare_tiles(a, b) {
             var diff = a.height - b.height;
@@ -868,29 +878,22 @@ function get_noise(tile_count) {
     var pass_x = [];
     var pass_y = [];
     var multiplier = [];
+    var coefficient = 1000 / tile_count;
     for (var _i = 0; _i < Math.round(Math.random() * 5); _i++) {
-        pass_x.push(Math.random() * 20 - 10);
-        pass_y.push(Math.random() * 20 - 10);
+        pass_x.push(Math.random() * coefficient - coefficient / 2);
+        pass_y.push(Math.random() * coefficient - coefficient / 2);
         multiplier.push(1);
     }
-    for (var _i2 = 0; _i2 < 4; _i2++) {
-        //pass_x.push(Math.random() * 50 - 25);
-        //pass_y.push(Math.random() * 50 - 25);
-        //multiplier.push(0.5);
+    coefficient = 8000 / tile_count;
+    for (var _i2 = 0; _i2 < Math.round(Math.random() * 5); _i2++) {
+        pass_x.push(Math.random() * coefficient - coefficient / 2);
+        pass_y.push(Math.random() * coefficient - coefficient / 2);
+        multiplier.push(0.5);
     }
-    for (var _i3 = 0; _i3 < 30; _i3++) {
-        //pass_x.push(Math.random() * 100 - 50);
-        //pass_y.push(Math.random() * 100 - 50);
-        //multiplier.push(0.2);
-    }
-    for (var _i4 = 0; _i4 < 30; _i4++) {
-        //pass_x.push(Math.random() * 400 - 200);
-        //pass_y.push(Math.random() * 400 - 200);
-        //multiplier.push(0.2);
-    }
-    for (var _i5 = 0; _i5 < 10; _i5++) {
-        pass_x.push(Math.random() * 800 - 400);
-        pass_y.push(Math.random() * 800 - 400);
+    coefficient = 800;
+    for (var _i3 = 0; _i3 < 10; _i3++) {
+        pass_x.push(Math.random() * coefficient - coefficient / 2);
+        pass_y.push(Math.random() * coefficient - coefficient / 2);
         multiplier.push(0.2);
     }
     var data = [];
@@ -975,32 +978,50 @@ function time(label, to_time) {
     return return_val;
 }
 window.onload = function () {
-    // Create all the components, timing how long they take.
-    var enviroment = new flowing_terrain_1.Enviroment();
-    var sea = time("seed_points", function () {
-        return genesis_1.seed_points(enviroment.tile_count);
-    });
-    var noise = time("get_noise", function () {
-        return genesis_1.get_noise(enviroment.tile_count);
-    });
-    var geography = time("geography", function () {
-        return new flowing_terrain_1.Geography(enviroment, sea, noise);
-    });
-    time("2d_display", function () {
-        _2d_view_1.draw_2d("2d_seed", genesis_1.seed_points_to_array(enviroment.tile_count, sea));
-        _2d_view_1.draw_2d("2d_heights", noise);
-        _2d_view_1.draw_2d("2d_output", geography.tiles, function (tile) {
-            return tile.height / enviroment.highest_point;
+    var enviroment = null;
+    var sea = null;
+    var noise = null;
+    var geography = null;
+    var display = null;
+    function setup() {
+        // Create all the components, timing how long they take.
+        enviroment = new flowing_terrain_1.Enviroment();
+        sea = time("seed_points", function () {
+            return genesis_1.seed_points(enviroment.tile_count);
         });
-    });
-    var display = time("3d_display", function () {
-        return new _3d_view_1.Display_3d(geography);
-    });
-    console.log(stats);
+        noise = time("get_noise", function () {
+            return genesis_1.get_noise(enviroment.tile_count);
+        });
+        geography = time("geography", function () {
+            if (geography === null) {
+                return new flowing_terrain_1.Geography(enviroment, sea, noise);
+            } else {
+                geography.terraform(enviroment, sea, noise);
+                return geography;
+            }
+        });
+        time("2d_display", function () {
+            _2d_view_1.draw_2d("2d_seed", genesis_1.seed_points_to_array(enviroment.tile_count, sea));
+            _2d_view_1.draw_2d("2d_heights", noise);
+            _2d_view_1.draw_2d("2d_output", geography.tiles, function (tile) {
+                return tile.height / enviroment.highest_point;
+            });
+        });
+        display = time("3d_display", function () {
+            if (display === null) {
+                return new _3d_view_1.Display_3d(geography);
+            } else {
+                display.draw();
+                return display;
+            }
+        });
+        console.log(stats);
+    }
+    setup();
     // Start drawing the 3d view.
-    //display.engine.runRenderLoop(() => {
-    display.scene.render();
-    //})
+    display.engine.runRenderLoop(function () {
+        display.scene.render();
+    });
     window.addEventListener("resize", function () {
         display.engine.resize();
     });
@@ -1057,6 +1078,12 @@ window.onload = function () {
     }
     var overhead_view = document.getElementById("overhead_view");
     overhead_view.addEventListener("click", menu_overhead_view);
+    function menu_terraform_handler(event) {
+        console.log("terraform");
+        setup();
+    }
+    var menu_terraform = document.getElementById("terraform");
+    menu_terraform.addEventListener("click", menu_terraform_handler);
     function menu_inspector_handler(event) {
         display.scene.debugLayer.show({ embedMode: true });
     }
