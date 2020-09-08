@@ -3,84 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <title>Hello Flowing World!</title>
-    <style>
-            html, body {
-                overflow: hidden;
-                width: 100%;
-                height: 100%;
-                margin: 0;
-                padding: 0;
-            }
-
-            div {
-              font-size: 1em;
-            }
-
-            span {
-              display: inline-block;
-              vertical-align: top;
-              padding-right: 1em;
-            }
-
-            #renderCanvas {
-                width: 100%;
-                height: 100%;
-                touch-action: none;
-            }
-
-            .collapse {
-              background: white;
-              margin: 5px;
-              border: solid;
-              border-color: darkgrey;
-              border-width: thin;
-              position: fixed;
-              z-index: 100;
-            }
-
-            .collapse .expandButton {
-              background: grey;
-              cursor: default;
-              border: solid;
-              border-color: darkgrey;
-              display: table;
-            }
-
-            .collapse .content {
-              animation-duration: 2s;
-              width: 95%;
-              display: block;
-              white-space: nowrap;
-            }
-
-            .collapse .content.hidden {
-              animation-duration: 2s;
-              display: none;
-            }
-
-            .content img{
-              height: 2em;
-              vertical-align: top;
-              float: right;
-            }
-
-            #loader {
-              position: relative;
-              height: 100%;
-            }
-            #loader_content {
-              width: 200px;
-              height: 50px;
-              background-color: green;
-              display: block;
-              text-align: center;
-              font-size: xx-large;
-              position: absolute;
-              top: 50%;
-              left: 50%;
-              margin: -25px 0 0 -25px;
-            }
-    </style>
+    <link rel="stylesheet" href="./main.css">
   </head>
   <body>
     <div class="collapse" id="config">
@@ -121,6 +44,10 @@
         <span>
           Height noise input:<br/>
           <canvas id="2d_heights"></canvas>
+        </span>
+        <span>
+          Output:<br/>
+          <canvas id="2d_output"></canvas>
         </span>
       </div>
     </div>

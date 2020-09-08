@@ -134,7 +134,7 @@ export function seed_points(tile_count: number): Set<string> {
   return sea;
 }
 
-export function slope_data(tile_count: number): Array<Array<number>> {
+export function get_noise(tile_count: number): Array<Array<number>> {
   let seed: Array<number> = [];
   for(let i = 0; i < 0xFF; i++) {
     seed.push(Math.sin(i * Math.PI / 0x7F));
@@ -143,7 +143,7 @@ export function slope_data(tile_count: number): Array<Array<number>> {
   let pass_x: Array<number> = [];
   let pass_y: Array<number> = [];
   let multiplier: Array<number> = [];
-  for(let i = 0; i < 3; i++) {
+  for(let i = 0; i < Math.round(Math.random() * 5); i++) {
     pass_x.push(Math.random() * 20 - 10);
     pass_y.push(Math.random() * 20 - 10);
     multiplier.push(1);
@@ -163,7 +163,7 @@ export function slope_data(tile_count: number): Array<Array<number>> {
     //pass_y.push(Math.random() * 400 - 200);
     //multiplier.push(0.2);
   }
-  for(let i = 0; i < 30; i++) {
+  for(let i = 0; i < 10; i++) {
     pass_x.push(Math.random() * 800 - 400);
     pass_y.push(Math.random() * 800 - 400);
     multiplier.push(0.2);

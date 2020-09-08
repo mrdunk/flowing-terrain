@@ -47,7 +47,10 @@ var n=function(e,t){return(n=Object.setPrototypeOf||{__proto__:[]}instanceof Arr
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.draw_2d = void 0;
 function draw_2d(id, data) {
-    var size = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 2;
+    var accessor = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : function (item) {
+        return item;
+    };
+    var size = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : 2;
 
     var canvas = document.getElementById(id);
     console.assert(canvas !== undefined, "Can't find canvas element: " + id);
@@ -59,7 +62,7 @@ function draw_2d(id, data) {
     for (var x = 0; x < data.length; x++) {
         console.assert(y_len === data[x].length, "Mismatched data lengths");
         for (var y = 0; y < data[x].length; y++) {
-            var val = data[x][y] * 255;
+            var val = accessor(data[x][y]) * 255;
             ctx.fillStyle = "rgba(" + val + ", " + val + ", " + val + ", 1";
             ctx.fillRect((data.length - x - 1) * size, y * size, size, size);
         }
@@ -68,547 +71,6 @@ function draw_2d(id, data) {
 exports.draw_2d = draw_2d;
 
 },{}],3:[function(require,module,exports){
-"use strict";
-/*
- * MIT License
- *
- * Copyright (c) 2020 duncan law
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- */
-
-var _slicedToArray = function () { function sliceIterator(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"]) _i["return"](); } finally { if (_d) throw _e; } } return _arr; } return function (arr, i) { if (Array.isArray(arr)) { return arr; } else if (Symbol.iterator in Object(arr)) { return sliceIterator(arr, i); } else { throw new TypeError("Invalid attempt to destructure non-iterable instance"); } }; }();
-
-var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
-
-function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.DisplayBase = exports.Geography = exports.Tile = exports.Enviroment = void 0;
-/* An algorithm for generating procedurally generated terrain where there is
- * always a downhill path to the sea from any tile.
- * See https://github.com/mrdunk/flowing-terrain for more information. */
-var ordered_set_1 = require("./ordered_set");
-var genesis_1 = require("./genesis");
-var _2d_view_1 = require("./2d_view");
-// State to be shared between all classes.
-
-var Enviroment = function Enviroment() {
-    _classCallCheck(this, Enviroment);
-
-    this.highest_point = 0;
-    this.sealevel = 1;
-    this.dampest = 0;
-    this.tile_count = 100;
-};
-
-exports.Enviroment = Enviroment;
-// A single point on the map.
-
-var Tile = function () {
-    function Tile(pos, enviroment) {
-        _classCallCheck(this, Tile);
-
-        this.pos = { x: -1, y: -1 };
-        this.height = null;
-        this.dampness = 1;
-        this.lowest_neighbour = null;
-        this.pos = pos;
-        this.enviroment = enviroment;
-    }
-
-    _createClass(Tile, [{
-        key: "toString",
-        value: function toString() {
-            return "x: " + this.pos.x + " y: " + this.pos.y + ", height: " + this.height;
-        }
-    }, {
-        key: "key",
-        value: function key() {
-            return this.pos.x + "," + this.pos.y;
-        }
-    }]);
-
-    return Tile;
-}();
-
-exports.Tile = Tile;
-// Data for a procedurally generated map.
-
-var Geography = function () {
-    function Geography() {
-        _classCallCheck(this, Geography);
-
-        this.tiles = [];
-        this.enviroment = new Enviroment();
-        this.open_set_sorted = new ordered_set_1.SortedSet([], this.compare_tiles);
-        var t0 = performance.now();
-        // Populate tile array with un-configured Tile elements.
-        for (var y = 0; y < this.enviroment.tile_count; y++) {
-            var row = [];
-            for (var x = 0; x < this.enviroment.tile_count; x++) {
-                var tile = new Tile({ x: x, y: y }, this.enviroment);
-                row.push(tile);
-            }
-            this.tiles.push(row);
-        }
-        this.starting_points();
-        this.heights_algorithm();
-        this.drainage_algorithm();
-        var t1 = performance.now();
-        console.log("Generating Geography took: " + (t1 - t0) + "ms");
-    }
-    // Used for sorting tiles according to height.
-
-
-    _createClass(Geography, [{
-        key: "compare_tiles",
-        value: function compare_tiles(a, b) {
-            var diff = a.height - b.height;
-            if (diff !== 0) {
-                return diff;
-            }
-            diff = a.pos.x - b.pos.x;
-            if (diff !== 0) {
-                return diff;
-            }
-            diff = a.pos.y - b.pos.y;
-            return diff;
-        }
-        // Set seed heights on map to start the height generation algorithm at.
-        // These points will be at height===0.
-
-    }, {
-        key: "starting_points",
-        value: function starting_points() {
-            var sea = genesis_1.seed_points(this.enviroment.tile_count);
-            _2d_view_1.draw_2d("2d_seed", genesis_1.seed_points_to_array(this.enviroment.tile_count, sea));
-            var _iteratorNormalCompletion = true;
-            var _didIteratorError = false;
-            var _iteratorError = undefined;
-
-            try {
-                for (var _iterator = sea[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
-                    var coord = _step.value;
-
-                    var _coord$split = coord.split(","),
-                        _coord$split2 = _slicedToArray(_coord$split, 2),
-                        x_str = _coord$split2[0],
-                        y_str = _coord$split2[1];
-
-                    var x = parseInt(x_str);
-                    var y = parseInt(y_str);
-                    var tile = this.get_tile({ x: x, y: y });
-                    console.assert(tile !== null, { x: x, y: y, tile: tile });
-                    tile.height = 0;
-                    this.open_set_sorted.push(tile);
-                }
-            } catch (err) {
-                _didIteratorError = true;
-                _iteratorError = err;
-            } finally {
-                try {
-                    if (!_iteratorNormalCompletion && _iterator.return) {
-                        _iterator.return();
-                    }
-                } finally {
-                    if (_didIteratorError) {
-                        throw _iteratorError;
-                    }
-                }
-            }
-        }
-        // Populate all tiles with height data. Also set the sealevel.
-
-    }, {
-        key: "heights_algorithm",
-        value: function heights_algorithm() {
-            var _this = this;
-
-            this.slopes = genesis_1.slope_data(this.enviroment.tile_count);
-            _2d_view_1.draw_2d("2d_heights", this.slopes);
-            var max_jitter = -999999999999;
-            var min_jitter = 999999999999;
-
-            var _loop = function _loop() {
-                var tile = _this.open_set_sorted.shift();
-                _this.get_neighbours(tile).forEach(function (neighbour) {
-                    if (neighbour.height === null) {
-                        var x = tile.pos.x;
-                        var y = tile.pos.y;
-                        var nx = neighbour.pos.x;
-                        var ny = neighbour.pos.y;
-                        // Diagonal neighbours will affect twice as many tiles as opposite
-                        // ones so halve their effect.
-                        var orientation_mod = x !== nx && y !== ny ? 1.414 : 1;
-                        var height_diff = Math.max(_this.slopes[x][y], 0);
-                        var unevenness = Math.max(_this.slopes[x][y] - _this.slopes[nx][ny] + 0.03, 0);
-                        var jitter = _this.slopes[x][y] - _this.slopes[nx][ny] + 0.3;
-                        if (max_jitter < jitter) {
-                            max_jitter = jitter;
-                        } else if (min_jitter > jitter) {
-                            min_jitter = jitter;
-                        }
-                        //console.log(height_diff, unevenness, jitter);
-                        neighbour.height = tile.height + 0.1;
-                        neighbour.height += orientation_mod * Math.pow(height_diff, 6) * 2;
-                        neighbour.height += orientation_mod * unevenness;
-                        //neighbour.height += orientation_mod * jitter;
-                        //neighbour.height += orientation_mod * Math.random() * 0.2;
-                        _this.open_set_sorted.push(neighbour);
-                    }
-                    if (neighbour.height > _this.enviroment.highest_point) {
-                        _this.enviroment.highest_point = neighbour.height;
-                    }
-                });
-            };
-
-            while (this.open_set_sorted.length) {
-                _loop();
-            }
-            console.log(min_jitter, max_jitter);
-        }
-        // Calculate the number of uphill tiles draining into each tile on the
-        // map. High tile.dampness values indicate a river runs through that tile.
-
-    }, {
-        key: "drainage_algorithm",
-        value: function drainage_algorithm() {
-            var _this2 = this;
-
-            this.open_set_sorted.clear();
-            for (var y = 0; y < this.enviroment.tile_count; y++) {
-                for (var x = 0; x < this.enviroment.tile_count; x++) {
-                    var _tile = this.get_tile({ x: x, y: y });
-                    this.open_set_sorted.push(_tile);
-                }
-            }
-            // Work through all tiles from the highest on the map downwards.
-            this.enviroment.dampest = 0;
-
-            var _loop2 = function _loop2() {
-                var tile = _this2.open_set_sorted.pop();
-                if (tile.height === 0) {
-                    return "continue";
-                }
-                var lowest_neighbours = [];
-                _this2.get_neighbours(tile).forEach(function (neighbour) {
-                    if (neighbour !== null && neighbour.height < tile.height) {
-                        if (lowest_neighbours.length === 0) {
-                            lowest_neighbours = [neighbour];
-                        } else if (neighbour.height < lowest_neighbours[0].height) {
-                            lowest_neighbours = [neighbour];
-                        } else if (neighbour.height === lowest_neighbours[0].height) {
-                            lowest_neighbours.push(neighbour);
-                        }
-                    }
-                });
-                console.assert(lowest_neighbours.length !== 0);
-                tile.lowest_neighbour = lowest_neighbours[Math.floor(Math.random() * lowest_neighbours.length)];
-                tile.lowest_neighbour.dampness += tile.dampness;
-                if (tile.lowest_neighbour.dampness > _this2.enviroment.dampest && tile.lowest_neighbour.height > 0) {
-                    _this2.enviroment.dampest = tile.lowest_neighbour.dampness;
-                }
-                console.assert(tile.lowest_neighbour.dampness > tile.dampness);
-            };
-
-            while (this.open_set_sorted.length > 0) {
-                var _ret2 = _loop2();
-
-                if (_ret2 === "continue") continue;
-            }
-        }
-    }, {
-        key: "get_tile",
-        value: function get_tile(coordinate) {
-            if (coordinate.x < 0 || coordinate.y < 0 || coordinate.x >= this.enviroment.tile_count || coordinate.y >= this.enviroment.tile_count) {
-                return null;
-            }
-            return this.tiles[coordinate.y][coordinate.x];
-        }
-    }, {
-        key: "get_neighbours",
-        value: function get_neighbours(tile) {
-            var neighbours = [this.get_tile({ x: tile.pos.x - 1, y: tile.pos.y - 1 }), this.get_tile({ x: tile.pos.x - 1, y: tile.pos.y }), this.get_tile({ x: tile.pos.x - 1, y: tile.pos.y + 1 }), this.get_tile({ x: tile.pos.x, y: tile.pos.y - 1 }), this.get_tile({ x: tile.pos.x, y: tile.pos.y + 1 }), this.get_tile({ x: tile.pos.x + 1, y: tile.pos.y - 1 }), this.get_tile({ x: tile.pos.x + 1, y: tile.pos.y }), this.get_tile({ x: tile.pos.x + 1, y: tile.pos.y + 1 })];
-            return neighbours.filter(function (neighbour) {
-                return neighbour !== null;
-            });
-        }
-    }]);
-
-    return Geography;
-}();
-
-exports.Geography = Geography;
-// Example to iterate over a Geography object.
-
-var DisplayBase = function () {
-    function DisplayBase() {
-        _classCallCheck(this, DisplayBase);
-    }
-    // Access all points in Geography and call `draw_tile(...)` method on each.
-
-
-    _createClass(DisplayBase, [{
-        key: "draw",
-        value: function draw() {
-            this.geography = new Geography();
-            this.enviroment = this.geography.enviroment;
-            this.draw_start();
-            for (var y = 0; y < this.enviroment.tile_count; y += 1) {
-                for (var x = 0; x < this.enviroment.tile_count; x += 1) {
-                    var _tile2 = this.geography.get_tile({ x: x, y: y });
-                    this.draw_tile(_tile2);
-                    //this.draw_river(tile, tile.lowest_neighbour);
-                }
-            }
-            this.draw_end();
-        }
-        // Called before iteration through map's points.
-
-    }, {
-        key: "draw_start",
-        value: function draw_start() {}
-        // Override this method with display set-up related code.
-
-        // Called after iteration through map's points.
-
-    }, {
-        key: "draw_end",
-        value: function draw_end() {}
-        // Override this method with code to draw whole map and cleanup.
-
-        // Called once per point on the map.
-
-    }, {
-        key: "draw_tile",
-        value: function draw_tile(tile) {
-            // Override this method with code to draw one point on the map.
-            console.log(tile);
-        }
-    }, {
-        key: "draw_river",
-        value: function draw_river(a, b) {}
-    }]);
-
-    return DisplayBase;
-}();
-
-exports.DisplayBase = DisplayBase;
-
-},{"./2d_view":2,"./genesis":4,"./ordered_set":6}],4:[function(require,module,exports){
-"use strict";
-/*
- * MIT License
- *
- * Copyright (c) 2020 duncan law
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- */
-
-function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.slope_data = exports.seed_points = exports.seed_points_to_array = void 0;
-var ordered_set_1 = require("./ordered_set");
-/* Convert Coordinate into something that can be used as a key in a Set(). */
-function coord_to_str(coord) {
-    return coord.x + "," + coord.y;
-}
-/* Generate coordinates of neighbouring tiles. */
-function get_neighbours(coordinate) {
-    var neighbours = [];
-    neighbours.push({ x: coordinate.x - 1, y: coordinate.y - 1 });
-    neighbours.push({ x: coordinate.x - 1, y: coordinate.y });
-    neighbours.push({ x: coordinate.x - 1, y: coordinate.y + 1 });
-    neighbours.push({ x: coordinate.x + 1, y: coordinate.y - 1 });
-    neighbours.push({ x: coordinate.x + 1, y: coordinate.y });
-    neighbours.push({ x: coordinate.x + 1, y: coordinate.y + 1 });
-    neighbours.push({ x: coordinate.x, y: coordinate.y - 1 });
-    neighbours.push({ x: coordinate.x, y: coordinate.y + 1 });
-    return neighbours;
-}
-
-var Flood = function Flood(coordinate, value) {
-    _classCallCheck(this, Flood);
-
-    this.coordinate = coordinate;
-    this.value = value;
-};
-
-function compare_floods(a, b) {
-    if (a.value !== b.value) {
-        return a.value - b.value;
-    }
-    if (a.coordinate.x !== b.coordinate.x) {
-        return a.coordinate.x - b.coordinate.x;
-    }
-    return a.coordinate.y - b.coordinate.y;
-}
-function seed_points_to_array(tile_count, sea) {
-    var sea_array = [];
-    for (var x = 0; x < tile_count; x++) {
-        var row = [];
-        for (var y = 0; y < tile_count; y++) {
-            row.push(sea.has(coord_to_str({ x: x, y: y })) ? 1 : 0);
-        }
-        sea_array.push(row);
-    }
-    return sea_array;
-}
-exports.seed_points_to_array = seed_points_to_array;
-/* Function to generate an area of the seabed from which to generate height.
- * Areas not in the returned set will never be above the base seabed height. */
-function seed_points(tile_count) {
-    var sea = new Set();
-    var open = new ordered_set_1.SortedSet([], compare_floods);
-    // Edge tiles on map should always be seed points.
-    for (var x = 0; x < tile_count; x++) {
-        var dx = x - tile_count / 2;
-        var dy = tile_count / 2;
-        var dist_from_center = dx * dx + dy * dy;
-        var y = 0;
-        open.push(new Flood({ x: x, y: y }, dist_from_center));
-        y = tile_count - 1;
-        open.push(new Flood({ x: x, y: y }, dist_from_center));
-    }
-    for (var _y = 0; _y < tile_count; _y++) {
-        var _dx = tile_count / 2;
-        var _dy = _y - tile_count / 2;
-        var _dist_from_center = _dx * _dx + _dy * _dy;
-        var _x = 0;
-        open.push(new Flood({ x: _x, y: _y }, _dist_from_center));
-        _x = tile_count - 1;
-        open.push(new Flood({ x: _x, y: _y }, _dist_from_center));
-    }
-
-    var _loop = function _loop() {
-        var tile = open.pop();
-        sea.add(coord_to_str(tile.coordinate));
-        get_neighbours(tile.coordinate).forEach(function (neighbour) {
-            if (neighbour.x >= 0 && neighbour.x < tile_count && neighbour.y >= 0 && neighbour.y < tile_count) {
-                if (Math.random() < 0.22) {
-                    if (!sea.has(coord_to_str(neighbour))) {
-                        open.push(new Flood(neighbour, tile.value));
-                    }
-                }
-            }
-        });
-    };
-
-    while (open.length > 0) {
-        _loop();
-    }
-    return sea;
-}
-exports.seed_points = seed_points;
-function slope_data(tile_count) {
-    var seed = [];
-    for (var i = 0; i < 0xFF; i++) {
-        seed.push(Math.sin(i * Math.PI / 0x7F));
-    }
-    var pass_x = [];
-    var pass_y = [];
-    var multiplier = [];
-    for (var _i = 0; _i < 3; _i++) {
-        pass_x.push(Math.random() * 20 - 10);
-        pass_y.push(Math.random() * 20 - 10);
-        multiplier.push(1);
-    }
-    for (var _i2 = 0; _i2 < 4; _i2++) {
-        //pass_x.push(Math.random() * 50 - 25);
-        //pass_y.push(Math.random() * 50 - 25);
-        //multiplier.push(0.5);
-    }
-    for (var _i3 = 0; _i3 < 30; _i3++) {
-        //pass_x.push(Math.random() * 100 - 50);
-        //pass_y.push(Math.random() * 100 - 50);
-        //multiplier.push(0.2);
-    }
-    for (var _i4 = 0; _i4 < 30; _i4++) {
-        //pass_x.push(Math.random() * 400 - 200);
-        //pass_y.push(Math.random() * 400 - 200);
-        //multiplier.push(0.2);
-    }
-    for (var _i5 = 0; _i5 < 30; _i5++) {
-        pass_x.push(Math.random() * 800 - 400);
-        pass_y.push(Math.random() * 800 - 400);
-        multiplier.push(0.2);
-    }
-    var data = [];
-    var min = 99999999999;
-    var max = -99999999999;
-
-    var _loop2 = function _loop2(y) {
-        var row = [];
-
-        var _loop3 = function _loop3(_x2) {
-            var val = 0;
-            pass_x.forEach(function (mod, index) {
-                val += multiplier[index] * seed[Math.round(mod * _x2 + pass_y[index] * y) & 0xff - 1];
-            });
-            row.push(val);
-            if (val > max) {
-                max = val;
-            } else if (val < min) {
-                min = val;
-            }
-        };
-
-        for (var _x2 = 0; _x2 < tile_count; _x2++) {
-            _loop3(_x2);
-        }
-        data.push(row);
-    };
-
-    for (var y = 0; y < tile_count; y++) {
-        _loop2(y);
-    }
-    // Normalize data.
-    var range = max - min;
-    for (var x = 0; x < tile_count; x++) {
-        for (var y = 0; y < tile_count; y++) {
-            data[x][y] -= min;
-            data[x][y] /= range;
-        }
-    }
-    return data;
-}
-exports.slope_data = slope_data;
-
-},{"./ordered_set":6}],5:[function(require,module,exports){
 "use strict";
 /*
  * MIT License
@@ -643,23 +105,23 @@ function _possibleConstructorReturn(self, call) { if (!self) { throw new Referen
 function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
 
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.Display_3d = void 0;
 /* A sample frontend for the algorithm described at
  * https://github.com/mrdunk/flowing-terrain */
 var BABYLON = require("babylonjs");
 var flowing_terrain_1 = require("./flowing_terrain");
 
-var Display = function (_flowing_terrain_1$Di) {
-    _inherits(Display, _flowing_terrain_1$Di);
+var Display_3d = function (_flowing_terrain_1$Di) {
+    _inherits(Display_3d, _flowing_terrain_1$Di);
 
-    function Display() {
-        _classCallCheck(this, Display);
+    function Display_3d(geography) {
+        _classCallCheck(this, Display_3d);
 
-        var _this = _possibleConstructorReturn(this, (Display.__proto__ || Object.getPrototypeOf(Display)).call(this));
+        var _this = _possibleConstructorReturn(this, (Display_3d.__proto__ || Object.getPrototypeOf(Display_3d)).call(this, geography));
 
         _this.tile_size = 2;
         _this.river_threshold = 3;
         _this.positions = [];
-        _this.colors = [];
         _this.indices = [];
         _this.normals = [];
         _this.rivers = [];
@@ -668,7 +130,7 @@ var Display = function (_flowing_terrain_1$Di) {
         _this.engine = new BABYLON.Engine(renderCanvas, true);
         _this.scene = new BABYLON.Scene(_this.engine);
         _this.camera = new BABYLON.UniversalCamera("UniversalCamera", new BABYLON.Vector3(0, 0, 0), _this.scene);
-        var mapsize = _this.tile_size * new flowing_terrain_1.Enviroment().tile_count;
+        var mapsize = _this.tile_size * _this.geography.enviroment.tile_count;
         _this.camera.position = new BABYLON.Vector3(-mapsize / 4, mapsize / 4, -mapsize / 4);
         _this.camera.checkCollisions = true;
         _this.camera.ellipsoid = new BABYLON.Vector3(0.5, 0.5, 0.5);
@@ -689,7 +151,7 @@ var Display = function (_flowing_terrain_1$Di) {
     // Move camera to overhead view. Middle of map, looking straight down.
 
 
-    _createClass(Display, [{
+    _createClass(Display_3d, [{
         key: "overhead_view",
         value: function overhead_view() {
             var mapsize = this.tile_size * this.enviroment.tile_count;
@@ -723,10 +185,6 @@ var Display = function (_flowing_terrain_1$Di) {
                     this.positions.push(tile.pos.x * this.tile_size);
                     this.positions.push(tile.height);
                     this.positions.push(tile.pos.y * this.tile_size);
-                    this.colors.push(this.geography.slopes[x][y]);
-                    this.colors.push(this.geography.slopes[x][y]);
-                    this.colors.push(this.geography.slopes[x][y]);
-                    this.colors.push(1);
                 }
             }
         }
@@ -867,7 +325,6 @@ var Display = function (_flowing_terrain_1$Di) {
             vertexData.positions = this.positions;
             vertexData.indices = this.indices;
             vertexData.normals = this.normals;
-            //vertexData.colors = this.colors;
             var land = new BABYLON.Mesh("land");
             land.material = land_material;
             vertexData.applyToMesh(land, true);
@@ -951,77 +408,663 @@ var Display = function (_flowing_terrain_1$Di) {
         }
     }]);
 
-    return Display;
+    return Display_3d;
 }(flowing_terrain_1.DisplayBase);
 
-var display = new Display();
-display.engine.runRenderLoop(function () {
-    display.scene.render();
-});
-window.addEventListener("resize", function () {
-    display.engine.resize();
-});
-// UI components below this point.
-var menu_config = document.getElementById("config");
-menu_config.getElementsByClassName("expandButton")[0].addEventListener("click", function (event) {
-    var _iteratorNormalCompletion = true;
-    var _didIteratorError = false;
-    var _iteratorError = undefined;
+exports.Display_3d = Display_3d;
 
-    try {
-        for (var _iterator = menu_config.getElementsByClassName("content")[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
-            var content = _step.value;
+},{"./flowing_terrain":4,"babylonjs":1}],4:[function(require,module,exports){
+"use strict";
+/*
+ * MIT License
+ *
+ * Copyright (c) 2020 duncan law
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 
-            //const content = menu_config.getElementsByClassName("content")[0] as HTMLElement;
-            if (content.classList.contains("hidden")) {
-                content.classList.remove("hidden");
-            } else {
-                content.classList.add("hidden");
+var _slicedToArray = function () { function sliceIterator(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"]) _i["return"](); } finally { if (_d) throw _e; } } return _arr; } return function (arr, i) { if (Array.isArray(arr)) { return arr; } else if (Symbol.iterator in Object(arr)) { return sliceIterator(arr, i); } else { throw new TypeError("Invalid attempt to destructure non-iterable instance"); } }; }();
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.DisplayBase = exports.Geography = exports.Tile = exports.Enviroment = void 0;
+/* An algorithm for generating procedurally generated terrain where there is
+ * always a downhill path to the sea from any tile.
+ * See https://github.com/mrdunk/flowing-terrain for more information. */
+var ordered_set_1 = require("./ordered_set");
+// State to be shared between all classes.
+
+var Enviroment = function Enviroment() {
+    _classCallCheck(this, Enviroment);
+
+    this.highest_point = 0;
+    this.sealevel = 1;
+    this.dampest = 0;
+    this.tile_count = 100;
+};
+
+exports.Enviroment = Enviroment;
+// A single point on the map.
+
+var Tile = function () {
+    function Tile(pos, enviroment) {
+        _classCallCheck(this, Tile);
+
+        this.pos = { x: -1, y: -1 };
+        this.height = null;
+        this.dampness = 1;
+        this.lowest_neighbour = null;
+        this.pos = pos;
+        this.enviroment = enviroment;
+    }
+
+    _createClass(Tile, [{
+        key: "toString",
+        value: function toString() {
+            return "x: " + this.pos.x + " y: " + this.pos.y + ", height: " + this.height;
+        }
+    }, {
+        key: "key",
+        value: function key() {
+            return this.pos.x + "," + this.pos.y;
+        }
+    }]);
+
+    return Tile;
+}();
+
+exports.Tile = Tile;
+// Data for a procedurally generated map.
+
+var Geography = function () {
+    function Geography(enviroment, seed_points, noise) {
+        _classCallCheck(this, Geography);
+
+        this.tiles = [];
+        this.open_set_sorted = new ordered_set_1.SortedSet([], this.compare_tiles);
+        this.enviroment = enviroment;
+        this.seed_points = seed_points;
+        this.noise = noise;
+        // Populate tile array with un-configured Tile elements.
+        for (var x = 0; x < this.enviroment.tile_count; x++) {
+            var row = [];
+            for (var y = 0; y < this.enviroment.tile_count; y++) {
+                var tile = new Tile({ x: x, y: y }, this.enviroment);
+                row.push(tile);
+            }
+            this.tiles.push(row);
+        }
+        this.starting_points();
+        this.heights_algorithm();
+        this.drainage_algorithm();
+    }
+    // Used for sorting tiles according to height.
+
+
+    _createClass(Geography, [{
+        key: "compare_tiles",
+        value: function compare_tiles(a, b) {
+            var diff = a.height - b.height;
+            if (diff !== 0) {
+                return diff;
+            }
+            diff = a.pos.x - b.pos.x;
+            if (diff !== 0) {
+                return diff;
+            }
+            diff = a.pos.y - b.pos.y;
+            return diff;
+        }
+        // Set seed heights on map to start the height generation algorithm at.
+        // These points will be at height===0.
+
+    }, {
+        key: "starting_points",
+        value: function starting_points() {
+            var _iteratorNormalCompletion = true;
+            var _didIteratorError = false;
+            var _iteratorError = undefined;
+
+            try {
+                for (var _iterator = this.seed_points[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+                    var coord = _step.value;
+
+                    var _coord$split = coord.split(","),
+                        _coord$split2 = _slicedToArray(_coord$split, 2),
+                        x_str = _coord$split2[0],
+                        y_str = _coord$split2[1];
+
+                    var x = parseInt(x_str);
+                    var y = parseInt(y_str);
+                    var tile = this.get_tile({ x: x, y: y });
+                    console.assert(tile !== null, { x: x, y: y, tile: tile });
+                    tile.height = 0;
+                    this.open_set_sorted.push(tile);
+                }
+            } catch (err) {
+                _didIteratorError = true;
+                _iteratorError = err;
+            } finally {
+                try {
+                    if (!_iteratorNormalCompletion && _iterator.return) {
+                        _iterator.return();
+                    }
+                } finally {
+                    if (_didIteratorError) {
+                        throw _iteratorError;
+                    }
+                }
             }
         }
-    } catch (err) {
-        _didIteratorError = true;
-        _iteratorError = err;
-    } finally {
-        try {
-            if (!_iteratorNormalCompletion && _iterator.return) {
-                _iterator.return();
+        // Populate all tiles with height data. Also set the sealevel.
+
+    }, {
+        key: "heights_algorithm",
+        value: function heights_algorithm() {
+            var _this = this;
+
+            var _loop = function _loop() {
+                var tile = _this.open_set_sorted.shift();
+                _this.get_neighbours(tile).forEach(function (neighbour) {
+                    if (neighbour.height === null) {
+                        var x = tile.pos.x;
+                        var y = tile.pos.y;
+                        var nx = neighbour.pos.x;
+                        var ny = neighbour.pos.y;
+                        // Diagonal neighbours are further away so they should be affected more.
+                        var orientation_mod = x !== nx && y !== ny ? 1.414 : 1;
+                        var height_diff = Math.max(_this.noise[x][y], 0);
+                        var unevenness = Math.max(_this.noise[x][y] - _this.noise[nx][ny] + 0.03, 0);
+                        var jitter = _this.noise[x][y] - _this.noise[nx][ny] + 0.3;
+                        //console.log(height_diff, unevenness, jitter);
+                        neighbour.height = tile.height + 0.01;
+                        neighbour.height += orientation_mod * Math.pow(height_diff, 3);
+                        neighbour.height += orientation_mod * unevenness;
+                        //neighbour.height += orientation_mod * jitter;
+                        //neighbour.height += orientation_mod * Math.random() * 0.2;
+                        _this.open_set_sorted.push(neighbour);
+                    }
+                    if (neighbour.height > _this.enviroment.highest_point) {
+                        _this.enviroment.highest_point = neighbour.height;
+                    }
+                });
+            };
+
+            while (this.open_set_sorted.length) {
+                _loop();
             }
-        } finally {
-            if (_didIteratorError) {
-                throw _iteratorError;
+        }
+        // Calculate the number of uphill tiles draining into each tile on the
+        // map. High tile.dampness values indicate a river runs through that tile.
+
+    }, {
+        key: "drainage_algorithm",
+        value: function drainage_algorithm() {
+            var _this2 = this;
+
+            this.open_set_sorted.clear();
+            for (var y = 0; y < this.enviroment.tile_count; y++) {
+                for (var x = 0; x < this.enviroment.tile_count; x++) {
+                    var _tile = this.get_tile({ x: x, y: y });
+                    this.open_set_sorted.push(_tile);
+                }
             }
+            // Work through all tiles from the highest on the map downwards.
+            this.enviroment.dampest = 0;
+
+            var _loop2 = function _loop2() {
+                var tile = _this2.open_set_sorted.pop();
+                if (tile.height === 0) {
+                    return "continue";
+                }
+                var lowest_neighbours = [];
+                _this2.get_neighbours(tile).forEach(function (neighbour) {
+                    if (neighbour !== null && neighbour.height < tile.height) {
+                        if (lowest_neighbours.length === 0) {
+                            lowest_neighbours = [neighbour];
+                        } else if (neighbour.height < lowest_neighbours[0].height) {
+                            lowest_neighbours = [neighbour];
+                        } else if (neighbour.height === lowest_neighbours[0].height) {
+                            lowest_neighbours.push(neighbour);
+                        }
+                    }
+                });
+                console.assert(lowest_neighbours.length !== 0);
+                tile.lowest_neighbour = lowest_neighbours[Math.floor(Math.random() * lowest_neighbours.length)];
+                tile.lowest_neighbour.dampness += tile.dampness;
+                if (tile.lowest_neighbour.dampness > _this2.enviroment.dampest && tile.lowest_neighbour.height > 0) {
+                    _this2.enviroment.dampest = tile.lowest_neighbour.dampness;
+                }
+                console.assert(tile.lowest_neighbour.dampness > tile.dampness);
+            };
+
+            while (this.open_set_sorted.length > 0) {
+                var _ret2 = _loop2();
+
+                if (_ret2 === "continue") continue;
+            }
+        }
+    }, {
+        key: "get_tile",
+        value: function get_tile(coordinate) {
+            if (coordinate.x < 0 || coordinate.y < 0 || coordinate.x >= this.enviroment.tile_count || coordinate.y >= this.enviroment.tile_count) {
+                return null;
+            }
+            return this.tiles[coordinate.x][coordinate.y];
+        }
+    }, {
+        key: "get_neighbours",
+        value: function get_neighbours(tile) {
+            var neighbours = [this.get_tile({ x: tile.pos.x - 1, y: tile.pos.y - 1 }), this.get_tile({ x: tile.pos.x - 1, y: tile.pos.y }), this.get_tile({ x: tile.pos.x - 1, y: tile.pos.y + 1 }), this.get_tile({ x: tile.pos.x, y: tile.pos.y - 1 }), this.get_tile({ x: tile.pos.x, y: tile.pos.y + 1 }), this.get_tile({ x: tile.pos.x + 1, y: tile.pos.y - 1 }), this.get_tile({ x: tile.pos.x + 1, y: tile.pos.y }), this.get_tile({ x: tile.pos.x + 1, y: tile.pos.y + 1 })];
+            return neighbours.filter(function (neighbour) {
+                return neighbour !== null;
+            });
+        }
+    }]);
+
+    return Geography;
+}();
+
+exports.Geography = Geography;
+// Example to iterate over a Geography object.
+
+var DisplayBase = function () {
+    function DisplayBase(geography) {
+        _classCallCheck(this, DisplayBase);
+
+        this.geography = geography;
+        this.enviroment = this.geography.enviroment;
+    }
+    // Access all points in Geography and call `draw_tile(...)` method on each.
+
+
+    _createClass(DisplayBase, [{
+        key: "draw",
+        value: function draw() {
+            this.draw_start();
+            for (var y = 0; y < this.enviroment.tile_count; y += 1) {
+                for (var x = 0; x < this.enviroment.tile_count; x += 1) {
+                    var _tile2 = this.geography.get_tile({ x: x, y: y });
+                    this.draw_tile(_tile2);
+                }
+            }
+            this.draw_end();
+        }
+        // Called before iteration through map's points.
+
+    }, {
+        key: "draw_start",
+        value: function draw_start() {}
+        // Override this method with display set-up related code.
+
+        // Called after iteration through map's points.
+
+    }, {
+        key: "draw_end",
+        value: function draw_end() {}
+        // Override this method with code to draw whole map and cleanup.
+
+        // Called once per point on the map.
+
+    }, {
+        key: "draw_tile",
+        value: function draw_tile(tile) {
+            // Override this method with code to draw one point on the map.
+            console.log(tile);
+        }
+    }]);
+
+    return DisplayBase;
+}();
+
+exports.DisplayBase = DisplayBase;
+
+},{"./ordered_set":7}],5:[function(require,module,exports){
+"use strict";
+/*
+ * MIT License
+ *
+ * Copyright (c) 2020 duncan law
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.get_noise = exports.seed_points = exports.seed_points_to_array = void 0;
+var ordered_set_1 = require("./ordered_set");
+/* Convert Coordinate into something that can be used as a key in a Set(). */
+function coord_to_str(coord) {
+    return coord.x + "," + coord.y;
+}
+/* Generate coordinates of neighbouring tiles. */
+function get_neighbours(coordinate) {
+    var neighbours = [];
+    neighbours.push({ x: coordinate.x - 1, y: coordinate.y - 1 });
+    neighbours.push({ x: coordinate.x - 1, y: coordinate.y });
+    neighbours.push({ x: coordinate.x - 1, y: coordinate.y + 1 });
+    neighbours.push({ x: coordinate.x + 1, y: coordinate.y - 1 });
+    neighbours.push({ x: coordinate.x + 1, y: coordinate.y });
+    neighbours.push({ x: coordinate.x + 1, y: coordinate.y + 1 });
+    neighbours.push({ x: coordinate.x, y: coordinate.y - 1 });
+    neighbours.push({ x: coordinate.x, y: coordinate.y + 1 });
+    return neighbours;
+}
+
+var Flood = function Flood(coordinate, value) {
+    _classCallCheck(this, Flood);
+
+    this.coordinate = coordinate;
+    this.value = value;
+};
+
+function compare_floods(a, b) {
+    if (a.value !== b.value) {
+        return a.value - b.value;
+    }
+    if (a.coordinate.x !== b.coordinate.x) {
+        return a.coordinate.x - b.coordinate.x;
+    }
+    return a.coordinate.y - b.coordinate.y;
+}
+function seed_points_to_array(tile_count, sea) {
+    var sea_array = [];
+    for (var x = 0; x < tile_count; x++) {
+        var row = [];
+        for (var y = 0; y < tile_count; y++) {
+            row.push(sea.has(coord_to_str({ x: x, y: y })) ? 1 : 0);
+        }
+        sea_array.push(row);
+    }
+    return sea_array;
+}
+exports.seed_points_to_array = seed_points_to_array;
+/* Function to generate an area of the seabed from which to generate height.
+ * Areas not in the returned set will never be above the base seabed height. */
+function seed_points(tile_count) {
+    var sea = new Set();
+    var open = new ordered_set_1.SortedSet([], compare_floods);
+    // Edge tiles on map should always be seed points.
+    for (var x = 0; x < tile_count; x++) {
+        var dx = x - tile_count / 2;
+        var dy = tile_count / 2;
+        var dist_from_center = dx * dx + dy * dy;
+        var y = 0;
+        open.push(new Flood({ x: x, y: y }, dist_from_center));
+        y = tile_count - 1;
+        open.push(new Flood({ x: x, y: y }, dist_from_center));
+    }
+    for (var _y = 0; _y < tile_count; _y++) {
+        var _dx = tile_count / 2;
+        var _dy = _y - tile_count / 2;
+        var _dist_from_center = _dx * _dx + _dy * _dy;
+        var _x = 0;
+        open.push(new Flood({ x: _x, y: _y }, _dist_from_center));
+        _x = tile_count - 1;
+        open.push(new Flood({ x: _x, y: _y }, _dist_from_center));
+    }
+
+    var _loop = function _loop() {
+        var tile = open.pop();
+        sea.add(coord_to_str(tile.coordinate));
+        get_neighbours(tile.coordinate).forEach(function (neighbour) {
+            if (neighbour.x >= 0 && neighbour.x < tile_count && neighbour.y >= 0 && neighbour.y < tile_count) {
+                if (Math.random() < 0.22) {
+                    if (!sea.has(coord_to_str(neighbour))) {
+                        open.push(new Flood(neighbour, tile.value));
+                    }
+                }
+            }
+        });
+    };
+
+    while (open.length > 0) {
+        _loop();
+    }
+    return sea;
+}
+exports.seed_points = seed_points;
+function get_noise(tile_count) {
+    var seed = [];
+    for (var i = 0; i < 0xFF; i++) {
+        seed.push(Math.sin(i * Math.PI / 0x7F));
+    }
+    var pass_x = [];
+    var pass_y = [];
+    var multiplier = [];
+    for (var _i = 0; _i < Math.round(Math.random() * 5); _i++) {
+        pass_x.push(Math.random() * 20 - 10);
+        pass_y.push(Math.random() * 20 - 10);
+        multiplier.push(1);
+    }
+    for (var _i2 = 0; _i2 < 4; _i2++) {
+        //pass_x.push(Math.random() * 50 - 25);
+        //pass_y.push(Math.random() * 50 - 25);
+        //multiplier.push(0.5);
+    }
+    for (var _i3 = 0; _i3 < 30; _i3++) {
+        //pass_x.push(Math.random() * 100 - 50);
+        //pass_y.push(Math.random() * 100 - 50);
+        //multiplier.push(0.2);
+    }
+    for (var _i4 = 0; _i4 < 30; _i4++) {
+        //pass_x.push(Math.random() * 400 - 200);
+        //pass_y.push(Math.random() * 400 - 200);
+        //multiplier.push(0.2);
+    }
+    for (var _i5 = 0; _i5 < 10; _i5++) {
+        pass_x.push(Math.random() * 800 - 400);
+        pass_y.push(Math.random() * 800 - 400);
+        multiplier.push(0.2);
+    }
+    var data = [];
+    var min = 99999999999;
+    var max = -99999999999;
+
+    var _loop2 = function _loop2(y) {
+        var row = [];
+
+        var _loop3 = function _loop3(_x2) {
+            var val = 0;
+            pass_x.forEach(function (mod, index) {
+                val += multiplier[index] * seed[Math.round(mod * _x2 + pass_y[index] * y) & 0xff - 1];
+            });
+            row.push(val);
+            if (val > max) {
+                max = val;
+            } else if (val < min) {
+                min = val;
+            }
+        };
+
+        for (var _x2 = 0; _x2 < tile_count; _x2++) {
+            _loop3(_x2);
+        }
+        data.push(row);
+    };
+
+    for (var y = 0; y < tile_count; y++) {
+        _loop2(y);
+    }
+    // Normalize data.
+    var range = max - min;
+    for (var x = 0; x < tile_count; x++) {
+        for (var y = 0; y < tile_count; y++) {
+            data[x][y] -= min;
+            data[x][y] /= range;
         }
     }
-});
-function menu_sealevel_handler(event) {
-    var target = event.target;
-    display.set_sealevel(parseFloat(menu_sealevel.value));
+    return data;
 }
-var menu_sealevel = document.getElementById("seaLevel");
-menu_sealevel.addEventListener("change", menu_sealevel_handler);
-//menu_sealevel.addEventListener("click", menu_sealevel_handler);
-menu_sealevel.addEventListener("input", menu_sealevel_handler);
-function menu_rivers_handler(event) {
-    display.set_rivers(parseFloat(menu_rivers.value));
-}
-var menu_rivers = document.getElementById("rivers");
-menu_rivers.addEventListener("change", menu_rivers_handler);
-//menu_rivers.addEventListener("click", menu_rivers_handler);
-menu_rivers.addEventListener("input", menu_rivers_handler);
-function menu_overhead_view(event) {
-    display.overhead_view();
-}
-var overhead_view = document.getElementById("overhead_view");
-overhead_view.addEventListener("click", menu_overhead_view);
-function menu_inspector_handler(event) {
-    display.scene.debugLayer.show({ embedMode: true });
-}
-var menu_inspector = document.getElementById("inspector");
-menu_inspector.addEventListener("click", menu_inspector_handler);
-document.getElementById('renderCanvas').focus();
+exports.get_noise = get_noise;
 
-},{"./flowing_terrain":3,"babylonjs":1}],6:[function(require,module,exports){
+},{"./ordered_set":7}],6:[function(require,module,exports){
+"use strict";
+/*
+ * MIT License
+ *
+ * Copyright (c) 2020 duncan law
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+Object.defineProperty(exports, "__esModule", { value: true });
+/* A sample frontend for the algorithm described at
+ * https://github.com/mrdunk/flowing-terrain */
+var flowing_terrain_1 = require("./flowing_terrain");
+var genesis_1 = require("./genesis");
+var _2d_view_1 = require("./2d_view");
+var _3d_view_1 = require("./3d_view");
+var stats = {};
+function time(label, to_time) {
+    var start = performance.now();
+    var return_val = to_time();
+    stats[label] = performance.now() - start;
+    return return_val;
+}
+window.onload = function () {
+    // Create all the components, timing how long they take.
+    var enviroment = new flowing_terrain_1.Enviroment();
+    var sea = time("seed_points", function () {
+        return genesis_1.seed_points(enviroment.tile_count);
+    });
+    var noise = time("get_noise", function () {
+        return genesis_1.get_noise(enviroment.tile_count);
+    });
+    var geography = time("geography", function () {
+        return new flowing_terrain_1.Geography(enviroment, sea, noise);
+    });
+    time("2d_display", function () {
+        _2d_view_1.draw_2d("2d_seed", genesis_1.seed_points_to_array(enviroment.tile_count, sea));
+        _2d_view_1.draw_2d("2d_heights", noise);
+        _2d_view_1.draw_2d("2d_output", geography.tiles, function (tile) {
+            return tile.height / enviroment.highest_point;
+        });
+    });
+    var display = time("3d_display", function () {
+        return new _3d_view_1.Display_3d(geography);
+    });
+    console.log(stats);
+    // Start drawing the 3d view.
+    //display.engine.runRenderLoop(() => {
+    display.scene.render();
+    //})
+    window.addEventListener("resize", function () {
+        display.engine.resize();
+    });
+    // UI components below this point.
+    var menu_config = document.getElementById("config");
+    menu_config.getElementsByClassName("expandButton")[0].addEventListener("click", function (event) {
+        var _iteratorNormalCompletion = true;
+        var _didIteratorError = false;
+        var _iteratorError = undefined;
+
+        try {
+            for (var _iterator = menu_config.getElementsByClassName("content")[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+                var content = _step.value;
+
+                //const content = menu_config.getElementsByClassName("content")[0] as HTMLElement;
+                if (content.classList.contains("hidden")) {
+                    content.classList.remove("hidden");
+                } else {
+                    content.classList.add("hidden");
+                }
+            }
+        } catch (err) {
+            _didIteratorError = true;
+            _iteratorError = err;
+        } finally {
+            try {
+                if (!_iteratorNormalCompletion && _iterator.return) {
+                    _iterator.return();
+                }
+            } finally {
+                if (_didIteratorError) {
+                    throw _iteratorError;
+                }
+            }
+        }
+    });
+    function menu_sealevel_handler(event) {
+        var target = event.target;
+        display.set_sealevel(parseFloat(menu_sealevel.value));
+    }
+    var menu_sealevel = document.getElementById("seaLevel");
+    menu_sealevel.addEventListener("change", menu_sealevel_handler);
+    //menu_sealevel.addEventListener("click", menu_sealevel_handler);
+    menu_sealevel.addEventListener("input", menu_sealevel_handler);
+    function menu_rivers_handler(event) {
+        display.set_rivers(parseFloat(menu_rivers.value));
+    }
+    var menu_rivers = document.getElementById("rivers");
+    menu_rivers.addEventListener("change", menu_rivers_handler);
+    //menu_rivers.addEventListener("click", menu_rivers_handler);
+    menu_rivers.addEventListener("input", menu_rivers_handler);
+    function menu_overhead_view(event) {
+        display.overhead_view();
+    }
+    var overhead_view = document.getElementById("overhead_view");
+    overhead_view.addEventListener("click", menu_overhead_view);
+    function menu_inspector_handler(event) {
+        display.scene.debugLayer.show({ embedMode: true });
+    }
+    var menu_inspector = document.getElementById("inspector");
+    menu_inspector.addEventListener("click", menu_inspector_handler);
+};
+
+},{"./2d_view":2,"./3d_view":3,"./flowing_terrain":4,"./genesis":5}],7:[function(require,module,exports){
 "use strict";
 /*
 # MIT License
@@ -1152,6 +1195,6 @@ var SortedSet = function () {
 
 exports.SortedSet = SortedSet;
 
-},{}]},{},[5])
+},{}]},{},[6])
 
 //# sourceMappingURL=bundle.js.map

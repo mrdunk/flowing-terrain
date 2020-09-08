@@ -27,7 +27,6 @@
  * See https://github.com/mrdunk/flowing-terrain for more information. */
 
 import {SortedSet} from "./ordered_set"
-import {seed_points, seed_points_to_array, slope_data} from "./genesis"
 import {draw_2d} from "./2d_view"
 
 export interface Coordinate {
@@ -67,17 +66,21 @@ export class Tile {
 
 // Data for a procedurally generated map.
 export class Geography {
+  enviroment: Enviroment;
+  seed_points: Set<string>;
+  noise: Array<Array<number>>;
   tiles: Array<Array<Tile>> = [];
-  enviroment: Enviroment = new Enviroment();
   open_set_sorted: SortedSet = new SortedSet([], this.compare_tiles);
-  slopes: Array<Array<number>>;
 
-  constructor() {
-    const t0 = performance.now();
+  constructor(enviroment: Enviroment, seed_points: Set<string>, noise: Array<Array<number>>) {
+    this.enviroment = enviroment;
+    this.seed_points = seed_points;
+    this.noise = noise;
+
     // Populate tile array with un-configured Tile elements.
-    for(let y = 0; y < this.enviroment.tile_count; y++) {
+    for(let x = 0; x < this.enviroment.tile_count; x++) {
       let row: Array<Tile> = [];
-      for(let x = 0; x < this.enviroment.tile_count; x++) {
+      for(let y = 0; y < this.enviroment.tile_count; y++) {
         const tile: Tile = new Tile({x, y}, this.enviroment);
         row.push(tile);
       }
@@ -87,9 +90,6 @@ export class Geography {
     this.starting_points();
     this.heights_algorithm();
     this.drainage_algorithm();
-
-    const t1 = performance.now();
-    console.log(`Generating Geography took: ${t1 - t0}ms`);
   }
 
   // Used for sorting tiles according to height.
@@ -109,10 +109,7 @@ export class Geography {
   // Set seed heights on map to start the height generation algorithm at.
   // These points will be at height===0.
   starting_points(): void {
-    const sea = seed_points(this.enviroment.tile_count);
-    draw_2d("2d_seed", seed_points_to_array(this.enviroment.tile_count, sea));
-
-    for(let coord of sea) {
+    for(let coord of this.seed_points) {
       const [x_str, y_str] = coord.split(",");
       const x = parseInt(x_str);
       const y = parseInt(y_str);
@@ -125,11 +122,6 @@ export class Geography {
 
   // Populate all tiles with height data. Also set the sealevel.
   heights_algorithm(): void {
-    this.slopes = slope_data(this.enviroment.tile_count);
-    draw_2d("2d_heights", this.slopes);
-
-    let max_jitter = -999999999999;
-    let min_jitter = 999999999999;
     while(this.open_set_sorted.length) {
       let tile = this.open_set_sorted.shift();
       this.get_neighbours(tile).forEach((neighbour) => {
@@ -140,22 +132,16 @@ export class Geography {
           const nx = neighbour.pos.x;
           const ny = neighbour.pos.y;
 
-          // Diagonal neighbours will affect twice as many tiles as opposite
-          // ones so halve their effect.
+          // Diagonal neighbours are further away so they should be affected more.
           const orientation_mod = (x !== nx && y !== ny) ? 1.414 : 1;
 
-          const height_diff = Math.max(this.slopes[x][y], 0);
-          const unevenness = Math.max((this.slopes[x][y] - this.slopes[nx][ny]) + 0.03, 0);
-          const jitter = this.slopes[x][y] - this.slopes[nx][ny] + 0.3;
-          if(max_jitter < jitter) {
-            max_jitter = jitter;
-          } else if(min_jitter > jitter) {
-            min_jitter = jitter;
-          }
+          const height_diff = Math.max(this.noise[x][y], 0);
+          const unevenness = Math.max((this.noise[x][y] - this.noise[nx][ny]) + 0.03, 0);
+          const jitter = this.noise[x][y] - this.noise[nx][ny] + 0.3;
           //console.log(height_diff, unevenness, jitter);
 
-          neighbour.height = tile.height + 0.1;
-          neighbour.height += orientation_mod * Math.pow(height_diff, 6) * 2;
+          neighbour.height = tile.height + 0.01;
+          neighbour.height += orientation_mod * Math.pow(height_diff, 3);
           neighbour.height += orientation_mod * unevenness;
           //neighbour.height += orientation_mod * jitter;
           //neighbour.height += orientation_mod * Math.random() * 0.2;
@@ -168,7 +154,6 @@ export class Geography {
         }
       });
     }
-    console.log(min_jitter, max_jitter);
   }
 
   // Calculate the number of uphill tiles draining into each tile on the
@@ -221,7 +206,7 @@ export class Geography {
        coordinate.y >= this.enviroment.tile_count) {
       return null;
     }
-    return this.tiles[coordinate.y][coordinate.x];
+    return this.tiles[coordinate.x][coordinate.y];
   }
 
   get_neighbours(tile: Tile): Array<Tile> {
@@ -245,20 +230,18 @@ export class DisplayBase {
   geography: Geography;
   enviroment: Enviroment;
 
-  constructor() {
+  constructor(geography: Geography) {
+    this.geography = geography;
+    this.enviroment = this.geography.enviroment;
   }
 
   // Access all points in Geography and call `draw_tile(...)` method on each.
   draw(): void {
-    this.geography = new Geography();
-    this.enviroment = this.geography.enviroment;
-
     this.draw_start();
     for(let y = 0; y < this.enviroment.tile_count; y += 1) {
       for(let x = 0; x < this.enviroment.tile_count; x += 1) {
         const tile = this.geography.get_tile({x, y});
         this.draw_tile(tile);
-        //this.draw_river(tile, tile.lowest_neighbour);
       }
     }
     this.draw_end();
@@ -278,9 +261,6 @@ export class DisplayBase {
   draw_tile(tile: Tile): void {
     // Override this method with code to draw one point on the map.
     console.log(tile);
-  }
-
-  draw_river(a: Tile, b: Tile): void {
   }
 }
 

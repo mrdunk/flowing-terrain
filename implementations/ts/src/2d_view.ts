@@ -22,7 +22,10 @@
  * SOFTWARE.
  */
 
-export function draw_2d(id: string, data: Array<Array<number>>, size:number=2): void {
+export function draw_2d(id: string,
+                        data: Array<Array<any>>,
+                        accessor: any = (item: any) => {return item;},
+                        size:number=2): void {
   const canvas = document.getElementById(id) as HTMLCanvasElement;
   console.assert(canvas !== undefined, `Can't find canvas element: ${id}`);
   const ctx = canvas.getContext('2d');
@@ -35,7 +38,7 @@ export function draw_2d(id: string, data: Array<Array<number>>, size:number=2): 
   for(let x = 0; x < data.length; x++) {
     console.assert(y_len === data[x].length, "Mismatched data lengths");
     for(let y = 0; y < data[x].length; y++) {
-      const val = data[x][y] * 255;
+      const val = accessor(data[x][y]) * 255;
       ctx.fillStyle = `rgba(${val}, ${val}, ${val}, 1`;
       ctx.fillRect((data.length - x - 1) * size, y * size, size, size);
     }
