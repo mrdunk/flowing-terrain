@@ -76,10 +76,14 @@ export class Geography {
     this.terraform(enviroment, seed_points, noise);
   }
 
+  // Calculate the terrain.
   terraform(enviroment: Enviroment, seed_points: Set<string>, noise: Array<Array<number>>) {
     this.enviroment = enviroment;
     this.seed_points = seed_points;
     this.noise = noise;
+    
+    this.enviroment.highest_point = 0;
+    this.enviroment.dampest = 0;
 
     // Clear existing geography.
     this.tiles = [];

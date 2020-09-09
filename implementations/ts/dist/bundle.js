@@ -172,9 +172,11 @@ var Display_3d = function (_flowing_terrain_1$Di) {
     }, {
         key: "draw_start",
         value: function draw_start() {
-            this.scene.meshes.forEach(function (mesh) {
+            // Cleanup any existing meshes from previous draw.
+            while (this.scene.meshes.length > 0) {
+                var mesh = this.scene.meshes.pop();
                 mesh.dispose();
-            });
+            }
             this.positions = [];
             this.indices = [];
             this.rivers = [];
@@ -334,7 +336,7 @@ var Display_3d = function (_flowing_terrain_1$Di) {
             land.checkCollisions = true;
             //land.convertToFlatShadedMesh();
             // Rivers
-            this.set_rivers(3);
+            this.schedule_update_rivers();
             // Generate seabed.
             var mapsize = this.tile_size * this.enviroment.tile_count;
             var seabed = BABYLON.MeshBuilder.CreateGround("seabed", { width: mapsize * 2, height: mapsize * 2 });
@@ -513,6 +515,8 @@ var Geography = function () {
             this.enviroment = enviroment;
             this.seed_points = seed_points;
             this.noise = noise;
+            this.enviroment.highest_point = 0;
+            this.enviroment.dampest = 0;
             // Clear existing geography.
             this.tiles = [];
             // Populate tile array with un-configured Tile elements.
@@ -978,20 +982,24 @@ function time(label, to_time) {
     return return_val;
 }
 window.onload = function () {
-    var enviroment = null;
+    var enviroment = new flowing_terrain_1.Enviroment();
     var sea = null;
     var noise = null;
     var geography = null;
     var display = null;
-    function setup() {
-        // Create all the components, timing how long they take.
-        enviroment = new flowing_terrain_1.Enviroment();
+    function generate_seed_points() {
         sea = time("seed_points", function () {
             return genesis_1.seed_points(enviroment.tile_count);
         });
-        noise = time("get_noise", function () {
+        _2d_view_1.draw_2d("2d_seed", genesis_1.seed_points_to_array(enviroment.tile_count, sea));
+    }
+    function generate_noise() {
+        noise = time("noise", function () {
             return genesis_1.get_noise(enviroment.tile_count);
         });
+        _2d_view_1.draw_2d("2d_heights", noise);
+    }
+    function generate_terrain() {
         geography = time("geography", function () {
             if (geography === null) {
                 return new flowing_terrain_1.Geography(enviroment, sea, noise);
@@ -1001,8 +1009,6 @@ window.onload = function () {
             }
         });
         time("2d_display", function () {
-            _2d_view_1.draw_2d("2d_seed", genesis_1.seed_points_to_array(enviroment.tile_count, sea));
-            _2d_view_1.draw_2d("2d_heights", noise);
             _2d_view_1.draw_2d("2d_output", geography.tiles, function (tile) {
                 return tile.height / enviroment.highest_point;
             });
@@ -1015,9 +1021,10 @@ window.onload = function () {
                 return display;
             }
         });
-        console.log(stats);
     }
-    setup();
+    generate_seed_points();
+    generate_noise();
+    generate_terrain();
     // Start drawing the 3d view.
     display.engine.runRenderLoop(function () {
         display.scene.render();
@@ -1058,6 +1065,16 @@ window.onload = function () {
             }
         }
     });
+    var menu_seed_points = document.getElementById("seed_points");
+    menu_seed_points.addEventListener("click", function (event) {
+        generate_seed_points();
+        generate_terrain();
+    });
+    var menu_noise = document.getElementById("noise");
+    menu_noise.addEventListener("click", function (event) {
+        generate_noise();
+        generate_terrain();
+    });
     function menu_sealevel_handler(event) {
         var target = event.target;
         display.set_sealevel(parseFloat(menu_sealevel.value));
@@ -1080,7 +1097,7 @@ window.onload = function () {
     overhead_view.addEventListener("click", menu_overhead_view);
     function menu_terraform_handler(event) {
         console.log("terraform");
-        setup();
+        generate_terrain();
     }
     var menu_terraform = document.getElementById("terraform");
     menu_terraform.addEventListener("click", menu_terraform_handler);

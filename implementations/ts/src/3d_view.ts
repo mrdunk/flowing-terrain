@@ -105,9 +105,11 @@ export class Display_3d extends DisplayBase {
 
   // Called before iteration through map's points.
   draw_start(): void {
-    this.scene.meshes.forEach((mesh) => {
+    // Cleanup any existing meshes from previous draw.
+    while(this.scene.meshes.length > 0) {
+      let mesh = this.scene.meshes.pop();
       mesh.dispose();
-    });
+    }
 
     this.positions = [];
     this.indices = [];
@@ -284,7 +286,7 @@ export class Display_3d extends DisplayBase {
     //land.convertToFlatShadedMesh();
 
     // Rivers
-    this.set_rivers(3);
+    this.schedule_update_rivers();
 
     // Generate seabed.
     const mapsize = this.tile_size * this.enviroment.tile_count;
