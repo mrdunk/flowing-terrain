@@ -30,7 +30,7 @@
     "babylonjs": "^4.1.0",
     "bootstrap": "^4.5.2",
     "gulp-cli": "^2.3.0",
-    "jquery": "^3.0.0"
+    "jquery": "^3.5.0"
   },
   "devDependencies": {
     "@babylonjs/materials": "^4.1.0",
