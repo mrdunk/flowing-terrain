@@ -1,0 +1,50 @@
+#renderCanvas {
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+}
+
+#embed-host {
+  z-index: 2;
+}
+
+img.logo{
+  height: 2em;
+  vertical-align: top;
+  float: right;
+}
+
+#loader {
+  position: absolute;
+  align-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+#loader_content {
+  width: 200px;
+  height: 50px;
+  background-color: green;
+  display: block;
+  text-align: center;
+  font-size: xx-large;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin: -25px 0 0 -25px;
+}
+
+.overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 3;
+}
+
+.menu {
+  background: rgba(255, 255, 255, 0.3);
+}

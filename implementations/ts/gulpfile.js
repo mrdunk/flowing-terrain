@@ -5,7 +5,7 @@ var tsify = require("tsify");
 var sourcemaps = require("gulp-sourcemaps");
 var buffer = require("vinyl-buffer");
 var paths = {
-  pages: ["src/*.html"]
+  pages: ["src/*.html", "src/*.css"]
 };
 
 gulp.task("copy-html", function() {
@@ -18,7 +18,7 @@ gulp.task(
     return browserify({
       basedir: ".",
       debug: true,
-      entries: ["src/hello_flowing_world.ts"],
+      entries: ["src/main.ts"],
       cache: {},
       packageCache: {}
     })

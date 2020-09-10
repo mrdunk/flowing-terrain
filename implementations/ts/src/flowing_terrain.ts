@@ -1,25 +1,25 @@
 /*
-# MIT License
-#
-# Copyright (c) 2020 duncan law
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
+ * MIT License
+ *
+ * Copyright (c) 2020 duncan law
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  */
 
 /* An algorithm for generating procedurally generated terrain where there is
@@ -27,7 +27,7 @@
  * See https://github.com/mrdunk/flowing-terrain for more information. */
 
 import {SortedSet} from "./ordered_set"
-import {seed_points} from "./genesis"
+import {draw_2d} from "./2d_view"
 
 export interface Coordinate {
   x: number;
@@ -66,16 +66,32 @@ export class Tile {
 
 // Data for a procedurally generated map.
 export class Geography {
+  enviroment: Enviroment;
+  seed_points: Set<string>;
+  noise: Array<Array<number>>;
   tiles: Array<Array<Tile>> = [];
-  enviroment: Enviroment = new Enviroment();
   open_set_sorted: SortedSet = new SortedSet([], this.compare_tiles);
 
-  constructor() {
-    const t0 = performance.now();
+  constructor(enviroment: Enviroment, seed_points: Set<string>, noise: Array<Array<number>>) {
+    this.terraform(enviroment, seed_points, noise);
+  }
+
+  // Calculate the terrain.
+  terraform(enviroment: Enviroment, seed_points: Set<string>, noise: Array<Array<number>>) {
+    this.enviroment = enviroment;
+    this.seed_points = seed_points;
+    this.noise = noise;
+    
+    this.enviroment.highest_point = 0;
+    this.enviroment.dampest = 0;
+
+    // Clear existing geography.
+    this.tiles = [];
+
     // Populate tile array with un-configured Tile elements.
-    for(let y = 0; y < this.enviroment.tile_count; y++) {
+    for(let x = 0; x < this.enviroment.tile_count; x++) {
       let row: Array<Tile> = [];
-      for(let x = 0; x < this.enviroment.tile_count; x++) {
+      for(let y = 0; y < this.enviroment.tile_count; y++) {
         const tile: Tile = new Tile({x, y}, this.enviroment);
         row.push(tile);
       }
@@ -85,9 +101,6 @@ export class Geography {
     this.starting_points();
     this.heights_algorithm();
     this.drainage_algorithm();
-
-    const t1 = performance.now();
-    console.log(`Generating Geography took: ${t1 - t0}ms`);
   }
 
   // Used for sorting tiles according to height.
@@ -107,8 +120,7 @@ export class Geography {
   // Set seed heights on map to start the height generation algorithm at.
   // These points will be at height===0.
   starting_points(): void {
-    const sea = seed_points(this.enviroment.tile_count);
-    for(let coord of sea) {
+    for(let coord of this.seed_points) {
       const [x_str, y_str] = coord.split(",");
       const x = parseInt(x_str);
       const y = parseInt(y_str);
@@ -123,11 +135,31 @@ export class Geography {
   heights_algorithm(): void {
     while(this.open_set_sorted.length) {
       let tile = this.open_set_sorted.shift();
-      this.get_neighbours(tile, 1).forEach((neighbour) => {
+      this.get_neighbours(tile).forEach((neighbour) => {
         if(neighbour.height === null) {
-          neighbour.height = tile.height + 0.1 + Math.random() * 1;
+
+          const x = tile.pos.x;
+          const y = tile.pos.y;
+          const nx = neighbour.pos.x;
+          const ny = neighbour.pos.y;
+
+          // Diagonal neighbours are further away so they should be affected more.
+          const orientation_mod = (x !== nx && y !== ny) ? 1.414 : 1;
+
+          const height_diff = Math.max(this.noise[x][y], 0);
+          const unevenness = Math.max((this.noise[x][y] - this.noise[nx][ny]) + 0.03, 0);
+          const jitter = this.noise[x][y] - this.noise[nx][ny] + 0.3;
+          //console.log(height_diff, unevenness, jitter);
+
+          neighbour.height = tile.height + 0.01;
+          neighbour.height += orientation_mod * Math.pow(height_diff, 3);
+          neighbour.height += orientation_mod * unevenness;
+          //neighbour.height += orientation_mod * jitter;
+          //neighbour.height += orientation_mod * Math.random() * 0.2;
+          
           this.open_set_sorted.push(neighbour);
         }
+
         if(neighbour.height > this.enviroment.highest_point) {
           this.enviroment.highest_point = neighbour.height;
         }
@@ -153,23 +185,28 @@ export class Geography {
       if(tile.height === 0) {
         continue;
       }
-      let lowest_neighbour: Tile = null;
-      this.get_neighbours(tile, 1).forEach((neighbour) => {
+      let lowest_neighbours: Array<Tile> = [];
+      this.get_neighbours(tile).forEach((neighbour) => {
         if(neighbour !== null && neighbour.height < tile.height) {
-          if(lowest_neighbour === null || neighbour.height < lowest_neighbour.height) {
-            lowest_neighbour = neighbour;
+          if(lowest_neighbours.length === 0) {
+            lowest_neighbours = [neighbour];
+          } else if(neighbour.height < lowest_neighbours[0].height) {
+            lowest_neighbours = [neighbour];
+          } else if(neighbour.height === lowest_neighbours[0].height) {
+            lowest_neighbours.push(neighbour);
           }
         }
       });
-      console.assert(lowest_neighbour !== null );
-      lowest_neighbour.dampness += tile.dampness;
-      tile.lowest_neighbour = lowest_neighbour;
+      console.assert(lowest_neighbours.length !== 0 );
+      tile.lowest_neighbour = lowest_neighbours[
+        Math.floor(Math.random() * lowest_neighbours.length)];
+      tile.lowest_neighbour.dampness += tile.dampness;
 
-      if(lowest_neighbour.dampness > this.enviroment.dampest &&
-         lowest_neighbour.height > 0) {
-        this.enviroment.dampest = lowest_neighbour.dampness;
+      if(tile.lowest_neighbour.dampness > this.enviroment.dampest &&
+         tile.lowest_neighbour.height > 0) {
+        this.enviroment.dampest = tile.lowest_neighbour.dampness;
       }
-      console.assert(lowest_neighbour.dampness > tile.dampness);
+      console.assert(tile.lowest_neighbour.dampness > tile.dampness);
     }
   }
 
@@ -180,19 +217,19 @@ export class Geography {
        coordinate.y >= this.enviroment.tile_count) {
       return null;
     }
-    return this.tiles[coordinate.y][coordinate.x];
+    return this.tiles[coordinate.x][coordinate.y];
   }
 
-  get_neighbours(tile: Tile, offset: number): Array<Tile> {
+  get_neighbours(tile: Tile): Array<Tile> {
     let neighbours = [
-      this.get_tile({x: tile.pos.x - offset, y: tile.pos.y - offset}),
-      this.get_tile({x: tile.pos.x - offset, y: tile.pos.y}),
-      this.get_tile({x: tile.pos.x - offset, y: tile.pos.y + offset}),
-      this.get_tile({x: tile.pos.x, y: tile.pos.y - offset}),
-      this.get_tile({x: tile.pos.x, y: tile.pos.y + offset}),
-      this.get_tile({x: tile.pos.x + offset, y: tile.pos.y - offset}),
-      this.get_tile({x: tile.pos.x + offset, y: tile.pos.y}),
-      this.get_tile({x: tile.pos.x + offset, y: tile.pos.y + offset}),
+      this.get_tile({x: tile.pos.x - 1, y: tile.pos.y - 1}),
+      this.get_tile({x: tile.pos.x - 1, y: tile.pos.y}),
+      this.get_tile({x: tile.pos.x - 1, y: tile.pos.y + 1}),
+      this.get_tile({x: tile.pos.x, y: tile.pos.y - 1}),
+      this.get_tile({x: tile.pos.x, y: tile.pos.y + 1}),
+      this.get_tile({x: tile.pos.x + 1, y: tile.pos.y - 1}),
+      this.get_tile({x: tile.pos.x + 1, y: tile.pos.y}),
+      this.get_tile({x: tile.pos.x + 1, y: tile.pos.y + 1}),
     ];
 
     return neighbours.filter((neighbour) => neighbour !== null);
@@ -204,20 +241,18 @@ export class DisplayBase {
   geography: Geography;
   enviroment: Enviroment;
 
-  constructor() {
+  constructor(geography: Geography) {
+    this.geography = geography;
+    this.enviroment = this.geography.enviroment;
   }
 
   // Access all points in Geography and call `draw_tile(...)` method on each.
   draw(): void {
-    this.geography = new Geography();
-    this.enviroment = this.geography.enviroment;
-
     this.draw_start();
     for(let y = 0; y < this.enviroment.tile_count; y += 1) {
       for(let x = 0; x < this.enviroment.tile_count; x += 1) {
         const tile = this.geography.get_tile({x, y});
         this.draw_tile(tile);
-        //this.draw_river(tile, tile.lowest_neighbour);
       }
     }
     this.draw_end();
@@ -237,9 +272,6 @@ export class DisplayBase {
   draw_tile(tile: Tile): void {
     // Override this method with code to draw one point on the map.
     console.log(tile);
-  }
-
-  draw_river(a: Tile, b: Tile): void {
   }
 }
 
