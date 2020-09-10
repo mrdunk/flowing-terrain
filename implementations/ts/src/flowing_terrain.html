@@ -1,63 +1,101 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <title>Hello Flowing World!</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
+        integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
     <link rel="stylesheet" href="./main.css">
   </head>
   <body>
-    <div class="collapse" id="config">
-      <div class="expandButton">+</div>
-      <div class="content">
-        <span>
-          <div>This project is intended to document a simple algorithm for creating 3 dimensional terrain maps and their likely watercourses.</div>
-          <div>The map you see is randomly generated. Refresh for a new map. Cursor keys and mouse to move around.</div>
-          <div>An explanation of the algorithm can be found here:
-            <a href="https://github.com/mrdunk/flowing-terrain">https://github.com/mrdunk/flowing-terrain</a>
+    <div class="container-fluid clearfix">
+ 
+      <div class="overlay w-100">
+        <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#menu" aria-expanded="false" aria-controls="menu">
+          Menu
+        </button>
+
+        <div class="menu collapse w-75" id="menu">
+          <div class="menu card card-body">
+
+            <div class="list-group list-group-horizontal" id="myList" role="tablist">
+              <a class="list-group-item list-group-item-action w-25 active" data-toggle="list" href="#about" role="tab">About</a>
+              <a class="list-group-item list-group-item-action w-25" data-toggle="list" href="#environment" role="tab">Enviroment</a>
+              <a class="list-group-item list-group-item-action w-25" data-toggle="list" href="#geography" role="tab">Geography</a>
+            </div>
+            <div class="tab-content">
+              <div class="tab-pane active" id="about" role="tabpanel">
+                <div>This project is intended to document a simple algorithm for creating 3 dimensional terrain maps and their likely watercourses.</div>
+                <div>The map you see is randomly generated. Refresh for a new map. Cursor keys and mouse to move around.</div>
+                <div>An explanation of the algorithm can be found here:
+                  <a href="https://github.com/mrdunk/flowing-terrain">https://github.com/mrdunk/flowing-terrain</a>
+                </div>
+                <div>This demonstration was made with the excellent
+                  <a href="https://www.babylonjs.com/">Babylon.js</a> web rendering library.
+                  <a href="https://www.babylonjs.com/">
+                    <img class="logo" src="https://raw.githubusercontent.com/BabylonJS/Brand-Toolkit/master/babylonjs_identity/fullColor/babylonjs_identity_color.svg" alt="Bablyon.js logo">
+                  </a>
+                </div>
+              </div>
+
+              <div class="tab-pane" id="environment" role="tabpanel">
+                <div>
+                  <input type="range" id="seaLevel" name="seaLevel"
+                                                    min="0" max="10" step="0.1" value="1">
+                  <label for="seaLevel">Sea Level</label>
+                </div>
+                <div>
+                  <input type="range" id="rivers" name="rivers" min="0" max="10" value="3">
+                  <label for="rivers">River Likelihood</label>
+                </div>
+                <div>
+                  <input type="button" id="overhead_view" name="overhead_view" value="Overhead View">
+                </div>
+                <div>
+                  <input type="button" id="terraform" name="terraform" value="Recalculate land ">
+                </div>
+                <div>
+                  <input type="button" id="inspector" name="inspector" value="Launch Inspector">
+                </div>
+              </div>
+
+              <div class="tab-pane" id="geography" role="tabpanel">
+                <div class="d-inline-flex">
+                  <span class="border">
+                    <canvas id="2d_seed"></canvas><br>
+                    Seed points
+                    <input type="button" id="seed_points" name="seed_points" value="regenerate">
+                  </span>
+                </div>
+                &nbsp
+                <div class="d-inline-flex">
+                  <span class="border">
+                    <canvas id="2d_heights"></canvas><br>
+                    Height noise
+                    <input type="button" id="noise" name="noise" value="regenerate">
+                  </span>
+                </div>
+                &nbsp
+                <div class="d-inline-flex">
+                  <span class="border">
+                    <canvas id="2d_output"></canvas><br>
+                    Output
+                  </span>
+                </div>
+              </div>
+            </div>
+
           </div>
-          <div>This demonstration was made with the excellent
-            <a href="https://www.babylonjs.com/">Babylon.js</a> web rendering library.
-            <a href="https://www.babylonjs.com/">
-              <img src="https://raw.githubusercontent.com/BabylonJS/Brand-Toolkit/master/babylonjs_identity/fullColor/babylonjs_identity_color.svg" alt="Bablyon.js logo">
-            </a>
-          </div>
-          <div>
-            <input type="range" id="seaLevel" name="seaLevel"
-                                              min="0" max="10" step="0.1" value="1">
-            <label for="seaLevel">Sea Level</label>
-          </div>
-          <div>
-            <input type="range" id="rivers" name="rivers" min="0" max="10" value="3">
-            <label for="rivers">River Likelihood</label>
-          </div>
-          <div>
-            <input type="button" id="overhead_view" name="overhead_view" value="Overhead View">
-          </div>
-          <div>
-            <input type="button" id="terraform" name="terraform" value="Recalculate land ">
-          </div>
-          <div>
-            <input type="button" id="inspector" name="inspector" value="Launch Inspector">
-          </div>
-        </span>
-        <span>
-          Seed points:
-          <input type="button" id="seed_points" name="seed_points" value="regenerate"><br/>
-          <canvas id="2d_seed"></canvas>
-        </span>
-        <span>
-          Height noise input:
-          <input type="button" id="noise" name="noise" value="regenerate"><br/>
-          <canvas id="2d_heights"></canvas>
-        </span>
-        <span>
-          Output:<br/>
-          <canvas id="2d_output"></canvas>
-        </span>
+        </div>
       </div>
     </div>
-    <div id="loader"><div id="loader_content">Loading...</div></div>
+
     <canvas id="renderCanvas" touch-action="none"></canvas>
+
+    </div>
+
+    <div id="loader"><div id="loader_content">Loading...</div></div>
     <script src="bundle.js"></script>
   </body>
 </html>
