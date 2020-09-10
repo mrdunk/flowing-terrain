@@ -8,6 +8,10 @@
   z-index: 1;
 }
 
+#embed-host {
+  z-index: 2;
+}
+
 img.logo{
   height: 2em;
   vertical-align: top;
@@ -38,7 +42,7 @@ img.logo{
   position: absolute;
   top: 0;
   left: 0;
-  z-index: 2;
+  z-index: 3;
 }
 
 .menu {
