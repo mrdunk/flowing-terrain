@@ -25,7 +25,7 @@
 /* A sample frontend for the algorithm described at
  * https://github.com/mrdunk/flowing-terrain */
 
-import * as $ from "jquery";
+//import * as $ from "jquery";
 import "bootstrap";
 
 import {Enviroment, Geography, Tile} from "./flowing_terrain"
@@ -104,20 +104,6 @@ window.onload = () => {
 
 
   // UI components below this point.
-
-  /*const menu_config = document.getElementById("config");
-  menu_config.getElementsByClassName("expandButton")[0].addEventListener("click", (event) => {
-    for(let content of menu_config.getElementsByClassName("content")) {
-      //const content = menu_config.getElementsByClassName("content")[0] as HTMLElement;
-      if(content.classList.contains("hidden")) {
-        content.classList.remove("hidden");
-      }
-      else {
-        content.classList.add("hidden");
-      }
-    }
-  });*/
-
 
   const menu_seed_points = document.getElementById("seed_points") as HTMLInputElement;
   menu_seed_points.addEventListener("click", (event) => {

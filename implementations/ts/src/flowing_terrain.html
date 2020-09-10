@@ -5,29 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <title>Hello Flowing World!</title>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
-        integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
+                           integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
     <link rel="stylesheet" href="./main.css">
   </head>
   <body>
-    <div class="container-fluid clearfix">
- 
+    <div class="container-fluid clearfix" id="main">
+
       <div class="overlay w-100">
         <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#menu" aria-expanded="false" aria-controls="menu">
           Menu
         </button>
 
-        <div class="menu collapse w-75" id="menu">
+        <div class="menu collapse show w-75" id="menu" aria-expanded="true">
           <div class="menu card card-body">
+            <div>
+              <button type="button" class="close" data-toggle="collapse" data-target="#menu" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+              </button>
 
-            <div class="list-group list-group-horizontal" id="myList" role="tablist">
-              <a class="list-group-item list-group-item-action w-25 active" data-toggle="list" href="#about" role="tab">About</a>
-              <a class="list-group-item list-group-item-action w-25" data-toggle="list" href="#environment" role="tab">Enviroment</a>
-              <a class="list-group-item list-group-item-action w-25" data-toggle="list" href="#geography" role="tab">Geography</a>
+              <div class="list-group list-group-horizontal" id="myList" role="tablist">
+                <a class="list-group-item list-group-item-action w-25 active" data-toggle="list" href="#about" role="tab">About</a>
+                <a class="list-group-item list-group-item-action w-25" data-toggle="list" href="#environment" role="tab">Enviroment</a>
+                <a class="list-group-item list-group-item-action w-25" data-toggle="list" href="#geography" role="tab">Geography</a>
+              </div>
             </div>
             <div class="tab-content">
               <div class="tab-pane active" id="about" role="tabpanel">
                 <div>This project is intended to document a simple algorithm for creating 3 dimensional terrain maps and their likely watercourses.</div>
-                <div>The map you see is randomly generated. Refresh for a new map. Cursor keys and mouse to move around.</div>
+                <div>The map you see is randomly generated. For a new map, regenerate one of the sources under the Geography tab.</div>
+                <div>Cursor keys and mouse to move around.</div>
                 <div>An explanation of the algorithm can be found here:
                   <a href="https://github.com/mrdunk/flowing-terrain">https://github.com/mrdunk/flowing-terrain</a>
                 </div>
@@ -48,9 +54,6 @@
                 <div>
                   <input type="range" id="rivers" name="rivers" min="0" max="10" value="3">
                   <label for="rivers">River Likelihood</label>
-                </div>
-                <div>
-                  <input type="button" id="overhead_view" name="overhead_view" value="Overhead View">
                 </div>
                 <div>
                   <input type="button" id="terraform" name="terraform" value="Recalculate land ">
@@ -83,17 +86,19 @@
                     Output
                   </span>
                 </div>
+                &nbsp
+                <div class="d-inline-flex">
+                  <input type="button" id="overhead_view" name="overhead_view" value="Overhead View">
+                </div>
               </div>
             </div>
 
           </div>
         </div>
       </div>
-    </div>
-
     <canvas id="renderCanvas" touch-action="none"></canvas>
-
     </div>
+
 
     <div id="loader"><div id="loader_content">Loading...</div></div>
     <script src="bundle.js"></script>

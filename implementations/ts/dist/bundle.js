@@ -17224,6 +17224,7 @@ var Display_3d = function (_flowing_terrain_1$Di) {
         light_2.specular = new BABYLON.Color3(0.3, 0.3, 0.3);
         _this.scene.ambientColor = new BABYLON.Color3(0.2, 0.2, 0.3);
         _this.draw();
+        _this.camera.setTarget(new BABYLON.Vector3(mapsize / 2, 0, mapsize / 2));
         // Hide the HTML loader.
         document.getElementById("loader").style.display = "none";
         return _this;
@@ -17428,7 +17429,6 @@ var Display_3d = function (_flowing_terrain_1$Di) {
             this.sea_mesh.material = sea_material;
             this.sea_mesh.checkCollisions = false;
             this.set_sealevel(this.enviroment.sealevel);
-            this.camera.setTarget(new BABYLON.Vector3(mapsize / 2, 0, mapsize / 2));
         }
         // Move the height of the sea mesh on the Z axis.
 
@@ -18050,6 +18050,9 @@ exports.get_noise = get_noise;
  */
 
 Object.defineProperty(exports, "__esModule", { value: true });
+/* A sample frontend for the algorithm described at
+ * https://github.com/mrdunk/flowing-terrain */
+//import * as $ from "jquery";
 require("bootstrap");
 var flowing_terrain_1 = require("./flowing_terrain");
 var genesis_1 = require("./genesis");
@@ -18114,18 +18117,6 @@ window.onload = function () {
         display.engine.resize();
     });
     // UI components below this point.
-    /*const menu_config = document.getElementById("config");
-    menu_config.getElementsByClassName("expandButton")[0].addEventListener("click", (event) => {
-      for(let content of menu_config.getElementsByClassName("content")) {
-        //const content = menu_config.getElementsByClassName("content")[0] as HTMLElement;
-        if(content.classList.contains("hidden")) {
-          content.classList.remove("hidden");
-        }
-        else {
-          content.classList.add("hidden");
-        }
-      }
-    });*/
     var menu_seed_points = document.getElementById("seed_points");
     menu_seed_points.addEventListener("click", function (event) {
         generate_seed_points();

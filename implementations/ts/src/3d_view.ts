@@ -80,6 +80,8 @@ export class Display_3d extends DisplayBase {
 
     this.draw();
 
+    this.camera.setTarget(new BABYLON.Vector3(mapsize / 2, 0, mapsize / 2));
+
     // Hide the HTML loader.
     document.getElementById("loader").style.display = "none";
   }
@@ -303,8 +305,6 @@ export class Display_3d extends DisplayBase {
     this.sea_mesh.material = sea_material;
     this.sea_mesh.checkCollisions = false;
     this.set_sealevel(this.enviroment.sealevel);
-
-    this.camera.setTarget(new BABYLON.Vector3(mapsize / 2, 0, mapsize / 2));
   }
 
   // Move the height of the sea mesh on the Z axis.
