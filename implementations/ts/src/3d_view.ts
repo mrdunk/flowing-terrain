@@ -27,11 +27,12 @@
 
 import * as BABYLON from 'babylonjs';
 import {Geography, Tile, DisplayBase, Coordinate} from "./flowing_terrain"
+import {Config} from "./config"
 
 
 export class Display_3d extends DisplayBase {
+  config: Config = null;
   tile_size: number = 2;
-  river_threshold = 3;
   positions: Array<number> = [];
   indices: Array<number> = [];
   normals: Array<number> = [];
@@ -44,8 +45,10 @@ export class Display_3d extends DisplayBase {
   scene: BABYLON.Scene;
   camera: BABYLON.UniversalCamera;
 
-  constructor(geography: Geography) {
+  constructor(geography: Geography, config: Config) {
     super(geography);
+    
+    this.config = config;
 
     const renderCanvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
     this.engine = new BABYLON.Engine(renderCanvas, true);
@@ -216,14 +219,14 @@ export class Display_3d extends DisplayBase {
 
   // Draw river between 2 points.
   draw_river(highest: Tile, lowest: Tile): void {
-    const sealevel = this.enviroment.sealevel;
+    const sealevel = this.config.get("geography.sealevel");
     if(highest === null || lowest === null) {
       return;
     }
     if(highest.height < sealevel) {
       return;
     }
-    if(highest.dampness <= this.river_threshold) {
+    if(highest.dampness <= this.config.get("display.river_threshold")) {
       return;
     }
 
@@ -304,13 +307,13 @@ export class Display_3d extends DisplayBase {
       "sea", {width: mapsize * 2, height: mapsize * 2});
     this.sea_mesh.material = sea_material;
     this.sea_mesh.checkCollisions = false;
-    this.set_sealevel(this.enviroment.sealevel);
+    this.set_sealevel(this.config.get("geography.sealevel"));
   }
 
   // Move the height of the sea mesh on the Z axis.
   set_sealevel(sealevel: number): void {
     console.log("sealevel: ", sealevel);
-    this.enviroment.sealevel = sealevel;
+    this.config.set("geography.sealevel", sealevel);
     const mapsize = this.tile_size * this.enviroment.tile_count;
     this.sea_mesh.position = new BABYLON.Vector3(mapsize / 2, sealevel + 0.02, mapsize / 2);
 
@@ -321,7 +324,7 @@ export class Display_3d extends DisplayBase {
 
   // Set what Tile.dampness value to display rivers at and schedule a re-draw.
   set_rivers(value: number): void {
-    this.river_threshold = value;
+    this.config.set("display.river_threshold", value);
     console.log("set_rivers", value, this.geography.enviroment.dampest);
     this.schedule_update_rivers();
   }
@@ -340,7 +343,6 @@ export class Display_3d extends DisplayBase {
   // Delete existing rivers mesh and replace with one up to date for the current
   // river_threshold and sealevel values.
   update_rivers(): void {
-    console.log("update_rivers", this.update_rivers_timer);
     this.update_rivers_timer = 0;
     if(this.rivers.length > 0) {
       this.rivers = [];

@@ -2,7 +2,7 @@
   "files": ["src/flowing_terrain.ts", "src/hello_flowing_world.ts"],
   "compilerOptions": {
     "noImplicitAny": true,
-		"target": "es2015",
+		"target": "es2017",
 		"types": [
 			"babylonjs",
 			"babylonjs-gui",

@@ -27,10 +27,12 @@
     "@popperjs/core": "^2.4.4",
     "@types/bootstrap": "^4.5.0",
     "@types/jquery": "^3.5.1",
+    "@types/seedrandom": "^2.4.28",
     "babylonjs": "^4.1.0",
     "bootstrap": "^4.5.2",
     "gulp-cli": "^2.3.0",
-    "jquery": "^3.0.0"
+    "jquery": "^3.0.0",
+    "seedrandom": "^3.0.5"
   },
   "devDependencies": {
     "@babylonjs/materials": "^4.1.0",

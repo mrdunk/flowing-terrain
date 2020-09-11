@@ -22,6 +22,7 @@
  * SOFTWARE.
  */
 
+import * as seedrandom from 'seedrandom';
 import {SortedSet} from "./ordered_set"
 
 
@@ -87,9 +88,10 @@ export function seed_points_to_array(
 
 /* Function to generate an area of the seabed from which to generate height.
  * Areas not in the returned set will never be above the base seabed height. */
-export function seed_points(tile_count: number): Set<string> {
+export function seed_points(random_seed: string, tile_count: number): Set<string> {
   const sea: Set<string> = new Set();
   const open: SortedSet = new SortedSet([], compare_floods);
+  const random = seedrandom(random_seed);
 
   // Edge tiles on map should always be seed points.
   for(let x = 0; x < tile_count; x++){
@@ -122,7 +124,7 @@ export function seed_points(tile_count: number): Set<string> {
     get_neighbours(tile.coordinate).forEach((neighbour) => {
       if(neighbour.x >= 0 && neighbour.x < tile_count &&
          neighbour.y >= 0 && neighbour.y < tile_count) {
-        if(Math.random() < 0.22) {
+        if(random() < 0.22) {
           if(! sea.has(coord_to_str(neighbour))) {
             open.push(new Flood(neighbour, tile.value));
           }
@@ -134,7 +136,8 @@ export function seed_points(tile_count: number): Set<string> {
   return sea;
 }
 
-export function get_noise(tile_count: number): Array<Array<number>> {
+export function get_noise(random_seed: string, tile_count: number): Array<Array<number>> {
+  const random = seedrandom(random_seed);
   let seed: Array<number> = [];
   for(let i = 0; i < 0xFF; i++) {
     seed.push(Math.sin(i * Math.PI / 0x7F));
@@ -145,23 +148,23 @@ export function get_noise(tile_count: number): Array<Array<number>> {
   let multiplier: Array<number> = [];
 
   let coefficient = 1000 / tile_count;
-  for(let i = 0; i < Math.round(Math.random() * 5); i++) {
-    pass_x.push(Math.random() * coefficient - coefficient / 2);
-    pass_y.push(Math.random() * coefficient - coefficient / 2);
+  for(let i = 0; i < Math.round(random() * 5); i++) {
+    pass_x.push(random() * coefficient - coefficient / 2);
+    pass_y.push(random() * coefficient - coefficient / 2);
     multiplier.push(1);
   }
 
   coefficient = 8000 / tile_count;
-  for(let i = 0; i < Math.round(Math.random() * 5); i++) {
-    pass_x.push(Math.random() * coefficient - coefficient / 2);
-    pass_y.push(Math.random() * coefficient - coefficient / 2);
+  for(let i = 0; i < Math.round(random() * 5); i++) {
+    pass_x.push(random() * coefficient - coefficient / 2);
+    pass_y.push(random() * coefficient - coefficient / 2);
     multiplier.push(0.5);
   }
 
   coefficient = 800;
   for(let i = 0; i < 10; i++) {
-    pass_x.push(Math.random() * coefficient - coefficient / 2);
-    pass_y.push(Math.random() * coefficient - coefficient / 2);
+    pass_x.push(random() * coefficient - coefficient / 2);
+    pass_y.push(random() * coefficient - coefficient / 2);
     multiplier.push(0.2);
   }
 

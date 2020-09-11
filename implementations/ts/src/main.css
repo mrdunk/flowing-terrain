@@ -9,7 +9,7 @@
 }
 
 #embed-host {
-  z-index: 2;
+  z-index: 5;
 }
 
 img.logo{
@@ -46,5 +46,9 @@ img.logo{
 }
 
 .menu {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.toast {
+  z-index: 20;
 }

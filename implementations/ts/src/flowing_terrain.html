@@ -13,7 +13,10 @@
 
       <div class="overlay w-100">
         <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#menu" aria-expanded="false" aria-controls="menu">
-          Menu
+          menu
+        </button>
+        <button id="link" class="btn btn-primary" type="button" aria-expanded="false" aria-controls="direct link">
+          link
         </button>
 
         <div class="menu collapse show w-75" id="menu" aria-expanded="true">
@@ -96,6 +99,18 @@
           </div>
         </div>
       </div>
+
+      <div class="toast" data-delay="5000" style="position: absolute; top: 0; right: 0;">
+        <div class="toast-header">
+          <strong class="mr-auto">Perma-link saved</strong>
+          <small>Just now</small>
+        </div>
+        <div class="toast-body">
+          Link saved to paste buffer.<br>
+          [Ctrl]-V in your browsers address bar to visit.
+        </div>
+      </div>
+
     <canvas id="renderCanvas" touch-action="none"></canvas>
     </div>
 
