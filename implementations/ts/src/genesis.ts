@@ -24,6 +24,7 @@
 
 import * as seedrandom from 'seedrandom';
 import {SortedSet} from "./ordered_set"
+import {Config} from "./config"
 
 
 export interface Coordinate {
@@ -86,12 +87,15 @@ export function seed_points_to_array(
     return sea_array;
 }
 
-/* Function to generate an area of the seabed from which to generate height.
- * Areas not in the returned set will never be above the base seabed height. */
-export function seed_points(random_seed: string, tile_count: number): Set<string> {
-  const sea: Set<string> = new Set();
+/* Function to generate an area of seabed from which to generate land.
+ * The points in the returned set will be the lowest points on the map.
+ * ie: height===0.
+ * This area of seabed will flood in from the edges of the map so will never
+ * leave "lakes" surrounded by higher areas. */
+export function seed_points(config: Config, tile_count: number): Set<string> {
+  const seabed: Set<string> = new Set();
   const open: SortedSet = new SortedSet([], compare_floods);
-  const random = seedrandom(random_seed);
+  const random = seedrandom(config.get("seed_points.random_seed"));
 
   // Edge tiles on map should always be seed points.
   for(let x = 0; x < tile_count; x++){
@@ -119,13 +123,13 @@ export function seed_points(random_seed: string, tile_count: number): Set<string
 
   while(open.length > 0) {
     const tile = open.pop();
-    sea.add(coord_to_str(tile.coordinate));
+    seabed.add(coord_to_str(tile.coordinate));
 
     get_neighbours(tile.coordinate).forEach((neighbour) => {
       if(neighbour.x >= 0 && neighbour.x < tile_count &&
          neighbour.y >= 0 && neighbour.y < tile_count) {
-        if(random() < 0.22) {
-          if(! sea.has(coord_to_str(neighbour))) {
+        if(random() < config.get("seed_points.seed_threshold")) {
+          if(! seabed.has(coord_to_str(neighbour))) {
             open.push(new Flood(neighbour, tile.value));
           }
         }
@@ -133,11 +137,11 @@ export function seed_points(random_seed: string, tile_count: number): Set<string
     });
   }
 
-  return sea;
+  return seabed;
 }
 
-export function get_noise(random_seed: string, tile_count: number): Array<Array<number>> {
-  const random = seedrandom(random_seed);
+export function get_noise(config: Config, tile_count: number): Array<Array<number>> {
+  const random = seedrandom(config.get("noise.random_seed"));
   let seed: Array<number> = [];
   for(let i = 0; i < 0xFF; i++) {
     seed.push(Math.sin(i * Math.PI / 0x7F));

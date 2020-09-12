@@ -19091,12 +19091,15 @@ function seed_points_to_array(tile_count, sea) {
     return sea_array;
 }
 exports.seed_points_to_array = seed_points_to_array;
-/* Function to generate an area of the seabed from which to generate height.
- * Areas not in the returned set will never be above the base seabed height. */
-function seed_points(random_seed, tile_count) {
-    var sea = new Set();
+/* Function to generate an area of seabed from which to generate land.
+ * The points in the returned set will be the lowest points on the map.
+ * ie: height===0.
+ * This area of seabed will flood in from the edges of the map so will never
+ * leave "lakes" surrounded by higher areas. */
+function seed_points(config, tile_count) {
+    var seabed = new Set();
     var open = new ordered_set_1.SortedSet([], compare_floods);
-    var random = seedrandom(random_seed);
+    var random = seedrandom(config.get("seed_points.random_seed"));
     // Edge tiles on map should always be seed points.
     for (var x = 0; x < tile_count; x++) {
         var dx = x - tile_count / 2;
@@ -19119,11 +19122,11 @@ function seed_points(random_seed, tile_count) {
 
     var _loop = function _loop() {
         var tile = open.pop();
-        sea.add(coord_to_str(tile.coordinate));
+        seabed.add(coord_to_str(tile.coordinate));
         get_neighbours(tile.coordinate).forEach(function (neighbour) {
             if (neighbour.x >= 0 && neighbour.x < tile_count && neighbour.y >= 0 && neighbour.y < tile_count) {
-                if (random() < 0.22) {
-                    if (!sea.has(coord_to_str(neighbour))) {
+                if (random() < config.get("seed_points.seed_threshold")) {
+                    if (!seabed.has(coord_to_str(neighbour))) {
                         open.push(new Flood(neighbour, tile.value));
                     }
                 }
@@ -19134,11 +19137,11 @@ function seed_points(random_seed, tile_count) {
     while (open.length > 0) {
         _loop();
     }
-    return sea;
+    return seabed;
 }
 exports.seed_points = seed_points;
-function get_noise(random_seed, tile_count) {
-    var random = seedrandom(random_seed);
+function get_noise(config, tile_count) {
+    var random = seedrandom(config.get("noise.random_seed"));
     var seed = [];
     for (var i = 0; i < 0xFF; i++) {
         seed.push(Math.sin(i * Math.PI / 0x7F));
@@ -19251,32 +19254,33 @@ function time(label, to_time) {
 window.onload = function () {
     var enviroment = new flowing_terrain_1.Enviroment();
     var config = new config_1.Config();
-    var sea = null;
+    var seabed = null;
     var noise = null;
     var geography = null;
     var display = null;
     config.set_if_null("seed_points.random_seed", "" + new Date().getTime());
+    config.set_if_null("seed_points.seed_threshold", 0.22);
     config.set_if_null("noise.random_seed", "" + new Date().getTime());
     config.set_if_null("display.river_threshold", 3);
     config.set_if_null("geography.sealevel", 1);
     function generate_seed_points() {
-        sea = time("seed_points", function () {
-            return genesis_1.seed_points(config.get("seed_points.random_seed"), enviroment.tile_count);
+        seabed = time("seed_points", function () {
+            return genesis_1.seed_points(config, enviroment.tile_count);
         });
-        _2d_view_1.draw_2d("2d_seed", genesis_1.seed_points_to_array(enviroment.tile_count, sea));
+        _2d_view_1.draw_2d("2d_seed", genesis_1.seed_points_to_array(enviroment.tile_count, seabed));
     }
     function generate_noise() {
         noise = time("noise", function () {
-            return genesis_1.get_noise(config.get("noise.random_seed"), enviroment.tile_count);
+            return genesis_1.get_noise(config, enviroment.tile_count);
         });
         _2d_view_1.draw_2d("2d_heights", noise);
     }
     function generate_terrain() {
         geography = time("geography", function () {
             if (geography === null) {
-                return new flowing_terrain_1.Geography(enviroment, sea, noise);
+                return new flowing_terrain_1.Geography(enviroment, seabed, noise);
             } else {
-                geography.terraform(enviroment, sea, noise);
+                geography.terraform(enviroment, seabed, noise);
                 return geography;
             }
         });
@@ -19305,12 +19309,77 @@ window.onload = function () {
         display.engine.resize();
     });
     // UI components below this point.
+    // Display value for "range" sliders.
+    function setBubble(range, bubble) {
+        bubble.innerHTML = range.value;
+    }
+    var _iteratorNormalCompletion = true;
+    var _didIteratorError = false;
+    var _iteratorError = undefined;
+
+    try {
+        var _loop = function _loop() {
+            var range_wrap = _step.value;
+
+            var range = range_wrap.getElementsByClassName("range")[0];
+            var bubble = range_wrap.getElementsByClassName("bubble")[0];
+            //console.log(range_wrap, range, bubble);
+            range.addEventListener("input", function () {
+                setBubble(range, bubble);
+            });
+            setBubble(range, bubble);
+        };
+
+        for (var _iterator = document.getElementsByClassName("range-wrap")[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+            _loop();
+        }
+        // Button to regenerate the seed_point map.
+    } catch (err) {
+        _didIteratorError = true;
+        _iteratorError = err;
+    } finally {
+        try {
+            if (!_iteratorNormalCompletion && _iterator.return) {
+                _iterator.return();
+            }
+        } finally {
+            if (_didIteratorError) {
+                throw _iteratorError;
+            }
+        }
+    }
+
     var menu_seed_points = document.getElementById("seed_points");
     menu_seed_points.addEventListener("click", function (event) {
         config.set("seed_points.random_seed", "" + new Date().getTime());
         generate_seed_points();
         generate_terrain();
     }.bind(config));
+    // Slider for adjusting detail of the seed_point map.
+    var menu_seed_threshold_timer_fast = 0;
+    var menu_seed_threshold_timer_slow = 0;
+    function schedule_menu_seed_threshold_handler(event) {
+        // Change the minimap every 200ms.
+        if (menu_seed_threshold_timer_fast === 0) {
+            menu_seed_threshold_timer_fast = setTimeout(function () {
+                config.set("seed_points.seed_threshold", menu_seed_threshold.value);
+                generate_seed_points();
+                menu_seed_threshold_timer_fast = 0;
+            }, 200);
+        }
+        // Change the 3d display every 2 seconds.
+        if (menu_seed_threshold_timer_slow === 0) {
+            menu_seed_threshold_timer_slow = setTimeout(function () {
+                generate_terrain();
+                menu_seed_threshold_timer_slow = 0;
+            }, 2000);
+        }
+    }
+    var menu_seed_threshold_bubble = document.getElementById("seed_threshold_bubble");
+    var menu_seed_threshold = document.getElementById("seed_threshold");
+    menu_seed_threshold.value = config.get("seed_points.seed_threshold");
+    menu_seed_threshold.addEventListener("change", schedule_menu_seed_threshold_handler);
+    menu_seed_threshold.addEventListener("input", schedule_menu_seed_threshold_handler);
     var menu_noise = document.getElementById("noise");
     menu_noise.addEventListener("click", function (event) {
         config.set("noise.random_seed", "" + new Date().getTime());
@@ -19318,7 +19387,6 @@ window.onload = function () {
         generate_terrain();
     });
     function menu_sealevel_handler(event) {
-        var target = event.target;
         display.set_sealevel(parseFloat(menu_sealevel.value));
     }
     var menu_sealevel = document.getElementById("seaLevel");

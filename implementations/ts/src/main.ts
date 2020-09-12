@@ -46,26 +46,27 @@ function time(label: string, to_time: () => any) {
 window.onload = () => {
   const enviroment: Enviroment = new Enviroment;
   const config: Config = new Config();
-  let sea: Set<string> = null;
+  let seabed: Set<string> = null;
   let noise: Array<Array<number>> = null;
   let geography: Geography = null;
   let display: Display_3d = null;
 
   config.set_if_null("seed_points.random_seed", `${(new Date()).getTime()}`);
+  config.set_if_null("seed_points.seed_threshold", 0.22);
   config.set_if_null("noise.random_seed", `${(new Date()).getTime()}`);
   config.set_if_null("display.river_threshold", 3);
   config.set_if_null("geography.sealevel", 1);
 
   function generate_seed_points() {
-    sea = time("seed_points", () => {
-      return seed_points(config.get("seed_points.random_seed"), enviroment.tile_count);
+    seabed = time("seed_points", () => {
+      return seed_points(config, enviroment.tile_count);
     });
-    draw_2d("2d_seed", seed_points_to_array(enviroment.tile_count, sea));
+    draw_2d("2d_seed", seed_points_to_array(enviroment.tile_count, seabed));
   }
 
   function generate_noise() {
     noise = time("noise", () => {
-      return get_noise(config.get("noise.random_seed"), enviroment.tile_count);
+      return get_noise(config, enviroment.tile_count);
     });
     draw_2d("2d_heights", noise);
   }
@@ -73,9 +74,9 @@ window.onload = () => {
   function generate_terrain() {
     geography = time("geography", () => {
       if(geography === null) {
-        return new Geography(enviroment, sea, noise);
+        return new Geography(enviroment, seabed, noise);
       } else {
-        geography.terraform(enviroment, sea, noise);
+        geography.terraform(enviroment, seabed, noise);
         return geography;
       }
     });
@@ -112,12 +113,56 @@ window.onload = () => {
 
   // UI components below this point.
 
+  // Display value for "range" sliders.
+  function setBubble(range: HTMLInputElement, bubble: HTMLInputElement) {
+    bubble.innerHTML = range.value;
+  }
+  for(let range_wrap of document.getElementsByClassName("range-wrap")) {
+    const range = range_wrap.getElementsByClassName("range")[0] as HTMLInputElement;
+    const bubble = range_wrap.getElementsByClassName("bubble")[0] as HTMLInputElement;
+    //console.log(range_wrap, range, bubble);
+    range.addEventListener("input", () => {
+      setBubble(range, bubble);
+    });
+    setBubble(range, bubble);
+  }
+
+  // Button to regenerate the seed_point map.
   const menu_seed_points = document.getElementById("seed_points") as HTMLInputElement;
   menu_seed_points.addEventListener("click", function(event: Event) {
     config.set("seed_points.random_seed", `${(new Date()).getTime()}`);
     generate_seed_points();
     generate_terrain();
   }.bind(config));
+
+
+  // Slider for adjusting detail of the seed_point map.
+  let menu_seed_threshold_timer_fast: ReturnType<typeof setTimeout> = 0;
+  let menu_seed_threshold_timer_slow: ReturnType<typeof setTimeout> = 0;
+
+  function schedule_menu_seed_threshold_handler(event: Event) {
+    config.set("seed_points.seed_threshold", menu_seed_threshold.value);
+    // Change the minimap every 200ms.
+    if(menu_seed_threshold_timer_fast === 0) {
+      menu_seed_threshold_timer_fast = setTimeout(() => {
+        generate_seed_points();
+        menu_seed_threshold_timer_fast = 0;
+      }, 200);
+    }
+    // Change the 3d display every 2 seconds.
+    if(menu_seed_threshold_timer_slow === 0) {
+      menu_seed_threshold_timer_slow = setTimeout(() => {
+        generate_terrain();
+        menu_seed_threshold_timer_slow = 0;
+      }, 2000);
+    }
+  }
+  const menu_seed_threshold_bubble =
+    document.getElementById("seed_threshold_bubble") as HTMLInputElement;
+  const menu_seed_threshold = document.getElementById("seed_threshold") as HTMLInputElement;
+  menu_seed_threshold.value = config.get("seed_points.seed_threshold");
+  menu_seed_threshold.addEventListener("change", schedule_menu_seed_threshold_handler);
+  menu_seed_threshold.addEventListener("input", schedule_menu_seed_threshold_handler);
 
   const menu_noise = document.getElementById("noise") as HTMLInputElement;
   menu_noise.addEventListener("click", (event) => {
@@ -128,7 +173,6 @@ window.onload = () => {
 
 
   function menu_sealevel_handler(event: Event) {
-    const target = <HTMLInputElement>event.target;
     display.set_sealevel(parseFloat(menu_sealevel.value));
   }
   const menu_sealevel: HTMLInputElement = document.getElementById("seaLevel") as HTMLInputElement;
@@ -182,4 +226,5 @@ window.onload = () => {
   }
   const menu_link_button = document.getElementById("link") as HTMLInputElement;
   menu_link_button.addEventListener("click", menu_link_button_handler);
+
 }
