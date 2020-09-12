@@ -11,7 +11,7 @@
   <body>
     <div class="container-fluid clearfix" id="main">
 
-      <div class="overlay w-100">
+      <div class="overlay container">
         <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#menu" aria-expanded="false" aria-controls="menu" title="Options to tweak map generation">
           menu
         </button>
@@ -19,21 +19,28 @@
           link
         </button>
 
-        <div class="menu collapse show w-75" id="menu" aria-expanded="true">
+        <div class="collapse show" id="menu" aria-expanded="true">
           <div class="menu card card-body">
             <div>
-              <button type="button" class="close" data-toggle="collapse" data-target="#menu" aria-label="Close">
+              <button type="button" class="close" data-toggle="collapse" data-target="#menu" aria-label="Close" style="position: relative; top: 0; right: 0;">
                 <span aria-hidden="true">&times;</span>
               </button>
 
-              <div class="list-group list-group-horizontal" id="myList" role="tablist">
-                <a class="list-group-item list-group-item-action w-25 active" data-toggle="list" href="#about" role="tab">About</a>
-                <a class="list-group-item list-group-item-action w-25" data-toggle="list" href="#environment" role="tab">Enviroment</a>
-                <a class="list-group-item list-group-item-action w-25" data-toggle="list" href="#geography" role="tab">Geography</a>
-              </div>
+              <ul class="nav nav-tabs" id="myTab" role="tablist">
+                <li class="nav-item" role="presentation">
+                  <a class="nav-link active" id="home-tab" data-toggle="tab" href="#about" role="tab" aria-controls="home" aria-selected="true">About</a>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <a class="nav-link" id="profile-tab" data-toggle="tab" href="#environment" role="tab" aria-controls="profile" aria-selected="false">Enviroment</a>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <a class="nav-link" id="contact-tab" data-toggle="tab" href="#geography" role="tab" aria-controls="contact" aria-selected="false">Geography</a>
+                </li>
+              </ul>
             </div>
+
             <div class="tab-content">
-              <div class="tab-pane active" id="about" role="tabpanel">
+              <div class="tab-pane fade show active" id="about" role="tabpanel">
                 <div>This project is intended to document a simple algorithm for creating 3 dimensional terrain maps and their likely watercourses.</div>
                 <div>The map you see is randomly generated. For a new map, regenerate one of the sources under the Geography tab.</div>
                 <div>Cursor keys and mouse to move around.</div>
@@ -48,91 +55,107 @@
                 </div>
               </div>
 
-              <div class="tab-pane" id="environment" role="tabpanel">
-                <div class="form-group range-wrap" title="Set the sealevel">
-                  <label for="seaLevel">Sea Level: <output class="bubble"></output> </label>
-                  <input type="range" class="form-control-range range" id="seaLevel" name="seaLevel" min="0" max="10" step="0.1" value="1">
-                </div>
-                <div class="form-group range-wrap" title="Set how visible rivers are">
-                  <label for="rivers">River Likelihood: <output class="bubble"></output> </label>
-                  <input type="range" class="form-control-range range" id="rivers" name="rivers" min="0" max="10" value="3">
-                </div>
-                <div>
-                  <input type="button" id="terraform" name="terraform" value="Recalculate land ">
-                </div>
-                <div>
-                  <input type="button" id="inspector" name="inspector" value="Launch Inspector">
+              <div class="tab-pane fade" id="environment" role="tabpanel">
+                <div class="row">
+
+                  <div class="col-sm">
+                    <div class="form-group range-wrap" title="Set the sealevel">
+                      <label for="seaLevel">Sea Level:&nbsp;<output class="bubble"></output></label>
+                      <input type="range" class="form-control-range range" id="seaLevel" name="geography.sealevel" min="0" max="10" step="0.1" value="1">
+                    </div>
+                    <div class="form-group range-wrap" title="Set the transparency of the sea">
+                      <label for="sea_transparency">Sea Transparency:&nbsp;<output class="bubble"></output></label>
+                      <input type="range" class="form-control-range range" id="sea_transparency" name="display.sea_transparency" min="0" max="1" step="0.05" value="0.5">
+                    </div>
+                    <div class="form-group range-wrap" title="Set how visible rivers are">
+                      <label for="river_threshold">River Likelihood:&nbsp;<output class="bubble"></output></label>
+                      <input type="range" class="form-control-range range" id="river_threshold" name="display.river_threshold" min="0" max="10" value="3">
+                    </div>
+                    <div>
+                      <input type="button" id="terraform" name="terraform" value="Recalculate land ">
+                    </div>
+                    <div>
+                      <input type="button" id="inspector" name="inspector" value="Launch Inspector">
+                    </div>
+                  </div>
+
+                  <div class="col-sm">
+                  </div>
+
+                  <div class="col-sm">
+                  </div>
+
                 </div>
               </div>
 
-              <div class="tab-pane" id="geography" role="tabpanel">
-                <div class="d-inline-flex">
-                  <span class="border">
-                    <canvas id="2d_seed"></canvas><br>
-                    <div class="form-group">
-                      <label for="seed_points">Seed points</label>
-                      <input type="button" class="btn btn-primary" id="seed_points" name="seed_points" value="regenerate" title="Generate a new seedpoint map">
-                    </div>
-                    <div class="form-group show-tooltip range-wrap" title="Left=More land less water&#010;Right=More water less land">
-                      <label for="seed_threshold">Threashold: <output class="bubble"></output> </label>
-                      <input type="range" class="form-control-range range" id="seed_threshold" name="seed_threshold" min="0.15" max="0.26" value="0.22" step="0.002">
-                    </div>
-                  </span>
-                </div>
+              <div class="tab-pane fade" id="geography" role="tabpanel">
+                <div class="row">
 
-                &nbsp
-                <div class="d-inline-flex">
-                  <span class="border">
-                    <canvas id="2d_heights"></canvas><br>
-                    <div class="border">
+                  <div class="col-sm">
+                    <span class="border">
+                      <canvas id="2d_seed"></canvas><br>
                       <div class="form-group">
-                        <label for="noise">Height noise</label>
-                        <input type="button" class="btn btn-primary" id="noise" name="noise" value="regenerate" title="Generate a new noise map">
+                        <label for="seed_points">Seed points</label>
+                        <input type="button" class="btn btn-primary" id="seed_points" name="seed_points" value="regenerate" title="Generate a new seedpoint map">
                       </div>
-                    </div>
-                    <div class="border">
-                      <div class="form-group range-wrap m-0" title="Set number of low frequency (long wavelength) octaves">
-                        <label for="noise_low_octave" class="m-0 p-0">Low octaves: <output class="bubble"></output> </label>
-                        <input type="range" class="form-control-range range" id="noise_low_octave" name="noise_low_octave" min="0" max="10" value="3">
+                      <div class="form-group show-tooltip range-wrap" title="Left=More land less water&#010;Right=More water less land">
+                        <label for="seed_threshold">Threashold: <output class="bubble"></output> </label>
+                        <input type="range" class="form-control-range range" id="seed_threshold" name="seed_threshold" min="0.15" max="0.26" value="0.22" step="0.002">
                       </div>
-                      <div class="form-group form-check m-0" title="Set number of low frequency (long wavelength) octaves">
-                        <input type="checkbox" class="form-check-input" id="noise_low_octave_rand">
-                        <label class="form-check-label" for="noise_low_octave_rand">Random</label>
-                      </div>
-                    </div>
-                    <div class="border">
-                      <div class="form-group range-wrap m-0" title="Set number of mid frequency octaves">
-                        <label for="noise_mid_octave" class="m-0 p-0">Mid octaves: <output class="bubble"></output> </label>
-                        <input type="range" class="form-control-range range" id="noise_mid_octave" name="noise_mid_octave" min="0" max="10" value="3">
-                      </div>
-                      <div class="form-group form-check m-0" title="Set number of mid frequency octaves">
-                        <input type="checkbox" class="form-check-input" id="noise_mid_octave_rand">
-                        <label class="form-check-label" for="noise_mid_octave_rand">Random</label>
-                      </div>
-                    </div>
-                    <div class="border">
-                      <div class="form-group range-wrap m-0" title="Set number of high frequency (short wavelength) octaves">
-                        <label for="noise_high_octave" class="m-0 p-0">High octaves: <output class="bubble"></output> </label>
-                        <input type="range" class="form-control-range range" id="noise_high_octave" name="noise_high_octave" min="0" max="10" value="3">
-                      </div>
-                      <div class="form-group form-check m-0" title="Set number of high frequency (short wavelength) octaves">
-                        <input type="checkbox" class="form-check-input" id="noise_high_octave_rand">
-                        <label class="form-check-label" for="noise_high_octave_rand">Random</label>
-                      </div>
-                    </div>
-                  </span>
-                </div>
+                    </span>
+                  </div>
 
-                &nbsp
-                <div class="d-inline-flex">
-                  <span class="border">
-                    <canvas id="2d_output"></canvas><br>
-                    Output
-                  </span>
-                </div>
-                &nbsp
-                <div class="d-inline-flex">
-                  <input type="button" id="overhead_view" name="overhead_view" value="Overhead View">
+                  <div class="col-sm">
+                    <span class="border">
+                      <canvas id="2d_heights"></canvas><br>
+                      <div class="border">
+                        <div class="form-group">
+                          <label for="noise">Height noise</label>
+                          <input type="button" class="btn btn-primary" id="noise" name="noise" value="regenerate" title="Generate a new noise map">
+                        </div>
+                      </div>
+                      <div class="border">
+                        <div class="form-group range-wrap m-0" title="Set number of low frequency (long wavelength) octaves">
+                          <label for="noise_low_octave" class="m-0 p-0">Low octaves: <output class="bubble"></output> </label>
+                          <input type="range" class="form-control-range range" id="noise_low_octave" name="noise_low_octave" min="0" max="10" value="3">
+                        </div>
+                        <div class="form-group form-check m-0" title="Set number of low frequency (long wavelength) octaves">
+                          <input type="checkbox" class="form-check-input" id="noise_low_octave_rand">
+                          <label class="form-check-label" for="noise_low_octave_rand">Random</label>
+                        </div>
+                      </div>
+                      <div class="border">
+                        <div class="form-group range-wrap m-0" title="Set number of mid frequency octaves">
+                          <label for="noise_mid_octave" class="m-0 p-0">Mid octaves: <output class="bubble"></output> </label>
+                          <input type="range" class="form-control-range range" id="noise_mid_octave" name="noise_mid_octave" min="0" max="10" value="3">
+                        </div>
+                        <div class="form-group form-check m-0" title="Set number of mid frequency octaves">
+                          <input type="checkbox" class="form-check-input" id="noise_mid_octave_rand">
+                          <label class="form-check-label" for="noise_mid_octave_rand">Random</label>
+                        </div>
+                      </div>
+                      <div class="border">
+                        <div class="form-group range-wrap m-0" title="Set number of high frequency (short wavelength) octaves">
+                          <label for="noise_high_octave" class="m-0 p-0">High octaves: <output class="bubble"></output> </label>
+                          <input type="range" class="form-control-range range" id="noise_high_octave" name="noise_high_octave" min="0" max="10" value="3">
+                        </div>
+                        <div class="form-group form-check m-0" title="Set number of high frequency (short wavelength) octaves">
+                          <input type="checkbox" class="form-check-input" id="noise_high_octave_rand">
+                          <label class="form-check-label" for="noise_high_octave_rand">Random</label>
+                        </div>
+                      </div>
+                    </span>
+                  </div>
+
+                  <div class="col-sm">
+                    <span class="border">
+                      <canvas id="2d_output"></canvas><br>
+                      <p>Output</p>
+                    </span>
+
+                    <input type="button" id="overhead_view" name="overhead_view" value="Overhead View">
+                  </div>
+
                 </div>
               </div>
             </div>
@@ -141,18 +164,18 @@
         </div>
       </div>
 
-      <div class="toast" data-delay="5000" style="position: absolute; top: 0; right: 0;">
+      <div class="toast hide" data-delay="5000">
         <div class="toast-header">
           <strong class="mr-auto">Perma-link saved</strong>
           <small>Just now</small>
         </div>
         <div class="toast-body">
-          Link saved to paste buffer.<br>
-          [Ctrl]-V in your browsers address bar to visit.
+          Link saved to your computer's paste buffer.<br>
+          Click <a href="#" id="permalink">here</a> to visit.
         </div>
       </div>
 
-    <canvas id="renderCanvas" touch-action="none"></canvas>
+      <canvas id="renderCanvas" touch-action="none"></canvas>
     </div>
 
 

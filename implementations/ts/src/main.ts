@@ -54,8 +54,21 @@ window.onload = () => {
   config.set_if_null("seed_points.random_seed", `${(new Date()).getTime()}`);
   config.set_if_null("seed_points.seed_threshold", 0.22);
   config.set_if_null("noise.random_seed", `${(new Date()).getTime()}`);
+
   config.set_if_null("display.river_threshold", 3);
+  config.set_callback("display.river_threshold", (key: string, value: any) => {
+    display.set_rivers(value);
+  });
+  
   config.set_if_null("geography.sealevel", 1);
+  config.set_callback("geography.sealevel", (key: string, value: any) => {
+    display.set_sealevel(value);
+  });
+  
+  config.set_if_null("display.sea_transparency", 0.5);
+  config.set_callback("display.sea_transparency", (key: string, value: any) => {
+    display.sea_material.alpha = value;
+  });
 
   function generate_seed_points() {
     seabed = time("seed_points", () => {
@@ -123,8 +136,19 @@ window.onload = () => {
     //console.log(range_wrap, range, bubble);
     range.addEventListener("input", () => {
       setBubble(range, bubble);
+      if(config.get(range.name, false) !== null) {
+        config.set(range.name, parseFloat(range.value));
+      }
     });
-    setBubble(range, bubble);
+    const stored_value = config.get(range.name, false);
+    if(stored_value !== null) {
+      range.value = stored_value;
+    } else {
+      console.warn(
+        `Range element does not have coresponding entry in config: ${range.name}`);
+    }
+    //setBubble(range, bubble);
+    bubble.innerHTML = range.value;
   }
 
   // Button to regenerate the seed_point map.
@@ -171,27 +195,6 @@ window.onload = () => {
     generate_terrain();
   });
 
-
-  function menu_sealevel_handler(event: Event) {
-    display.set_sealevel(parseFloat(menu_sealevel.value));
-  }
-  const menu_sealevel: HTMLInputElement = document.getElementById("seaLevel") as HTMLInputElement;
-  menu_sealevel.value = config.get("geography.sealevel");
-  menu_sealevel.addEventListener("change", menu_sealevel_handler);
-  //menu_sealevel.addEventListener("click", menu_sealevel_handler);
-  menu_sealevel.addEventListener("input", menu_sealevel_handler);
-
-
-  function menu_rivers_handler(event: Event) {
-    display.set_rivers(parseFloat(menu_rivers.value));
-  }
-  const menu_rivers = document.getElementById("rivers") as HTMLInputElement;
-  menu_rivers.value = config.get("display.river_threshold");
-  menu_rivers.addEventListener("change", menu_rivers_handler);
-  //menu_rivers.addEventListener("click", menu_rivers_handler);
-  menu_rivers.addEventListener("input", menu_rivers_handler);
-
-
   function menu_overhead_view(event: Event) {
     display.overhead_view();
   }
@@ -222,7 +225,9 @@ window.onload = () => {
       /* clipboard write failed */
       console.log(`Failed to copy ${config.url.toString()} to paste buffer.`);
     });
-    window.open(config.url.toString());
+    //window.open(config.url.toString());
+    const hyperlink: HTMLAnchorElement = document.getElementById("permalink") as HTMLAnchorElement;
+    hyperlink.href = config.url.toString();
   }
   const menu_link_button = document.getElementById("link") as HTMLInputElement;
   menu_link_button.addEventListener("click", menu_link_button_handler);

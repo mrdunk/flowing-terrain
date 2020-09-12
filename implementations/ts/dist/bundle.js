@@ -18182,6 +18182,20 @@ var Display_3d = function (_flowing_terrain_1$Di) {
         light_2.diffuse = new BABYLON.Color3(0, 1, 1);
         light_2.specular = new BABYLON.Color3(0.3, 0.3, 0.3);
         _this.scene.ambientColor = new BABYLON.Color3(0.2, 0.2, 0.3);
+        _this.land_material = new BABYLON.StandardMaterial("land_material", _this.scene);
+        _this.land_material.diffuseColor = new BABYLON.Color3(0.3, 0.7, 0.2);
+        _this.land_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
+        //this.land_material.backFaceCulling = false;
+        _this.seabed_material = new BABYLON.StandardMaterial("sea_material", _this.scene);
+        _this.seabed_material.diffuseColor = new BABYLON.Color3(0.3, 0.7, 0.2);
+        _this.seabed_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
+        //this.seabed_material.backFaceCulling = false;
+        _this.sea_material = new BABYLON.StandardMaterial("sea_material", _this.scene);
+        _this.sea_material.diffuseColor = new BABYLON.Color3(0.2, 0.4, 0.7);
+        _this.sea_material.specularColor = new BABYLON.Color3(0.5, 0.5, 0.5);
+        //sea_material.alpha = 0.85;
+        _this.sea_material.alpha = config.get("display.sea_transparency");
+        _this.sea_material.backFaceCulling = false;
         _this.draw();
         _this.camera.setTarget(new BABYLON.Vector3(mapsize / 2, 0, mapsize / 2));
         // Hide the HTML loader.
@@ -18350,20 +18364,6 @@ var Display_3d = function (_flowing_terrain_1$Di) {
     }, {
         key: "draw_end",
         value: function draw_end() {
-            var land_material = new BABYLON.StandardMaterial("land_material", this.scene);
-            land_material.diffuseColor = new BABYLON.Color3(0.3, 0.7, 0.2);
-            land_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
-            //land_material.backFaceCulling = false;
-            var seabed_material = new BABYLON.StandardMaterial("sea_material", this.scene);
-            seabed_material.diffuseColor = new BABYLON.Color3(0.3, 0.7, 0.2);
-            seabed_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
-            //seabed_material.backFaceCulling = false;
-            var sea_material = new BABYLON.StandardMaterial("sea_material", this.scene);
-            sea_material.diffuseColor = new BABYLON.Color3(0, 0.3, 1);
-            sea_material.specularColor = new BABYLON.Color3(0.5, 0.5, 0.5);
-            //sea_material.alpha = 0.85;
-            sea_material.alpha = 0.5;
-            sea_material.backFaceCulling = false;
             // Finish computing land.
             BABYLON.VertexData.ComputeNormals(this.positions, this.indices, this.normals);
             var vertexData = new BABYLON.VertexData();
@@ -18371,7 +18371,7 @@ var Display_3d = function (_flowing_terrain_1$Di) {
             vertexData.indices = this.indices;
             vertexData.normals = this.normals;
             var land = new BABYLON.Mesh("land");
-            land.material = land_material;
+            land.material = this.land_material;
             vertexData.applyToMesh(land, true);
             land.checkCollisions = true;
             //land.convertToFlatShadedMesh();
@@ -18381,11 +18381,11 @@ var Display_3d = function (_flowing_terrain_1$Di) {
             var mapsize = this.tile_size * this.enviroment.tile_count;
             var seabed = BABYLON.MeshBuilder.CreateGround("seabed", { width: mapsize * 2, height: mapsize * 2 });
             seabed.position = new BABYLON.Vector3(mapsize / 2, -0.01, mapsize / 2);
-            seabed.material = seabed_material;
+            seabed.material = this.seabed_material;
             seabed.checkCollisions = true;
             // Generate sea.
             this.sea_mesh = BABYLON.MeshBuilder.CreateGround("sea", { width: mapsize * 2, height: mapsize * 2 });
-            this.sea_mesh.material = sea_material;
+            this.sea_mesh.material = this.sea_material;
             this.sea_mesh.checkCollisions = false;
             this.set_sealevel(this.config.get("geography.sealevel"));
         }
@@ -18395,7 +18395,6 @@ var Display_3d = function (_flowing_terrain_1$Di) {
         key: "set_sealevel",
         value: function set_sealevel(sealevel) {
             console.log("sealevel: ", sealevel);
-            this.config.set("geography.sealevel", sealevel);
             var mapsize = this.tile_size * this.enviroment.tile_count;
             this.sea_mesh.position = new BABYLON.Vector3(mapsize / 2, sealevel + 0.02, mapsize / 2);
             // Now recalculate the rivers as they now meet the sea at a different height
@@ -18407,7 +18406,6 @@ var Display_3d = function (_flowing_terrain_1$Di) {
     }, {
         key: "set_rivers",
         value: function set_rivers(value) {
-            this.config.set("display.river_threshold", value);
             console.log("set_rivers", value, this.geography.enviroment.dampest);
             this.schedule_update_rivers();
         }
@@ -18490,13 +18488,13 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Config = void 0;
-/* An class that can be used to store configuration that can be passed via URL. */
 
 var Config = function () {
     function Config() {
         _classCallCheck(this, Config);
 
         this.content = new Map();
+        this.callbacks = new Map();
         this.url = new URL(window.location.href);
         var _iteratorNormalCompletion = true;
         var _didIteratorError = false;
@@ -18534,6 +18532,8 @@ var Config = function () {
     _createClass(Config, [{
         key: "get",
         value: function get(keys) {
+            var warn = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : true;
+
             var valid = true;
             var pointer = this.content;
             keys.split(".").forEach(function (key) {
@@ -18544,18 +18544,23 @@ var Config = function () {
                     pointer = null;
                 }
             });
+            if (pointer === null && warn) {
+                console.warn("Could not get stored value for: " + keys);
+            }
             return pointer;
         }
     }, {
         key: "set_if_null",
         value: function set_if_null(keys, value) {
-            if (this.get(keys) === null) {
+            if (this.get(keys, false) === null) {
                 this.set(keys, value);
             }
         }
     }, {
         key: "set",
         value: function set(keys, value) {
+            var do_callback = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : true;
+
             var pointer = this.content;
             var last_pointer = null;
             var last_key = "";
@@ -18569,6 +18574,46 @@ var Config = function () {
             });
             last_pointer.set(last_key, value);
             this.url.searchParams.set("config", encodeURIComponent(this.to_json()));
+            if (do_callback) {
+                this.callback(keys, value);
+            }
+        }
+    }, {
+        key: "set_callback",
+        value: function set_callback(keys, value) {
+            var pointer = this.callbacks;
+            var last_pointer = null;
+            var last_key = "";
+            keys.split(".").forEach(function (key) {
+                last_pointer = pointer;
+                last_key = key;
+                if (!pointer.has(key)) {
+                    pointer.set(key, new Map());
+                }
+                pointer = pointer.get(key);
+            });
+            last_pointer.set(last_key, value);
+        }
+    }, {
+        key: "callback",
+        value: function callback(keys, value) {
+            var valid = true;
+            var pointer = this.callbacks;
+            keys.split(".").forEach(function (key) {
+                if (pointer && pointer.has(key) && valid) {
+                    pointer = pointer.get(key);
+                } else {
+                    valid = false;
+                    pointer = null;
+                }
+            });
+            if (pointer !== null) {
+                // Convert to "unknown" type first as TypeScript objects to converting
+                // Map<...> to Callback.
+                var tmp = pointer;
+                var callback = tmp;
+                callback(keys, value);
+            }
         }
     }, {
         key: "goto_url",
@@ -19262,7 +19307,17 @@ window.onload = function () {
     config.set_if_null("seed_points.seed_threshold", 0.22);
     config.set_if_null("noise.random_seed", "" + new Date().getTime());
     config.set_if_null("display.river_threshold", 3);
+    config.set_callback("display.river_threshold", function (key, value) {
+        display.set_rivers(value);
+    });
     config.set_if_null("geography.sealevel", 1);
+    config.set_callback("geography.sealevel", function (key, value) {
+        display.set_sealevel(value);
+    });
+    config.set_if_null("display.sea_transparency", 0.5);
+    config.set_callback("display.sea_transparency", function (key, value) {
+        display.sea_material.alpha = value;
+    });
     function generate_seed_points() {
         seabed = time("seed_points", function () {
             return genesis_1.seed_points(config, enviroment.tile_count);
@@ -19326,8 +19381,18 @@ window.onload = function () {
             //console.log(range_wrap, range, bubble);
             range.addEventListener("input", function () {
                 setBubble(range, bubble);
+                if (config.get(range.name, false) !== null) {
+                    config.set(range.name, parseFloat(range.value));
+                }
             });
-            setBubble(range, bubble);
+            var stored_value = config.get(range.name, false);
+            if (stored_value !== null) {
+                range.value = stored_value;
+            } else {
+                console.warn("Range element does not have coresponding entry in config: " + range.name);
+            }
+            //setBubble(range, bubble);
+            bubble.innerHTML = range.value;
         };
 
         for (var _iterator = document.getElementsByClassName("range-wrap")[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
@@ -19359,10 +19424,10 @@ window.onload = function () {
     var menu_seed_threshold_timer_fast = 0;
     var menu_seed_threshold_timer_slow = 0;
     function schedule_menu_seed_threshold_handler(event) {
+        config.set("seed_points.seed_threshold", menu_seed_threshold.value);
         // Change the minimap every 200ms.
         if (menu_seed_threshold_timer_fast === 0) {
             menu_seed_threshold_timer_fast = setTimeout(function () {
-                config.set("seed_points.seed_threshold", menu_seed_threshold.value);
                 generate_seed_points();
                 menu_seed_threshold_timer_fast = 0;
             }, 200);
@@ -19386,22 +19451,6 @@ window.onload = function () {
         generate_noise();
         generate_terrain();
     });
-    function menu_sealevel_handler(event) {
-        display.set_sealevel(parseFloat(menu_sealevel.value));
-    }
-    var menu_sealevel = document.getElementById("seaLevel");
-    menu_sealevel.value = config.get("geography.sealevel");
-    menu_sealevel.addEventListener("change", menu_sealevel_handler);
-    //menu_sealevel.addEventListener("click", menu_sealevel_handler);
-    menu_sealevel.addEventListener("input", menu_sealevel_handler);
-    function menu_rivers_handler(event) {
-        display.set_rivers(parseFloat(menu_rivers.value));
-    }
-    var menu_rivers = document.getElementById("rivers");
-    menu_rivers.value = config.get("display.river_threshold");
-    menu_rivers.addEventListener("change", menu_rivers_handler);
-    //menu_rivers.addEventListener("click", menu_rivers_handler);
-    menu_rivers.addEventListener("input", menu_rivers_handler);
     function menu_overhead_view(event) {
         display.overhead_view();
     }
@@ -19426,7 +19475,9 @@ window.onload = function () {
             /* clipboard write failed */
             console.log("Failed to copy " + config.url.toString() + " to paste buffer.");
         });
-        window.open(config.url.toString());
+        //window.open(config.url.toString());
+        var hyperlink = document.getElementById("permalink");
+        hyperlink.href = config.url.toString();
     }
     var menu_link_button = document.getElementById("link");
     menu_link_button.addEventListener("click", menu_link_button_handler);

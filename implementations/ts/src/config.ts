@@ -24,8 +24,13 @@
 
 /* An class that can be used to store configuration that can be passed via URL. */
 
+interface Callback {
+  (keys: string, value: any): void;
+}
+
 export class Config {
   content: Map<string, any> = new Map();
+  callbacks: Map<string, any> = new Map();
   url = new URL(window.location.href);
 
   constructor() {
@@ -39,7 +44,7 @@ export class Config {
     console.log(this.to_json());
   }
 
-  get(keys: string): any {
+  get(keys: string, warn: boolean=true): any {
     let valid = true;
     let pointer = this.content;
     keys.split(".").forEach((key) => {
@@ -50,16 +55,19 @@ export class Config {
         pointer = null;
       }
     });
+    if(pointer === null && warn) {
+      console.warn(`Could not get stored value for: ${keys}`);
+    }
     return pointer;
   }
 
   set_if_null(keys: string, value: any): void {
-    if(this.get(keys) === null) {
+    if(this.get(keys, false) === null) {
       this.set(keys, value);
     }
   }
 
-  set(keys: string, value: any): void {
+  set(keys: string, value: any, do_callback: boolean = true): void {
     let pointer = this.content;
     let last_pointer: Map<string, any> = null;
     let last_key: string = "";
@@ -73,6 +81,45 @@ export class Config {
     });
     last_pointer.set(last_key, value);
     this.url.searchParams.set("config", encodeURIComponent(this.to_json()));
+
+    if(do_callback) {
+      this.callback(keys, value);
+    }
+  }
+
+  set_callback(keys: string, value: any): void {
+    let pointer = this.callbacks;
+    let last_pointer: Map<string, any> = null;
+    let last_key: string = "";
+    keys.split(".").forEach((key) => {
+      last_pointer = pointer;
+      last_key = key;
+      if(! pointer.has(key)) {
+        pointer.set(key, new Map());
+      }
+      pointer = pointer.get(key);
+    });
+    last_pointer.set(last_key, value);
+  }
+
+  callback(keys: string, value: any): void {
+    let valid = true;
+    let pointer = this.callbacks;
+    keys.split(".").forEach((key) => {
+      if(pointer && pointer.has(key) && valid) {
+        pointer = pointer.get(key);
+      } else {
+        valid = false;
+        pointer = null;
+      }
+    });
+    if(pointer !== null) {
+      // Convert to "unknown" type first as TypeScript objects to converting
+      // Map<...> to Callback.
+      const tmp: unknown = pointer;
+      const callback: Callback = tmp as Callback;
+      callback(keys, value);
+    }
   }
 
   goto_url(): void {
