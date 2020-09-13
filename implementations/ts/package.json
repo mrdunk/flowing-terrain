@@ -32,8 +32,8 @@
     "bootstrap": "^4.5.2",
     "bootstrap-icons": "^1.0.0",
     "gulp-cli": "^2.3.0",
-    "jquery": "^3.0.0",
     "seedrandom": "^3.0.5"
+    "jquery": "^3.5.0"
   },
   "devDependencies": {
     "@babylonjs/materials": "^4.1.0",
