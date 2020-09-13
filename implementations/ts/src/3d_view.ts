@@ -316,7 +316,6 @@ export class Display_3d extends DisplayBase {
 
   // Move the height of the sea mesh on the Z axis.
   set_sealevel(sealevel: number): void {
-    console.log("sealevel: ", sealevel);
     const mapsize = this.tile_size * this.enviroment.tile_count;
     this.sea_mesh.position = new BABYLON.Vector3(mapsize / 2, sealevel + 0.02, mapsize / 2);
 

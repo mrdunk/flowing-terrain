@@ -128,7 +128,7 @@ export function seed_points(config: Config, tile_count: number): Set<string> {
     get_neighbours(tile.coordinate).forEach((neighbour) => {
       if(neighbour.x >= 0 && neighbour.x < tile_count &&
          neighbour.y >= 0 && neighbour.y < tile_count) {
-        if(random() < config.get("seed_points.seed_threshold")) {
+        if(random() < config.get("seed_points.threshold")) {
           if(! seabed.has(coord_to_str(neighbour))) {
             open.push(new Flood(neighbour, tile.value));
           }
@@ -142,31 +142,41 @@ export function seed_points(config: Config, tile_count: number): Set<string> {
 
 export function get_noise(config: Config, tile_count: number): Array<Array<number>> {
   const random = seedrandom(config.get("noise.random_seed"));
-  let seed: Array<number> = [];
-  for(let i = 0; i < 0xFF; i++) {
-    seed.push(Math.sin(i * Math.PI / 0x7F));
-  }
+
+  // Get ranges of octaves to use from config.
+  const low_octave = config.get("noise.low_octave");
+  const low_octave_range = (
+    config.get("noise.low_octave_rand") ? 
+    Math.round(random() * low_octave) : low_octave);
+  const mid_octave = config.get("noise.mid_octave");
+  const mid_octave_range = (
+    config.get("noise.mid_octave_rand") ? 
+    Math.round(random() * mid_octave) : mid_octave);
+  const high_octave = config.get("noise.high_octave");
+  const high_octave_range = (
+    config.get("noise.high_octave_rand") ? 
+    Math.round(random() * high_octave) : high_octave);
 
   let pass_x: Array<number> = [];
   let pass_y: Array<number> = [];
   let multiplier: Array<number> = [];
 
-  let coefficient = 1000 / tile_count;
-  for(let i = 0; i < Math.round(random() * 5); i++) {
+  let coefficient = 20 / tile_count;
+  for(let i = 0; i < low_octave_range; i++) {
     pass_x.push(random() * coefficient - coefficient / 2);
     pass_y.push(random() * coefficient - coefficient / 2);
     multiplier.push(1);
   }
 
-  coefficient = 8000 / tile_count;
-  for(let i = 0; i < Math.round(random() * 5); i++) {
+  coefficient = 100 / tile_count;
+  for(let i = 0; i < mid_octave_range; i++) {
     pass_x.push(random() * coefficient - coefficient / 2);
     pass_y.push(random() * coefficient - coefficient / 2);
     multiplier.push(0.5);
   }
 
-  coefficient = 800;
-  for(let i = 0; i < 10; i++) {
+  coefficient = 10;
+  for(let i = 0; i < high_octave_range; i++) {
     pass_x.push(random() * coefficient - coefficient / 2);
     pass_y.push(random() * coefficient - coefficient / 2);
     multiplier.push(0.2);
@@ -180,7 +190,7 @@ export function get_noise(config: Config, tile_count: number): Array<Array<numbe
     for(let x = 0; x < tile_count; x++){
       let val = 0;
       pass_x.forEach((mod, index) => {
-        val += multiplier[index] * seed[Math.round(mod * x + pass_y[index] * y) & 0xff - 1];
+        val += multiplier[index] * Math.sin(mod * x + pass_y[index] * y);
       });
       row.push(val);
 

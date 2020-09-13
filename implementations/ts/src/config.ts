@@ -41,7 +41,7 @@ export class Config {
       }
     }
 
-    console.log(this.to_json());
+    console.dirxml(this.content);
   }
 
   get(keys: string, warn: boolean=true): any {
@@ -160,6 +160,8 @@ export class Config {
       if(typeof value === "string") {
         map.set(key, value);
       } else if(typeof value === "number") {
+        map.set(key, value);
+      } else if(typeof value === "boolean") {
         map.set(key, value);
       } else {
         map.set(key, new Map);

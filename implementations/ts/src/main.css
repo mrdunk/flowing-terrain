@@ -46,6 +46,10 @@ img.logo{
 }
 
 .menu {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.menu:hover {
   background: rgba(255, 255, 255, 0.6);
 }
 

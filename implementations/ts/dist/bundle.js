@@ -18394,7 +18394,6 @@ var Display_3d = function (_flowing_terrain_1$Di) {
     }, {
         key: "set_sealevel",
         value: function set_sealevel(sealevel) {
-            console.log("sealevel: ", sealevel);
             var mapsize = this.tile_size * this.enviroment.tile_count;
             this.sea_mesh.position = new BABYLON.Vector3(mapsize / 2, sealevel + 0.02, mapsize / 2);
             // Now recalculate the rivers as they now meet the sea at a different height
@@ -18526,7 +18525,7 @@ var Config = function () {
             }
         }
 
-        console.log(this.to_json());
+        console.dirxml(this.content);
     }
 
     _createClass(Config, [{
@@ -18692,6 +18691,8 @@ var Config = function () {
                     if (typeof value === "string") {
                         map.set(key, value);
                     } else if (typeof value === "number") {
+                        map.set(key, value);
+                    } else if (typeof value === "boolean") {
                         map.set(key, value);
                     } else {
                         map.set(key, new Map());
@@ -19170,7 +19171,7 @@ function seed_points(config, tile_count) {
         seabed.add(coord_to_str(tile.coordinate));
         get_neighbours(tile.coordinate).forEach(function (neighbour) {
             if (neighbour.x >= 0 && neighbour.x < tile_count && neighbour.y >= 0 && neighbour.y < tile_count) {
-                if (random() < config.get("seed_points.seed_threshold")) {
+                if (random() < config.get("seed_points.threshold")) {
                     if (!seabed.has(coord_to_str(neighbour))) {
                         open.push(new Flood(neighbour, tile.value));
                     }
@@ -19187,27 +19188,30 @@ function seed_points(config, tile_count) {
 exports.seed_points = seed_points;
 function get_noise(config, tile_count) {
     var random = seedrandom(config.get("noise.random_seed"));
-    var seed = [];
-    for (var i = 0; i < 0xFF; i++) {
-        seed.push(Math.sin(i * Math.PI / 0x7F));
-    }
+    // Get ranges of octaves to use from config.
+    var low_octave = config.get("noise.low_octave");
+    var low_octave_range = config.get("noise.low_octave_rand") ? Math.round(random() * low_octave) : low_octave;
+    var mid_octave = config.get("noise.mid_octave");
+    var mid_octave_range = config.get("noise.mid_octave_rand") ? Math.round(random() * mid_octave) : mid_octave;
+    var high_octave = config.get("noise.high_octave");
+    var high_octave_range = config.get("noise.high_octave_rand") ? Math.round(random() * high_octave) : high_octave;
     var pass_x = [];
     var pass_y = [];
     var multiplier = [];
-    var coefficient = 1000 / tile_count;
-    for (var _i = 0; _i < Math.round(random() * 5); _i++) {
+    var coefficient = 20 / tile_count;
+    for (var i = 0; i < low_octave_range; i++) {
         pass_x.push(random() * coefficient - coefficient / 2);
         pass_y.push(random() * coefficient - coefficient / 2);
         multiplier.push(1);
     }
-    coefficient = 8000 / tile_count;
-    for (var _i2 = 0; _i2 < Math.round(random() * 5); _i2++) {
+    coefficient = 100 / tile_count;
+    for (var _i = 0; _i < mid_octave_range; _i++) {
         pass_x.push(random() * coefficient - coefficient / 2);
         pass_y.push(random() * coefficient - coefficient / 2);
         multiplier.push(0.5);
     }
-    coefficient = 800;
-    for (var _i3 = 0; _i3 < 10; _i3++) {
+    coefficient = 10;
+    for (var _i2 = 0; _i2 < high_octave_range; _i2++) {
         pass_x.push(random() * coefficient - coefficient / 2);
         pass_y.push(random() * coefficient - coefficient / 2);
         multiplier.push(0.2);
@@ -19222,7 +19226,7 @@ function get_noise(config, tile_count) {
         var _loop3 = function _loop3(_x2) {
             var val = 0;
             pass_x.forEach(function (mod, index) {
-                val += multiplier[index] * seed[Math.round(mod * _x2 + pass_y[index] * y) & 0xff - 1];
+                val += multiplier[index] * Math.sin(mod * _x2 + pass_y[index] * y);
             });
             row.push(val);
             if (val > max) {
@@ -19290,6 +19294,7 @@ var _2d_view_1 = require("./2d_view");
 var _3d_view_1 = require("./3d_view");
 var config_1 = require("./config");
 var stats = {};
+// TODO: Use console.timer() instead.
 function time(label, to_time) {
     var start = performance.now();
     var return_val = to_time();
@@ -19304,8 +19309,21 @@ window.onload = function () {
     var geography = null;
     var display = null;
     config.set_if_null("seed_points.random_seed", "" + new Date().getTime());
-    config.set_if_null("seed_points.seed_threshold", 0.22);
     config.set_if_null("noise.random_seed", "" + new Date().getTime());
+    config.set_if_null("seed_points.threshold", 0.22);
+    config.set_callback("seed_points.threshold", seed_threshold_callback);
+    config.set_if_null("noise.low_octave", 5);
+    config.set_callback("noise.low_octave", noise_octaves_callback);
+    config.set_if_null("noise.low_octave_rand", true);
+    config.set_callback("noise.low_octave_rand", noise_octaves_callback);
+    config.set_if_null("noise.mid_octave", 5);
+    config.set_callback("noise.mid_octave", noise_octaves_callback);
+    config.set_if_null("noise.mid_octave_rand", true);
+    config.set_callback("noise.mid_octave_rand", noise_octaves_callback);
+    config.set_if_null("noise.high_octave", 5);
+    config.set_callback("noise.high_octave", noise_octaves_callback);
+    config.set_if_null("noise.high_octave_rand", false);
+    config.set_callback("noise.high_octave_rand", noise_octaves_callback);
     config.set_if_null("display.river_threshold", 3);
     config.set_callback("display.river_threshold", function (key, value) {
         display.set_rivers(value);
@@ -19356,6 +19374,7 @@ window.onload = function () {
     generate_seed_points();
     generate_noise();
     generate_terrain();
+    console.table(stats);
     // Start drawing the 3d view.
     display.engine.runRenderLoop(function () {
         display.scene.render();
@@ -19364,38 +19383,55 @@ window.onload = function () {
         display.engine.resize();
     });
     // UI components below this point.
-    // Display value for "range" sliders.
-    function setBubble(range, bubble) {
-        bubble.innerHTML = range.value;
-    }
+    // Configure HTML input elements.
     var _iteratorNormalCompletion = true;
     var _didIteratorError = false;
     var _iteratorError = undefined;
 
     try {
         var _loop = function _loop() {
-            var range_wrap = _step.value;
+            var input_wrap = _step.value;
 
-            var range = range_wrap.getElementsByClassName("range")[0];
-            var bubble = range_wrap.getElementsByClassName("bubble")[0];
-            //console.log(range_wrap, range, bubble);
-            range.addEventListener("input", function () {
-                setBubble(range, bubble);
-                if (config.get(range.name, false) !== null) {
-                    config.set(range.name, parseFloat(range.value));
+            var input = input_wrap.getElementsByClassName("input")[0];
+            var bubble = input_wrap.getElementsByClassName("bubble")[0];
+            var stored_value = config.get(input.name, false);
+            //console.log(
+            //  input.name,
+            //  input.type === "checkbox" ? input.checked : input.value,
+            //  stored_value
+            //)
+            // Make the HTML element match the stored state.
+            if (stored_value !== null) {
+                if (input.type === "checkbox") {
+                    input.checked = stored_value;
+                } else {
+                    input.value = stored_value;
+                }
+            } else {
+                console.warn("Range element does not have coresponding entry in config: " + input.name);
+            }
+            if (bubble) {
+                bubble.innerHTML = input.value;
+            }
+            // Set up HTML element callback.
+            input.addEventListener("input", function () {
+                var value = input.type === "checkbox" ? input.checked : input.value;
+                //console.log(input.name, value);
+                if (bubble) {
+                    bubble.innerHTML = "" + value;
+                }
+                if (config.get(input.name, false) !== null) {
+                    // Callback happens as part of the config.set(...).
+                    if (typeof value === "string") {
+                        config.set(input.name, parseFloat(value));
+                    } else {
+                        config.set(input.name, value);
+                    }
                 }
             });
-            var stored_value = config.get(range.name, false);
-            if (stored_value !== null) {
-                range.value = stored_value;
-            } else {
-                console.warn("Range element does not have coresponding entry in config: " + range.name);
-            }
-            //setBubble(range, bubble);
-            bubble.innerHTML = range.value;
         };
 
-        for (var _iterator = document.getElementsByClassName("range-wrap")[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+        for (var _iterator = document.getElementsByClassName("input-wrap")[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
             _loop();
         }
         // Button to regenerate the seed_point map.
@@ -19420,53 +19456,64 @@ window.onload = function () {
         generate_seed_points();
         generate_terrain();
     }.bind(config));
-    // Slider for adjusting detail of the seed_point map.
-    var menu_seed_threshold_timer_fast = 0;
-    var menu_seed_threshold_timer_slow = 0;
-    function schedule_menu_seed_threshold_handler(event) {
-        config.set("seed_points.seed_threshold", menu_seed_threshold.value);
-        // Change the minimap every 200ms.
-        if (menu_seed_threshold_timer_fast === 0) {
-            menu_seed_threshold_timer_fast = setTimeout(function () {
+    // Callabck for adjusting detail of the seed_point map.
+    var seed_threshold_timer_fast = 0;
+    var seed_threshold_timer_slow = 0;
+    function seed_threshold_callback(keys, value) {
+        // Only change the minimap every 200ms, even if more updates are sent.
+        if (seed_threshold_timer_fast === 0) {
+            seed_threshold_timer_fast = setTimeout(function () {
+                config.set("seed_points.random_seed", "" + new Date().getTime());
                 generate_seed_points();
-                menu_seed_threshold_timer_fast = 0;
+                seed_threshold_timer_fast = 0;
             }, 200);
         }
-        // Change the 3d display every 2 seconds.
-        if (menu_seed_threshold_timer_slow === 0) {
-            menu_seed_threshold_timer_slow = setTimeout(function () {
+        // Only change the 3d display every 2 seconds.
+        if (seed_threshold_timer_slow === 0) {
+            seed_threshold_timer_slow = setTimeout(function () {
                 generate_terrain();
-                menu_seed_threshold_timer_slow = 0;
+                seed_threshold_timer_slow = 0;
             }, 2000);
         }
     }
-    var menu_seed_threshold_bubble = document.getElementById("seed_threshold_bubble");
-    var menu_seed_threshold = document.getElementById("seed_threshold");
-    menu_seed_threshold.value = config.get("seed_points.seed_threshold");
-    menu_seed_threshold.addEventListener("change", schedule_menu_seed_threshold_handler);
-    menu_seed_threshold.addEventListener("input", schedule_menu_seed_threshold_handler);
+    // Button to regenerate the noise map.
     var menu_noise = document.getElementById("noise");
     menu_noise.addEventListener("click", function (event) {
         config.set("noise.random_seed", "" + new Date().getTime());
         generate_noise();
         generate_terrain();
     });
-    function menu_overhead_view(event) {
-        display.overhead_view();
+    // Callback to set noise octaves.
+    // This single callback will work for all octaves.
+    var noise_timer_fast = 0;
+    var noise_timer_slow = 0;
+    function noise_octaves_callback(keys, value) {
+        // Only change the minimap every 200ms, even if more updates are sent.
+        if (noise_timer_fast === 0) {
+            noise_timer_fast = setTimeout(function () {
+                config.set("noise.random_seed", "" + new Date().getTime());
+                generate_noise();
+                noise_timer_fast = 0;
+            }, 200);
+        }
+        // Only change the 3d display every 2 seconds.
+        if (noise_timer_slow === 0) {
+            noise_timer_slow = setTimeout(function () {
+                generate_terrain();
+                noise_timer_slow = 0;
+            }, 2000);
+        }
     }
+    // Move camera to overhead view.
     var overhead_view = document.getElementById("overhead_view");
-    overhead_view.addEventListener("click", menu_overhead_view);
-    function menu_terraform_handler(event) {
-        console.log("terraform");
-        generate_terrain();
-    }
-    var menu_terraform = document.getElementById("terraform");
-    menu_terraform.addEventListener("click", menu_terraform_handler);
+    overhead_view.addEventListener("click", display.overhead_view.bind(display));
+    // Launch Babylon.js debug panel.
     function menu_inspector_handler(event) {
         display.scene.debugLayer.show({ embedMode: true });
     }
     var menu_inspector = document.getElementById("inspector");
     menu_inspector.addEventListener("click", menu_inspector_handler);
+    // Create a permanent link to the current map.
     function menu_link_button_handler(event) {
         navigator.clipboard.writeText(config.url.toString()).then(function () {
             /* clipboard successfully set */
