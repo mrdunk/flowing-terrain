@@ -1,8 +1,16 @@
 {
-  "files": ["src/flowing_terrain.ts", "src/hello_flowing_world.ts"],
+   "files": [
+     "src/flowing_terrain.ts",
+     "src/2d_view.ts",
+     "src/3d_view.ts",
+     "src/config.ts",
+     "src/genesis.ts",
+     "src/main.ts",
+     "src/ordered_set.ts"
+   ],
   "compilerOptions": {
     "noImplicitAny": true,
-		"target": "es2015",
+		"target": "es2017",
 		"types": [
 			"babylonjs",
 			"babylonjs-gui",

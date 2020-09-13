@@ -23,7 +23,7 @@
  */
 
 export function draw_2d(id: string,
-                        data: Array<Array<any>>,
+                        data: any[][],
                         accessor: any = (item: any) => {return item;},
                         size:number=2): void {
   const canvas = document.getElementById(id) as HTMLCanvasElement;
@@ -31,7 +31,7 @@ export function draw_2d(id: string,
   const ctx = canvas.getContext('2d');
 
   console.assert(data.length > 0, "Invalid data");
-  let y_len: number = data[0].length;
+  const y_len: number = data[0].length;
   ctx.canvas.width = y_len * size;
   ctx.canvas.height = data.length * size;
 

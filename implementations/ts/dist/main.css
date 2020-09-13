@@ -5,11 +5,11 @@
   position: absolute;
   top: 0;
   left: 0;
-  z-index: 1;
+  z-index: -1;
 }
 
 #embed-host {
-  z-index: 2;
+  z-index: 10000;
 }
 
 img.logo{
@@ -42,9 +42,20 @@ img.logo{
   position: absolute;
   top: 0;
   left: 0;
-  z-index: 3;
+  max-width: 800px;
 }
 
 .menu {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.2);
 }
+
+.menu:hover {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.toast {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+

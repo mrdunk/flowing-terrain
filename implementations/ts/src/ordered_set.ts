@@ -31,10 +31,10 @@
  */
 export class SortedSet {
   compare: (a: any, b: any) => number;
-  values: Array<any> = [];
+  values: any[] = [];
   length: number;
 
-  constructor(values: Array<any>, compare: (a: any, b: any) => number) {
+  constructor(values: any[], compare: (a: any, b: any) => number) {
     this.compare = compare;
     values.forEach((v) => this.push(v));
   }
@@ -44,8 +44,8 @@ export class SortedSet {
     let left = 0;
     let right = this.length;
     while(right > left) {
-      let mid = Math.round((left + right - 1) / 2);
-      let comp = this.compare(value, this.values[mid]);
+      const mid = Math.round((left + right - 1) / 2);
+      const comp = this.compare(value, this.values[mid]);
       if(comp > 0) {
         left = mid + 1;
       } else if(comp === 0) {
@@ -65,8 +65,8 @@ export class SortedSet {
     let left = 0;
     let right = this.length;
     while(right > left) {
-      let mid = Math.round((left + right - 1) / 2);
-      let comp = this.compare(value, this.values[mid]);
+      const mid = Math.round((left + right - 1) / 2);
+      const comp = this.compare(value, this.values[mid]);
       if(comp > 0) {
         left = mid + 1;
       } else if(comp === 0) {
@@ -81,13 +81,13 @@ export class SortedSet {
 
   has(value: any): boolean {
     // O(log n) time.
-    return this.get_index(value) !== NaN;
+    return ! isNaN(this.get_index(value));
   }
 
   pop() {
     // Return highest value.
     // Constant time.
-    let val = this.values.pop();
+    const val = this.values.pop();
     this.length = this.values.length;
     return val;
   }
@@ -95,7 +95,7 @@ export class SortedSet {
   shift() {
     // Return lowest value.
     // Constant time.
-    let val = this.values.shift();
+    const val = this.values.shift();
     this.length = this.values.length;
     return val;
   }

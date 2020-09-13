@@ -27,15 +27,16 @@
 
 import * as BABYLON from 'babylonjs';
 import {Geography, Tile, DisplayBase, Coordinate} from "./flowing_terrain"
+import {Config} from "./config"
 
 
-export class Display_3d extends DisplayBase {
+export class Display3d extends DisplayBase {
+  config: Config = null;
   tile_size: number = 2;
-  river_threshold = 3;
-  positions: Array<number> = [];
-  indices: Array<number> = [];
-  normals: Array<number> = [];
-  rivers: Array<Array<BABYLON.Vector3>> = [];
+  positions: number[] = [];
+  indices: number[] = [];
+  normals: number[] = [];
+  rivers: BABYLON.Vector3[][] = [];
   sea_mesh: BABYLON.Mesh;
   rivers_mesh: BABYLON.Mesh;
   update_rivers_timer: ReturnType<typeof setTimeout> = 0;
@@ -44,8 +45,14 @@ export class Display_3d extends DisplayBase {
   scene: BABYLON.Scene;
   camera: BABYLON.UniversalCamera;
 
-  constructor(geography: Geography) {
+  land_material: BABYLON.StandardMaterial;
+  sea_material: BABYLON.StandardMaterial;
+  seabed_material: BABYLON.StandardMaterial;
+
+  constructor(geography: Geography, config: Config) {
     super(geography);
+
+    this.config = config;
 
     const renderCanvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
     this.engine = new BABYLON.Engine(renderCanvas, true);
@@ -78,6 +85,22 @@ export class Display_3d extends DisplayBase {
 
     this.scene.ambientColor = new BABYLON.Color3(0.2, 0.2, 0.3);
 
+    this.land_material = new BABYLON.StandardMaterial("land_material", this.scene);
+    this.land_material.diffuseColor = new BABYLON.Color3(0.3, 0.7, 0.2);
+    this.land_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
+    // this.land_material.backFaceCulling = false;
+
+    this.seabed_material = new BABYLON.StandardMaterial("sea_material", this.scene);
+    this.seabed_material.diffuseColor = new BABYLON.Color3(0.3, 0.7, 0.2);
+    this.seabed_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
+    // this.seabed_material.backFaceCulling = false;
+
+    this.sea_material = new BABYLON.StandardMaterial("sea_material", this.scene);
+    this.sea_material.diffuseColor = new BABYLON.Color3(0.2, 0.4, 0.7);
+    this.sea_material.specularColor = new BABYLON.Color3(0.5, 0.5, 0.5);
+    this.sea_material.alpha = config.get("display.sea_transparency");
+    this.sea_material.backFaceCulling = false;
+
     this.draw();
 
     this.camera.setTarget(new BABYLON.Vector3(mapsize / 2, 0, mapsize / 2));
@@ -92,7 +115,7 @@ export class Display_3d extends DisplayBase {
     const position = new BABYLON.Vector3(mapsize / 2, mapsize * 2, mapsize / 2);
     const rotation = new BABYLON.Vector3(Math.PI / 2, Math.PI, 0.001);
 
-    var ease = new BABYLON.CubicEase();
+    const ease = new BABYLON.CubicEase();
     ease.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEINOUT);
 
     BABYLON.Animation.CreateAndStartAnimation(
@@ -109,7 +132,7 @@ export class Display_3d extends DisplayBase {
   draw_start(): void {
     // Cleanup any existing meshes from previous draw.
     while(this.scene.meshes.length > 0) {
-      let mesh = this.scene.meshes.pop();
+      const mesh = this.scene.meshes.pop();
       mesh.dispose();
     }
 
@@ -125,7 +148,7 @@ export class Display_3d extends DisplayBase {
         // the this.positions array much more challenging though.
         const tile = this.geography.get_tile({x, y});
         this.positions.push(tile.pos.x * this.tile_size);
-        this.positions.push(tile.height);
+        this.positions.push(tile.height * this.tile_size);
         this.positions.push(tile.pos.y * this.tile_size);
       }
     }
@@ -216,14 +239,14 @@ export class Display_3d extends DisplayBase {
 
   // Draw river between 2 points.
   draw_river(highest: Tile, lowest: Tile): void {
-    const sealevel = this.enviroment.sealevel;
+    const sealevel = this.config.get("geography.sealevel");
     if(highest === null || lowest === null) {
       return;
     }
     if(highest.height < sealevel) {
       return;
     }
-    if(highest.dampness <= this.river_threshold) {
+    if(highest.dampness <= this.config.get("display.river_threshold")) {
       return;
     }
 
@@ -233,23 +256,30 @@ export class Display_3d extends DisplayBase {
 
     console.assert( highest.height >= lowest.height, {errormessage: "river flows uphill"});
 
-    const river: Array<BABYLON.Vector3> = [];
+    const river: BABYLON.Vector3[] = [];
 
     // River section from highest to mid-point.
     river.push(new BABYLON.Vector3(
-      highest.pos.x * this.tile_size, highest.height + offset, highest.pos.y * this.tile_size));
+      highest.pos.x * this.tile_size,
+      (highest.height + offset) * this.tile_size,
+      highest.pos.y * this.tile_size));
     if(lowest.height >= sealevel) {
       river.push(new BABYLON.Vector3(
-        lowest.pos.x * this.tile_size, lowest.height + offset, lowest.pos.y * this.tile_size));
+        lowest.pos.x * this.tile_size,
+        (lowest.height + offset) * this.tile_size,
+        lowest.pos.y * this.tile_size));
     } else {
       // Stop at shoreline.
       const ratio_x = (highest.pos.x - lowest.pos.x) /
                       (highest.height - lowest.height);
       const ratio_y = (highest.pos.y - lowest.pos.y) /
                       (highest.height - lowest.height);
-      let x = highest.pos.x - ((highest.height - sealevel) * ratio_x);
-      let y = highest.pos.y - ((highest.height - sealevel) * ratio_y);
-      river.push(new BABYLON.Vector3(x * this.tile_size, sealevel + offset, y * this.tile_size));
+      const x = highest.pos.x - ((highest.height - sealevel) * ratio_x);
+      const y = highest.pos.y - ((highest.height - sealevel) * ratio_y);
+      river.push(new BABYLON.Vector3(
+        x * this.tile_size,
+        (sealevel + offset) * this.tile_size,
+        y * this.tile_size));
     }
 
     this.rivers.push(river);
@@ -257,23 +287,6 @@ export class Display_3d extends DisplayBase {
 
   // Called as the last stage of the render.
   draw_end(): void {
-    const land_material = new BABYLON.StandardMaterial("land_material", this.scene);
-    land_material.diffuseColor = new BABYLON.Color3(0.3, 0.7, 0.2);
-    land_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
-    //land_material.backFaceCulling = false;
-
-    const seabed_material = new BABYLON.StandardMaterial("sea_material", this.scene);
-    seabed_material.diffuseColor = new BABYLON.Color3(0.3, 0.7, 0.2);
-    seabed_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
-    //seabed_material.backFaceCulling = false;
-
-    const sea_material = new BABYLON.StandardMaterial("sea_material", this.scene);
-    sea_material.diffuseColor = new BABYLON.Color3(0, 0.3, 1);
-    sea_material.specularColor = new BABYLON.Color3(0.5, 0.5, 0.5);
-    //sea_material.alpha = 0.85;
-    sea_material.alpha = 0.5;
-    sea_material.backFaceCulling = false;
-
     // Finish computing land.
     BABYLON.VertexData.ComputeNormals(this.positions, this.indices, this.normals);
     const vertexData = new BABYLON.VertexData();
@@ -282,10 +295,10 @@ export class Display_3d extends DisplayBase {
     vertexData.normals = this.normals;
 
     const land = new BABYLON.Mesh("land");
-    land.material = land_material;
+    land.material = this.land_material;
     vertexData.applyToMesh(land, true);
     land.checkCollisions = true;
-    //land.convertToFlatShadedMesh();
+    // land.convertToFlatShadedMesh();
 
     // Rivers
     this.schedule_update_rivers();
@@ -296,23 +309,22 @@ export class Display_3d extends DisplayBase {
       "seabed", {width: mapsize * 2, height: mapsize * 2});
     seabed.position = new BABYLON.Vector3(
       mapsize / 2, -0.01, mapsize / 2);
-    seabed.material = seabed_material;
+    seabed.material = this.seabed_material;
     seabed.checkCollisions = true;
 
     // Generate sea.
     this.sea_mesh = BABYLON.MeshBuilder.CreateGround(
       "sea", {width: mapsize * 2, height: mapsize * 2});
-    this.sea_mesh.material = sea_material;
+    this.sea_mesh.material = this.sea_material;
     this.sea_mesh.checkCollisions = false;
-    this.set_sealevel(this.enviroment.sealevel);
+    this.set_sealevel(this.config.get("geography.sealevel"));
   }
 
   // Move the height of the sea mesh on the Z axis.
   set_sealevel(sealevel: number): void {
-    console.log("sealevel: ", sealevel);
-    this.enviroment.sealevel = sealevel;
     const mapsize = this.tile_size * this.enviroment.tile_count;
-    this.sea_mesh.position = new BABYLON.Vector3(mapsize / 2, sealevel + 0.02, mapsize / 2);
+    this.sea_mesh.position = new BABYLON.Vector3(
+      mapsize / 2, (sealevel + 0.02) * this.tile_size, mapsize / 2);
 
     // Now recalculate the rivers as they now meet the sea at a different height
     // so length will be different.
@@ -321,7 +333,6 @@ export class Display_3d extends DisplayBase {
 
   // Set what Tile.dampness value to display rivers at and schedule a re-draw.
   set_rivers(value: number): void {
-    this.river_threshold = value;
     console.log("set_rivers", value, this.geography.enviroment.dampest);
     this.schedule_update_rivers();
   }
@@ -340,7 +351,6 @@ export class Display_3d extends DisplayBase {
   // Delete existing rivers mesh and replace with one up to date for the current
   // river_threshold and sealevel values.
   update_rivers(): void {
-    console.log("update_rivers", this.update_rivers_timer);
     this.update_rivers_timer = 0;
     if(this.rivers.length > 0) {
       this.rivers = [];
