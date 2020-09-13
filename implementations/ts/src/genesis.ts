@@ -38,8 +38,8 @@ function coord_to_str(coord: Coordinate): string {
 }
 
 /* Generate coordinates of neighbouring tiles. */
-function get_neighbours(coordinate: Coordinate): Array<Coordinate> {
-  const neighbours: Array<Coordinate> = [];
+function get_neighbours(coordinate: Coordinate): Coordinate[] {
+  const neighbours: Coordinate[] = [];
 
   neighbours.push({x: coordinate.x - 1, y: coordinate.y - 1});
   neighbours.push({x: coordinate.x - 1, y: coordinate.y});
@@ -74,10 +74,10 @@ function compare_floods(a: Flood, b: Flood): number {
 }
 
 export function seed_points_to_array(
-  tile_count: number, sea: Set<string>): Array<Array<number>> {
-    let sea_array = [];
+  tile_count: number, sea: Set<string>): number[][] {
+    const sea_array = [];
     for(let x = 0; x < tile_count; x++) {
-      let row: Array<number> = [];
+      const row: number[] = [];
       for(let y = 0; y < tile_count; y++) {
         row.push(sea.has(coord_to_str({x, y}))? 1 : 0);
       }
@@ -99,9 +99,9 @@ export function seed_points(config: Config, tile_count: number): Set<string> {
 
   // Edge tiles on map should always be seed points.
   for(let x = 0; x < tile_count; x++){
-    let dx = x - tile_count / 2;
-    let dy = tile_count / 2;
-    let dist_from_center = dx * dx + dy * dy;
+    const dx = x - tile_count / 2;
+    const dy = tile_count / 2;
+    const dist_from_center = dx * dx + dy * dy;
 
     let y = 0;
     open.push(new Flood({x, y}, dist_from_center));
@@ -110,9 +110,9 @@ export function seed_points(config: Config, tile_count: number): Set<string> {
     open.push(new Flood({x, y}, dist_from_center));
   }
   for(let y = 0; y < tile_count; y++){
-    let dx = tile_count / 2;
-    let dy = y - tile_count / 2;
-    let dist_from_center = dx * dx + dy * dy;
+    const dx = tile_count / 2;
+    const dy = y - tile_count / 2;
+    const dist_from_center = dx * dx + dy * dy;
 
     let x = 0;
     open.push(new Flood({x, y}, dist_from_center));
@@ -143,17 +143,17 @@ export function seed_points(config: Config, tile_count: number): Set<string> {
 export class Noise {
   config: Config;
 
-  coefficients_x_low: Array<number>;
-  coefficients_y_low: Array<number>;
-  coefficients_x_mid: Array<number>;
-  coefficients_y_mid: Array<number>;
-  coefficients_x_high: Array<number>;
-  coefficients_y_high: Array<number>;
+  coefficients_x_low: number[];
+  coefficients_y_low: number[];
+  coefficients_x_mid: number[];
+  coefficients_y_mid: number[];
+  coefficients_x_high: number[];
+  coefficients_y_high: number[];
 
-  data_low: Array<Array<number>>;
-  data_mid: Array<Array<number>>;
-  data_high: Array<Array<number>>;
-  data_combined: Array<Array<number>>;
+  data_low: number[][];
+  data_mid: number[][];
+  data_high: number[][];
+  data_combined: number[][];
 
   constructor(config: Config) {
     this.config = config;
@@ -162,8 +162,8 @@ export class Noise {
   set_octave(octave: string) {
     const tile_count = this.config.get("enviroment.tile_count");
     let scale: number = 1;
-    let coefficients_x: Array<number> = null;
-    let coefficients_y: Array<number> = null;
+    let coefficients_x: number[] = null;
+    let coefficients_y: number[] = null;
     let random: seedrandom.prng = null;
 
     switch (octave) {
@@ -208,9 +208,9 @@ export class Noise {
     const tile_count = this.config.get("enviroment.tile_count");
 
     let weight: number = 1;
-    let coefficients_x: Array<number> = null;
-    let coefficients_y: Array<number> = null;
-    let data: Array<Array<number>> = null;
+    let coefficients_x: number[] = null;
+    let coefficients_y: number[] = null;
+    let data: number[][] = null;
 
     switch (octave) {
       case "low":
@@ -238,12 +238,8 @@ export class Noise {
         console.trace();
     }
 
-    //console.info("generate_octave", octave);
-    //console.table(coefficients_x);
-    //console.table(coefficients_y);
-
     for(let y = 0; y < tile_count; y++){
-      let row: Array<number> = [];
+      const row: number[] = [];
       for(let x = 0; x < tile_count; x++){
         let val = 0;
         coefficients_x.forEach((mod, index) => {
@@ -264,17 +260,13 @@ export class Noise {
     this.data_combined = [];
 
     for(let y = 0; y < tile_count; y++){
-      let row: Array<number> = [];
+      const row: number[] = [];
       for(let x = 0; x < tile_count; x++){
-        let val = (this.data_low[y][x] + this.data_mid[y][x] + this.data_high[y][x]) / 3;
+        const val = (this.data_low[y][x] + this.data_mid[y][x] + this.data_high[y][x]) / 3;
         row.push(val);
       }
       this.data_combined.push(row);
     }
-    //console.table(this.data_low);
-    //console.table(this.data_mid);
-    //console.table(this.data_high);
-    //console.table(this.data_combined);
   }
 
   generate(regenerate: boolean = false) {
@@ -285,6 +277,7 @@ export class Noise {
       this.config.set("noise.random_seed_high", `high ${(new Date()).getTime()}`);
     }
 
+    // TODO: Calculate what needs updating and do just that.
     let octave = "all";
 
     switch (octave) {

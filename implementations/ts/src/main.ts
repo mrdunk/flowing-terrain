@@ -31,7 +31,7 @@ import "bootstrap";
 import {Enviroment, Geography, Tile} from "./flowing_terrain"
 import {seed_points, seed_points_to_array, Noise} from "./genesis"
 import {draw_2d} from "./2d_view"
-import {Display_3d} from "./3d_view"
+import {Display3d} from "./3d_view"
 import {Config} from "./config"
 
 const stats: Record<string, number> = {};
@@ -45,20 +45,19 @@ function time(label: string, to_time: () => any) {
 }
 
 window.onload = () => {
-  const enviroment: Enviroment = new Enviroment;
+  const enviroment: Enviroment = new Enviroment();
   const config: Config = new Config();
   let seabed: Set<string> = null;
-  //let noise: Array<Array<number>> = null;
   let noise: Noise = null;
   let geography: Geography = null;
-  let display: Display_3d = null;
+  let display: Display3d = null;
 
   config.set_if_null("enviroment.tile_count", 100);
   config.set_if_null("seed_points.random_seed", `${(new Date()).getTime()}`);
   config.set_if_null("noise.random_seed_low", `low ${(new Date()).getTime()}`);
   config.set_if_null("noise.random_seed_mid", `mid ${(new Date()).getTime()}`);
   config.set_if_null("noise.random_seed_high", `high ${(new Date()).getTime()}`);
-  
+
   config.set_if_null("seed_points.threshold", 0.18);
   config.set_callback("seed_points.threshold", seed_threshold_callback);
 
@@ -79,12 +78,12 @@ window.onload = () => {
   config.set_callback("display.river_threshold", (key: string, value: any) => {
     display.set_rivers(value);
   });
-  
+
   config.set_if_null("geography.sealevel", 0.5);
   config.set_callback("geography.sealevel", (key: string, value: any) => {
     display.set_sealevel(value);
   });
-  
+
   config.set_if_null("display.sea_transparency", 0.5);
   config.set_callback("display.sea_transparency", (key: string, value: any) => {
     display.sea_material.alpha = value;
@@ -122,14 +121,14 @@ window.onload = () => {
     });
 
     time("2d_height_map", () => {
-      draw_2d("2d_height_map", 
+      draw_2d("2d_height_map",
         geography.tiles,
         (tile: Tile) => { return tile.height / enviroment.highest_point;});
     });
 
     display = time("3d_display", () => {
       if(display === null) {
-        return new Display_3d(geography, config);
+        return new Display3d(geography, config);
       } else {
         display.draw();
         return display;
@@ -148,7 +147,7 @@ window.onload = () => {
     display.scene.render();
   })
 
-  window.addEventListener("resize", function () {
+  window.addEventListener("resize", () => {
     display.engine.resize();
   });
 
@@ -156,17 +155,17 @@ window.onload = () => {
   // UI components below this point.
 
   // Configure HTML input elements.
-  for(let input_wrap of document.getElementsByClassName("input-wrap")) {
+  for(const input_wrap of document.getElementsByClassName("input-wrap")) {
     const input = input_wrap.getElementsByClassName("input")[0] as HTMLInputElement;
     const bubble = input_wrap.getElementsByClassName("bubble")[0] as HTMLInputElement;
-    
+
     const stored_value = config.get(input.name, false);
 
-    //console.log(
+    // console.log(
     //  input.name,
     //  input.type === "checkbox" ? input.checked : input.value,
     //  stored_value
-    //)
+    // );
 
     // Make the HTML element match the stored state.
     if(stored_value !== null) {
@@ -186,7 +185,6 @@ window.onload = () => {
     // Set up HTML element callback.
     input.addEventListener("input", () => {
       const value = input.type === "checkbox" ? input.checked : input.value
-      //console.log(input.name, value);
       if(bubble) {
         bubble.innerHTML = `${value}`;
       }
@@ -204,11 +202,11 @@ window.onload = () => {
 
   // Button to regenerate the seed_point map.
   const menu_seed_points = document.getElementById("seed_points") as HTMLInputElement;
-  menu_seed_points.addEventListener("click", function(event: Event) {
+  menu_seed_points.addEventListener("click", (event: Event) => {
     config.set("seed_points.random_seed", `${(new Date()).getTime()}`);
     generate_seed_points();
     generate_terrain();
-  }.bind(config));
+  });
 
 
   // Callabck for adjusting detail of the seed_point map.
@@ -277,14 +275,14 @@ window.onload = () => {
 
   // Create a permanent link to the current map.
   function menu_link_button_handler(event: Event) {
-    navigator.clipboard.writeText(config.url.toString()).then(function() {
+    navigator.clipboard.writeText(config.url.toString()).then(() => {
       /* clipboard successfully set */
       $('.toast').toast('show');
-    }, function() {
+    }, () => {
       /* clipboard write failed */
       console.log(`Failed to copy ${config.url.toString()} to paste buffer.`);
     });
-    //window.open(config.url.toString());
+    // window.open(config.url.toString());
     const hyperlink: HTMLAnchorElement = document.getElementById("permalink") as HTMLAnchorElement;
     hyperlink.href = config.url.toString();
   }

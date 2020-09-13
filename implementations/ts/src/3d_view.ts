@@ -30,13 +30,13 @@ import {Geography, Tile, DisplayBase, Coordinate} from "./flowing_terrain"
 import {Config} from "./config"
 
 
-export class Display_3d extends DisplayBase {
+export class Display3d extends DisplayBase {
   config: Config = null;
   tile_size: number = 2;
-  positions: Array<number> = [];
-  indices: Array<number> = [];
-  normals: Array<number> = [];
-  rivers: Array<Array<BABYLON.Vector3>> = [];
+  positions: number[] = [];
+  indices: number[] = [];
+  normals: number[] = [];
+  rivers: BABYLON.Vector3[][] = [];
   sea_mesh: BABYLON.Mesh;
   rivers_mesh: BABYLON.Mesh;
   update_rivers_timer: ReturnType<typeof setTimeout> = 0;
@@ -51,7 +51,7 @@ export class Display_3d extends DisplayBase {
 
   constructor(geography: Geography, config: Config) {
     super(geography);
-    
+
     this.config = config;
 
     const renderCanvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
@@ -88,17 +88,16 @@ export class Display_3d extends DisplayBase {
     this.land_material = new BABYLON.StandardMaterial("land_material", this.scene);
     this.land_material.diffuseColor = new BABYLON.Color3(0.3, 0.7, 0.2);
     this.land_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
-    //this.land_material.backFaceCulling = false;
+    // this.land_material.backFaceCulling = false;
 
     this.seabed_material = new BABYLON.StandardMaterial("sea_material", this.scene);
     this.seabed_material.diffuseColor = new BABYLON.Color3(0.3, 0.7, 0.2);
     this.seabed_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
-    //this.seabed_material.backFaceCulling = false;
+    // this.seabed_material.backFaceCulling = false;
 
     this.sea_material = new BABYLON.StandardMaterial("sea_material", this.scene);
     this.sea_material.diffuseColor = new BABYLON.Color3(0.2, 0.4, 0.7);
     this.sea_material.specularColor = new BABYLON.Color3(0.5, 0.5, 0.5);
-    //sea_material.alpha = 0.85;
     this.sea_material.alpha = config.get("display.sea_transparency");
     this.sea_material.backFaceCulling = false;
 
@@ -116,7 +115,7 @@ export class Display_3d extends DisplayBase {
     const position = new BABYLON.Vector3(mapsize / 2, mapsize * 2, mapsize / 2);
     const rotation = new BABYLON.Vector3(Math.PI / 2, Math.PI, 0.001);
 
-    var ease = new BABYLON.CubicEase();
+    const ease = new BABYLON.CubicEase();
     ease.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEINOUT);
 
     BABYLON.Animation.CreateAndStartAnimation(
@@ -133,7 +132,7 @@ export class Display_3d extends DisplayBase {
   draw_start(): void {
     // Cleanup any existing meshes from previous draw.
     while(this.scene.meshes.length > 0) {
-      let mesh = this.scene.meshes.pop();
+      const mesh = this.scene.meshes.pop();
       mesh.dispose();
     }
 
@@ -257,7 +256,7 @@ export class Display_3d extends DisplayBase {
 
     console.assert( highest.height >= lowest.height, {errormessage: "river flows uphill"});
 
-    const river: Array<BABYLON.Vector3> = [];
+    const river: BABYLON.Vector3[] = [];
 
     // River section from highest to mid-point.
     river.push(new BABYLON.Vector3(
@@ -275,8 +274,8 @@ export class Display_3d extends DisplayBase {
                       (highest.height - lowest.height);
       const ratio_y = (highest.pos.y - lowest.pos.y) /
                       (highest.height - lowest.height);
-      let x = highest.pos.x - ((highest.height - sealevel) * ratio_x);
-      let y = highest.pos.y - ((highest.height - sealevel) * ratio_y);
+      const x = highest.pos.x - ((highest.height - sealevel) * ratio_x);
+      const y = highest.pos.y - ((highest.height - sealevel) * ratio_y);
       river.push(new BABYLON.Vector3(
         x * this.tile_size,
         (sealevel + offset) * this.tile_size,
@@ -299,7 +298,7 @@ export class Display_3d extends DisplayBase {
     land.material = this.land_material;
     vertexData.applyToMesh(land, true);
     land.checkCollisions = true;
-    //land.convertToFlatShadedMesh();
+    // land.convertToFlatShadedMesh();
 
     // Rivers
     this.schedule_update_rivers();

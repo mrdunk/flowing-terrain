@@ -22,11 +22,9 @@
  * SOFTWARE.
  */
 
-/* An class that can be used to store configuration that can be passed via URL. */
+/* A class that can be used to store configuration that can be passed via URL. */
 
-interface Callback {
-  (keys: string, value: any): void;
-}
+type Callback = (keys: string, value: any) => void;
 
 export class Config {
   content: Map<string, any> = new Map();
@@ -150,7 +148,7 @@ export class Config {
     return ret_val;
   }
 
-  from_json(json: string, map: Map<string, any> = null, obj: Object = null): Map<string, any> {
+  from_json(json: string, map: Map<string, any> = null, obj: object = null): Map<string, any> {
     if(map === null) {
       obj = JSON.parse(json);
       map = this.content;
@@ -164,7 +162,7 @@ export class Config {
       } else if(typeof value === "boolean") {
         map.set(key, value);
       } else {
-        map.set(key, new Map);
+        map.set(key, new Map());
         this.from_json("", map.get(key), value);
       }
     }

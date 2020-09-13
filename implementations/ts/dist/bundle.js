@@ -18143,19 +18143,19 @@ function _possibleConstructorReturn(self, call) { if (!self) { throw new Referen
 function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
 
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Display_3d = void 0;
+exports.Display3d = void 0;
 /* A sample frontend for the algorithm described at
  * https://github.com/mrdunk/flowing-terrain */
 var BABYLON = require("babylonjs");
 var flowing_terrain_1 = require("./flowing_terrain");
 
-var Display_3d = function (_flowing_terrain_1$Di) {
-    _inherits(Display_3d, _flowing_terrain_1$Di);
+var Display3d = function (_flowing_terrain_1$Di) {
+    _inherits(Display3d, _flowing_terrain_1$Di);
 
-    function Display_3d(geography, config) {
-        _classCallCheck(this, Display_3d);
+    function Display3d(geography, config) {
+        _classCallCheck(this, Display3d);
 
-        var _this = _possibleConstructorReturn(this, (Display_3d.__proto__ || Object.getPrototypeOf(Display_3d)).call(this, geography));
+        var _this = _possibleConstructorReturn(this, (Display3d.__proto__ || Object.getPrototypeOf(Display3d)).call(this, geography));
 
         _this.config = null;
         _this.tile_size = 2;
@@ -18185,15 +18185,14 @@ var Display_3d = function (_flowing_terrain_1$Di) {
         _this.land_material = new BABYLON.StandardMaterial("land_material", _this.scene);
         _this.land_material.diffuseColor = new BABYLON.Color3(0.3, 0.7, 0.2);
         _this.land_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
-        //this.land_material.backFaceCulling = false;
+        // this.land_material.backFaceCulling = false;
         _this.seabed_material = new BABYLON.StandardMaterial("sea_material", _this.scene);
         _this.seabed_material.diffuseColor = new BABYLON.Color3(0.3, 0.7, 0.2);
         _this.seabed_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
-        //this.seabed_material.backFaceCulling = false;
+        // this.seabed_material.backFaceCulling = false;
         _this.sea_material = new BABYLON.StandardMaterial("sea_material", _this.scene);
         _this.sea_material.diffuseColor = new BABYLON.Color3(0.2, 0.4, 0.7);
         _this.sea_material.specularColor = new BABYLON.Color3(0.5, 0.5, 0.5);
-        //sea_material.alpha = 0.85;
         _this.sea_material.alpha = config.get("display.sea_transparency");
         _this.sea_material.backFaceCulling = false;
         _this.draw();
@@ -18205,7 +18204,7 @@ var Display_3d = function (_flowing_terrain_1$Di) {
     // Move camera to overhead view. Middle of map, looking straight down.
 
 
-    _createClass(Display_3d, [{
+    _createClass(Display3d, [{
         key: "overhead_view",
         value: function overhead_view() {
             var mapsize = this.tile_size * this.enviroment.tile_count;
@@ -18374,7 +18373,7 @@ var Display_3d = function (_flowing_terrain_1$Di) {
             land.material = this.land_material;
             vertexData.applyToMesh(land, true);
             land.checkCollisions = true;
-            //land.convertToFlatShadedMesh();
+            // land.convertToFlatShadedMesh();
             // Rivers
             this.schedule_update_rivers();
             // Generate seabed.
@@ -18448,10 +18447,10 @@ var Display_3d = function (_flowing_terrain_1$Di) {
         }
     }]);
 
-    return Display_3d;
+    return Display3d;
 }(flowing_terrain_1.DisplayBase);
 
-exports.Display_3d = Display_3d;
+exports.Display3d = Display3d;
 
 },{"./flowing_terrain":17,"babylonjs":1}],16:[function(require,module,exports){
 "use strict";
@@ -18874,8 +18873,8 @@ var Geography = function () {
                         x_str = _coord$split2[0],
                         y_str = _coord$split2[1];
 
-                    var x = parseInt(x_str);
-                    var y = parseInt(y_str);
+                    var x = parseInt(x_str, 10);
+                    var y = parseInt(y_str, 10);
                     var tile = this.get_tile({ x: x, y: y });
                     console.assert(tile !== null, { x: x, y: y, tile: tile });
                     tile.height = 0;
@@ -18916,12 +18915,11 @@ var Geography = function () {
                         var height_diff = Math.max(_this.noise[x][y], 0);
                         var unevenness = Math.max(_this.noise[x][y] - _this.noise[nx][ny] + 0.03, 0);
                         var jitter = _this.noise[x][y] - _this.noise[nx][ny] + 0.3;
-                        //console.log(height_diff, unevenness, jitter);
                         neighbour.height = tile.height + 0.01;
                         neighbour.height += orientation_mod * Math.pow(height_diff, 3);
                         neighbour.height += orientation_mod * unevenness;
-                        //neighbour.height += orientation_mod * jitter;
-                        //neighbour.height += orientation_mod * Math.random() * 0.2;
+                        // neighbour.height += orientation_mod * jitter;
+                        // neighbour.height += orientation_mod * Math.random() * 0.2;
                         _this.open_set_sorted.push(neighbour);
                     }
                     if (neighbour.height > _this.enviroment.highest_point) {
@@ -19050,7 +19048,7 @@ var DisplayBase = function () {
         key: "draw_tile",
         value: function draw_tile(tile) {
             // Override this method with code to draw one point on the map.
-            console.log(tile);
+            console.info(tile);
         }
     }]);
 
@@ -19272,9 +19270,6 @@ var Noise = function () {
                 default:
                     console.trace();
             }
-            //console.info("generate_octave", octave);
-            //console.table(coefficients_x);
-            //console.table(coefficients_y);
 
             var _loop2 = function _loop2(y) {
                 var row = [];
@@ -19314,10 +19309,6 @@ var Noise = function () {
                 }
                 this.data_combined.push(_row);
             }
-            //console.table(this.data_low);
-            //console.table(this.data_mid);
-            //console.table(this.data_high);
-            //console.table(this.data_combined);
         }
     }, {
         key: "generate",
@@ -19330,6 +19321,7 @@ var Noise = function () {
                 this.config.set("noise.random_seed_mid", "mid " + new Date().getTime());
                 this.config.set("noise.random_seed_high", "high " + new Date().getTime());
             }
+            // TODO: Calculate what needs updating and do just that.
             var octave = "all";
             switch (octave) {
                 case "low":
@@ -19406,7 +19398,6 @@ window.onload = function () {
     var enviroment = new flowing_terrain_1.Enviroment();
     var config = new config_1.Config();
     var seabed = null;
-    //let noise: Array<Array<number>> = null;
     var noise = null;
     var geography = null;
     var display = null;
@@ -19478,7 +19469,7 @@ window.onload = function () {
         });
         display = time("3d_display", function () {
             if (display === null) {
-                return new _3d_view_1.Display_3d(geography, config);
+                return new _3d_view_1.Display3d(geography, config);
             } else {
                 display.draw();
                 return display;
@@ -19509,11 +19500,11 @@ window.onload = function () {
             var input = input_wrap.getElementsByClassName("input")[0];
             var bubble = input_wrap.getElementsByClassName("bubble")[0];
             var stored_value = config.get(input.name, false);
-            //console.log(
+            // console.log(
             //  input.name,
             //  input.type === "checkbox" ? input.checked : input.value,
             //  stored_value
-            //)
+            // );
             // Make the HTML element match the stored state.
             if (stored_value !== null) {
                 if (input.type === "checkbox") {
@@ -19530,7 +19521,6 @@ window.onload = function () {
             // Set up HTML element callback.
             input.addEventListener("input", function () {
                 var value = input.type === "checkbox" ? input.checked : input.value;
-                //console.log(input.name, value);
                 if (bubble) {
                     bubble.innerHTML = "" + value;
                 }
@@ -19569,7 +19559,7 @@ window.onload = function () {
         config.set("seed_points.random_seed", "" + new Date().getTime());
         generate_seed_points();
         generate_terrain();
-    }.bind(config));
+    });
     // Callabck for adjusting detail of the seed_point map.
     var seed_threshold_timer_fast = 0;
     var seed_threshold_timer_slow = 0;
@@ -19634,7 +19624,7 @@ window.onload = function () {
             /* clipboard write failed */
             console.log("Failed to copy " + config.url.toString() + " to paste buffer.");
         });
-        //window.open(config.url.toString());
+        // window.open(config.url.toString());
         var hyperlink = document.getElementById("permalink");
         hyperlink.href = config.url.toString();
     }
@@ -19740,7 +19730,7 @@ var SortedSet = function () {
         key: "has",
         value: function has(value) {
             // O(log n) time.
-            return this.get_index(value) !== NaN;
+            return !isNaN(this.get_index(value));
         }
     }, {
         key: "pop",

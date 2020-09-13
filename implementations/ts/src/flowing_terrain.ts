@@ -68,20 +68,20 @@ export class Tile {
 export class Geography {
   enviroment: Enviroment;
   seed_points: Set<string>;
-  noise: Array<Array<number>>;
-  tiles: Array<Array<Tile>> = [];
+  noise: number[][];
+  tiles: Tile[][] = [];
   open_set_sorted: SortedSet = new SortedSet([], this.compare_tiles);
 
-  constructor(enviroment: Enviroment, seed_points: Set<string>, noise: Array<Array<number>>) {
+  constructor(enviroment: Enviroment, seed_points: Set<string>, noise: number[][]) {
     this.terraform(enviroment, seed_points, noise);
   }
 
   // Calculate the terrain.
-  terraform(enviroment: Enviroment, seed_points: Set<string>, noise: Array<Array<number>>) {
+  terraform(enviroment: Enviroment, seed_points: Set<string>, noise: number[][]) {
     this.enviroment = enviroment;
     this.seed_points = seed_points;
     this.noise = noise;
-    
+
     this.enviroment.highest_point = 0;
     this.enviroment.dampest = 0;
 
@@ -90,7 +90,7 @@ export class Geography {
 
     // Populate tile array with un-configured Tile elements.
     for(let x = 0; x < this.enviroment.tile_count; x++) {
-      let row: Array<Tile> = [];
+      const row: Tile[] = [];
       for(let y = 0; y < this.enviroment.tile_count; y++) {
         const tile: Tile = new Tile({x, y}, this.enviroment);
         row.push(tile);
@@ -120,10 +120,10 @@ export class Geography {
   // Set seed heights on map to start the height generation algorithm at.
   // These points will be at height===0.
   starting_points(): void {
-    for(let coord of this.seed_points) {
+    for(const coord of this.seed_points) {
       const [x_str, y_str] = coord.split(",");
-      const x = parseInt(x_str);
-      const y = parseInt(y_str);
+      const x = parseInt(x_str, 10);
+      const y = parseInt(y_str, 10);
       const tile = this.get_tile({x, y});
       console.assert(tile !== null, {x, y, tile});
       tile.height = 0;
@@ -134,7 +134,7 @@ export class Geography {
   // Populate all tiles with height data. Also set the sealevel.
   heights_algorithm(): void {
     while(this.open_set_sorted.length) {
-      let tile = this.open_set_sorted.shift();
+      const tile = this.open_set_sorted.shift();
       this.get_neighbours(tile).forEach((neighbour) => {
         if(neighbour.height === null) {
 
@@ -149,14 +149,13 @@ export class Geography {
           const height_diff = Math.max(this.noise[x][y], 0);
           const unevenness = Math.max((this.noise[x][y] - this.noise[nx][ny]) + 0.03, 0);
           const jitter = this.noise[x][y] - this.noise[nx][ny] + 0.3;
-          //console.log(height_diff, unevenness, jitter);
 
           neighbour.height = tile.height + 0.01;
           neighbour.height += orientation_mod * Math.pow(height_diff, 3);
           neighbour.height += orientation_mod * unevenness;
-          //neighbour.height += orientation_mod * jitter;
-          //neighbour.height += orientation_mod * Math.random() * 0.2;
-          
+          // neighbour.height += orientation_mod * jitter;
+          // neighbour.height += orientation_mod * Math.random() * 0.2;
+
           this.open_set_sorted.push(neighbour);
         }
 
@@ -185,7 +184,7 @@ export class Geography {
       if(tile.height === 0) {
         continue;
       }
-      let lowest_neighbours: Array<Tile> = [];
+      let lowest_neighbours: Tile[] = [];
       this.get_neighbours(tile).forEach((neighbour) => {
         if(neighbour !== null && neighbour.height < tile.height) {
           if(lowest_neighbours.length === 0) {
@@ -220,8 +219,8 @@ export class Geography {
     return this.tiles[coordinate.x][coordinate.y];
   }
 
-  get_neighbours(tile: Tile): Array<Tile> {
-    let neighbours = [
+  get_neighbours(tile: Tile): Tile[] {
+    const neighbours = [
       this.get_tile({x: tile.pos.x - 1, y: tile.pos.y - 1}),
       this.get_tile({x: tile.pos.x - 1, y: tile.pos.y}),
       this.get_tile({x: tile.pos.x - 1, y: tile.pos.y + 1}),
@@ -271,7 +270,7 @@ export class DisplayBase {
   // Called once per point on the map.
   draw_tile(tile: Tile): void {
     // Override this method with code to draw one point on the map.
-    console.log(tile);
+    console.info(tile);
   }
 }
 
