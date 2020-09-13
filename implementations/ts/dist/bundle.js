@@ -18242,7 +18242,7 @@ var Display_3d = function (_flowing_terrain_1$Di) {
                     // the this.positions array much more challenging though.
                     var tile = this.geography.get_tile({ x: x, y: y });
                     this.positions.push(tile.pos.x * this.tile_size);
-                    this.positions.push(tile.height);
+                    this.positions.push(tile.height * this.tile_size);
                     this.positions.push(tile.pos.y * this.tile_size);
                 }
             }
@@ -18346,16 +18346,16 @@ var Display_3d = function (_flowing_terrain_1$Di) {
             console.assert(highest.height >= lowest.height, { errormessage: "river flows uphill" });
             var river = [];
             // River section from highest to mid-point.
-            river.push(new BABYLON.Vector3(highest.pos.x * this.tile_size, highest.height + offset, highest.pos.y * this.tile_size));
+            river.push(new BABYLON.Vector3(highest.pos.x * this.tile_size, (highest.height + offset) * this.tile_size, highest.pos.y * this.tile_size));
             if (lowest.height >= sealevel) {
-                river.push(new BABYLON.Vector3(lowest.pos.x * this.tile_size, lowest.height + offset, lowest.pos.y * this.tile_size));
+                river.push(new BABYLON.Vector3(lowest.pos.x * this.tile_size, (lowest.height + offset) * this.tile_size, lowest.pos.y * this.tile_size));
             } else {
                 // Stop at shoreline.
                 var ratio_x = (highest.pos.x - lowest.pos.x) / (highest.height - lowest.height);
                 var ratio_y = (highest.pos.y - lowest.pos.y) / (highest.height - lowest.height);
                 var x = highest.pos.x - (highest.height - sealevel) * ratio_x;
                 var y = highest.pos.y - (highest.height - sealevel) * ratio_y;
-                river.push(new BABYLON.Vector3(x * this.tile_size, sealevel + offset, y * this.tile_size));
+                river.push(new BABYLON.Vector3(x * this.tile_size, (sealevel + offset) * this.tile_size, y * this.tile_size));
             }
             this.rivers.push(river);
         }
@@ -18395,7 +18395,7 @@ var Display_3d = function (_flowing_terrain_1$Di) {
         key: "set_sealevel",
         value: function set_sealevel(sealevel) {
             var mapsize = this.tile_size * this.enviroment.tile_count;
-            this.sea_mesh.position = new BABYLON.Vector3(mapsize / 2, sealevel + 0.02, mapsize / 2);
+            this.sea_mesh.position = new BABYLON.Vector3(mapsize / 2, (sealevel + 0.02) * this.tile_size, mapsize / 2);
             // Now recalculate the rivers as they now meet the sea at a different height
             // so length will be different.
             this.schedule_update_rivers();
@@ -19085,10 +19085,12 @@ exports.DisplayBase = DisplayBase;
  * SOFTWARE.
  */
 
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.get_noise = exports.seed_points = exports.seed_points_to_array = void 0;
+exports.Noise = exports.seed_points = exports.seed_points_to_array = void 0;
 var seedrandom = require("seedrandom");
 var ordered_set_1 = require("./ordered_set");
 /* Convert Coordinate into something that can be used as a key in a Set(). */
@@ -19186,76 +19188,175 @@ function seed_points(config, tile_count) {
     return seabed;
 }
 exports.seed_points = seed_points;
-function get_noise(config, tile_count) {
-    var random = seedrandom(config.get("noise.random_seed"));
-    // Get ranges of octaves to use from config.
-    var low_octave = config.get("noise.low_octave");
-    var low_octave_range = config.get("noise.low_octave_rand") ? Math.round(random() * low_octave) : low_octave;
-    var mid_octave = config.get("noise.mid_octave");
-    var mid_octave_range = config.get("noise.mid_octave_rand") ? Math.round(random() * mid_octave) : mid_octave;
-    var high_octave = config.get("noise.high_octave");
-    var high_octave_range = config.get("noise.high_octave_rand") ? Math.round(random() * high_octave) : high_octave;
-    var pass_x = [];
-    var pass_y = [];
-    var multiplier = [];
-    var coefficient = 20 / tile_count;
-    for (var i = 0; i < low_octave_range; i++) {
-        pass_x.push(random() * coefficient - coefficient / 2);
-        pass_y.push(random() * coefficient - coefficient / 2);
-        multiplier.push(1);
-    }
-    coefficient = 100 / tile_count;
-    for (var _i = 0; _i < mid_octave_range; _i++) {
-        pass_x.push(random() * coefficient - coefficient / 2);
-        pass_y.push(random() * coefficient - coefficient / 2);
-        multiplier.push(0.5);
-    }
-    coefficient = 10;
-    for (var _i2 = 0; _i2 < high_octave_range; _i2++) {
-        pass_x.push(random() * coefficient - coefficient / 2);
-        pass_y.push(random() * coefficient - coefficient / 2);
-        multiplier.push(0.2);
-    }
-    var data = [];
-    var min = 99999999999;
-    var max = -99999999999;
 
-    var _loop2 = function _loop2(y) {
-        var row = [];
+var Noise = function () {
+    function Noise(config) {
+        _classCallCheck(this, Noise);
 
-        var _loop3 = function _loop3(_x2) {
-            var val = 0;
-            pass_x.forEach(function (mod, index) {
-                val += multiplier[index] * Math.sin(mod * _x2 + pass_y[index] * y);
-            });
-            row.push(val);
-            if (val > max) {
-                max = val;
-            } else if (val < min) {
-                min = val;
+        this.config = config;
+    }
+
+    _createClass(Noise, [{
+        key: "set_octave",
+        value: function set_octave(octave) {
+            var tile_count = this.config.get("enviroment.tile_count");
+            var scale = 1;
+            var coefficients_x = null;
+            var coefficients_y = null;
+            var random = null;
+            switch (octave) {
+                case "low":
+                    scale = 20 / tile_count;
+                    this.coefficients_x_low = [];
+                    this.coefficients_y_low = [];
+                    coefficients_x = this.coefficients_x_low;
+                    coefficients_y = this.coefficients_y_low;
+                    random = seedrandom(this.config.get("noise.random_seed_low"));
+                    break;
+                case "mid":
+                    scale = 100 / tile_count;
+                    this.coefficients_x_mid = [];
+                    this.coefficients_y_mid = [];
+                    coefficients_x = this.coefficients_x_mid;
+                    coefficients_y = this.coefficients_y_mid;
+                    random = seedrandom(this.config.get("noise.random_seed_mid"));
+                    break;
+                case "high":
+                    scale = 10;
+                    this.coefficients_x_high = [];
+                    this.coefficients_y_high = [];
+                    coefficients_x = this.coefficients_x_high;
+                    coefficients_y = this.coefficients_y_high;
+                    random = seedrandom(this.config.get("noise.random_seed_high"));
+                    break;
+                default:
+                    console.trace();
             }
-        };
-
-        for (var _x2 = 0; _x2 < tile_count; _x2++) {
-            _loop3(_x2);
+            // Get ranges of octaves to use from config.
+            var octave_count = this.config.get("noise." + octave + "_octave");
+            for (var i = 0; i < octave_count; i++) {
+                coefficients_x.push(random() * scale - scale / 2);
+                coefficients_y.push(random() * scale - scale / 2);
+            }
         }
-        data.push(row);
-    };
+    }, {
+        key: "generate_octave",
+        value: function generate_octave(octave) {
+            var tile_count = this.config.get("enviroment.tile_count");
+            var weight = 1;
+            var coefficients_x = null;
+            var coefficients_y = null;
+            var data = null;
+            switch (octave) {
+                case "low":
+                    weight = this.config.get("noise.low_octave_weight");
+                    coefficients_x = this.coefficients_x_low;
+                    coefficients_y = this.coefficients_y_low;
+                    this.data_low = [];
+                    data = this.data_low;
+                    break;
+                case "mid":
+                    weight = this.config.get("noise.mid_octave_weight");
+                    coefficients_x = this.coefficients_x_mid;
+                    coefficients_y = this.coefficients_y_mid;
+                    this.data_mid = [];
+                    data = this.data_mid;
+                    break;
+                case "high":
+                    weight = this.config.get("noise.high_octave_weight");
+                    coefficients_x = this.coefficients_x_high;
+                    coefficients_y = this.coefficients_y_high;
+                    this.data_high = [];
+                    data = this.data_high;
+                    break;
+                default:
+                    console.trace();
+            }
+            //console.info("generate_octave", octave);
+            //console.table(coefficients_x);
+            //console.table(coefficients_y);
 
-    for (var y = 0; y < tile_count; y++) {
-        _loop2(y);
-    }
-    // Normalize data.
-    var range = max - min;
-    for (var x = 0; x < tile_count; x++) {
-        for (var y = 0; y < tile_count; y++) {
-            data[x][y] -= min;
-            data[x][y] /= range;
+            var _loop2 = function _loop2(y) {
+                var row = [];
+
+                var _loop3 = function _loop3(x) {
+                    var val = 0;
+                    coefficients_x.forEach(function (mod, index) {
+                        val += Math.sin(mod * x + coefficients_y[index] * y);
+                    });
+                    if (coefficients_x.length > 0) {
+                        val /= Math.sqrt(coefficients_x.length);
+                    }
+                    val *= weight;
+                    row.push(val);
+                };
+
+                for (var x = 0; x < tile_count; x++) {
+                    _loop3(x);
+                }
+                data.push(row);
+            };
+
+            for (var y = 0; y < tile_count; y++) {
+                _loop2(y);
+            }
         }
-    }
-    return data;
-}
-exports.get_noise = get_noise;
+    }, {
+        key: "combine_octaves",
+        value: function combine_octaves() {
+            var tile_count = this.config.get("enviroment.tile_count");
+            this.data_combined = [];
+            for (var y = 0; y < tile_count; y++) {
+                var _row = [];
+                for (var x = 0; x < tile_count; x++) {
+                    var _val = (this.data_low[y][x] + this.data_mid[y][x] + this.data_high[y][x]) / 3;
+                    _row.push(_val);
+                }
+                this.data_combined.push(_row);
+            }
+            //console.table(this.data_low);
+            //console.table(this.data_mid);
+            //console.table(this.data_high);
+            //console.table(this.data_combined);
+        }
+    }, {
+        key: "generate",
+        value: function generate() {
+            var regenerate = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : false;
+
+            if (regenerate) {
+                // Do not use same values again.
+                this.config.set("noise.random_seed_low", "low " + new Date().getTime());
+                this.config.set("noise.random_seed_mid", "mid " + new Date().getTime());
+                this.config.set("noise.random_seed_high", "high " + new Date().getTime());
+            }
+            var octave = "all";
+            switch (octave) {
+                case "low":
+                case "mid":
+                case "high":
+                    this.set_octave(octave);
+                    this.generate_octave(octave);
+                    break;
+                case "all":
+                    this.set_octave("low");
+                    this.set_octave("mid");
+                    this.set_octave("high");
+                    this.generate_octave("low");
+                    this.generate_octave("mid");
+                    this.generate_octave("high");
+                    break;
+                default:
+                    console.trace();
+            }
+            this.combine_octaves();
+        }
+    }]);
+
+    return Noise;
+}();
+
+exports.Noise = Noise;
 
 },{"./ordered_set":20,"seedrandom":6}],19:[function(require,module,exports){
 "use strict";
@@ -19305,30 +19406,34 @@ window.onload = function () {
     var enviroment = new flowing_terrain_1.Enviroment();
     var config = new config_1.Config();
     var seabed = null;
+    //let noise: Array<Array<number>> = null;
     var noise = null;
     var geography = null;
     var display = null;
+    config.set_if_null("enviroment.tile_count", 100);
     config.set_if_null("seed_points.random_seed", "" + new Date().getTime());
-    config.set_if_null("noise.random_seed", "" + new Date().getTime());
-    config.set_if_null("seed_points.threshold", 0.22);
+    config.set_if_null("noise.random_seed_low", "low " + new Date().getTime());
+    config.set_if_null("noise.random_seed_mid", "mid " + new Date().getTime());
+    config.set_if_null("noise.random_seed_high", "high " + new Date().getTime());
+    config.set_if_null("seed_points.threshold", 0.18);
     config.set_callback("seed_points.threshold", seed_threshold_callback);
-    config.set_if_null("noise.low_octave", 5);
+    config.set_if_null("noise.low_octave", 3);
     config.set_callback("noise.low_octave", noise_octaves_callback);
-    config.set_if_null("noise.low_octave_rand", true);
-    config.set_callback("noise.low_octave_rand", noise_octaves_callback);
     config.set_if_null("noise.mid_octave", 5);
     config.set_callback("noise.mid_octave", noise_octaves_callback);
-    config.set_if_null("noise.mid_octave_rand", true);
-    config.set_callback("noise.mid_octave_rand", noise_octaves_callback);
-    config.set_if_null("noise.high_octave", 5);
+    config.set_if_null("noise.high_octave", 10);
     config.set_callback("noise.high_octave", noise_octaves_callback);
-    config.set_if_null("noise.high_octave_rand", false);
-    config.set_callback("noise.high_octave_rand", noise_octaves_callback);
+    config.set_if_null("noise.low_octave_weight", 1.5);
+    config.set_callback("noise.low_octave_weight", noise_octaves_callback);
+    config.set_if_null("noise.mid_octave_weight", 0.5);
+    config.set_callback("noise.mid_octave_weight", noise_octaves_callback);
+    config.set_if_null("noise.high_octave_weight", 0.2);
+    config.set_callback("noise.high_octave_weight", noise_octaves_callback);
     config.set_if_null("display.river_threshold", 3);
     config.set_callback("display.river_threshold", function (key, value) {
         display.set_rivers(value);
     });
-    config.set_if_null("geography.sealevel", 1);
+    config.set_if_null("geography.sealevel", 0.5);
     config.set_callback("geography.sealevel", function (key, value) {
         display.set_sealevel(value);
     });
@@ -19340,25 +19445,34 @@ window.onload = function () {
         seabed = time("seed_points", function () {
             return genesis_1.seed_points(config, enviroment.tile_count);
         });
-        _2d_view_1.draw_2d("2d_seed", genesis_1.seed_points_to_array(enviroment.tile_count, seabed));
+        time("2d_seed_map", function () {
+            _2d_view_1.draw_2d("2d_seed_map", genesis_1.seed_points_to_array(enviroment.tile_count, seabed));
+        });
     }
     function generate_noise() {
-        noise = time("noise", function () {
-            return genesis_1.get_noise(config, enviroment.tile_count);
+        var regenerate = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : false;
+
+        time("noise", function () {
+            if (noise === null) {
+                noise = new genesis_1.Noise(config);
+            }
+            noise.generate(regenerate);
         });
-        _2d_view_1.draw_2d("2d_heights", noise);
+        time("2d_noise_map", function () {
+            _2d_view_1.draw_2d("2d_noise_map", noise.data_combined);
+        });
     }
     function generate_terrain() {
         geography = time("geography", function () {
             if (geography === null) {
-                return new flowing_terrain_1.Geography(enviroment, seabed, noise);
+                return new flowing_terrain_1.Geography(enviroment, seabed, noise.data_combined);
             } else {
-                geography.terraform(enviroment, seabed, noise);
+                geography.terraform(enviroment, seabed, noise.data_combined);
                 return geography;
             }
         });
-        time("2d_display", function () {
-            _2d_view_1.draw_2d("2d_output", geography.tiles, function (tile) {
+        time("2d_height_map", function () {
+            _2d_view_1.draw_2d("2d_height_map", geography.tiles, function (tile) {
                 return tile.height / enviroment.highest_point;
             });
         });
@@ -19476,11 +19590,10 @@ window.onload = function () {
             }, 2000);
         }
     }
-    // Button to regenerate the noise map.
+    // Button to regenerate all aspects of the noise map.
     var menu_noise = document.getElementById("noise");
     menu_noise.addEventListener("click", function (event) {
-        config.set("noise.random_seed", "" + new Date().getTime());
-        generate_noise();
+        generate_noise(true);
         generate_terrain();
     });
     // Callback to set noise octaves.
@@ -19488,10 +19601,9 @@ window.onload = function () {
     var noise_timer_fast = 0;
     var noise_timer_slow = 0;
     function noise_octaves_callback(keys, value) {
-        // Only change the minimap every 200ms, even if more updates are sent.
+        // Only do this every 200ms, even if more updates are sent.
         if (noise_timer_fast === 0) {
             noise_timer_fast = setTimeout(function () {
-                config.set("noise.random_seed", "" + new Date().getTime());
                 generate_noise();
                 noise_timer_fast = 0;
             }, 200);

@@ -5,16 +5,21 @@ var tsify = require("tsify");
 var sourcemaps = require("gulp-sourcemaps");
 var buffer = require("vinyl-buffer");
 var paths = {
-  pages: ["src/*.html", "src/*.css"]
+  pages: ["src/*.html", "src/*.css"],
+  assets: ["src/assets/*"]
 };
 
 gulp.task("copy-html", function() {
   return gulp.src(paths.pages).pipe(gulp.dest("dist"));
 });
 
+gulp.task("copy-assets", function() {
+  return gulp.src(paths.assets).pipe(gulp.dest("dist/assets"));
+});
+
 gulp.task(
   "default",
-  gulp.series(gulp.parallel("copy-html"), function() {
+  gulp.series(gulp.parallel("copy-html"), gulp.parallel("copy-assets"), function ts() {
     return browserify({
       basedir: ".",
       debug: true,

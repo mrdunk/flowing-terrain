@@ -149,7 +149,7 @@ export class Display_3d extends DisplayBase {
         // the this.positions array much more challenging though.
         const tile = this.geography.get_tile({x, y});
         this.positions.push(tile.pos.x * this.tile_size);
-        this.positions.push(tile.height);
+        this.positions.push(tile.height * this.tile_size);
         this.positions.push(tile.pos.y * this.tile_size);
       }
     }
@@ -261,10 +261,14 @@ export class Display_3d extends DisplayBase {
 
     // River section from highest to mid-point.
     river.push(new BABYLON.Vector3(
-      highest.pos.x * this.tile_size, highest.height + offset, highest.pos.y * this.tile_size));
+      highest.pos.x * this.tile_size,
+      (highest.height + offset) * this.tile_size,
+      highest.pos.y * this.tile_size));
     if(lowest.height >= sealevel) {
       river.push(new BABYLON.Vector3(
-        lowest.pos.x * this.tile_size, lowest.height + offset, lowest.pos.y * this.tile_size));
+        lowest.pos.x * this.tile_size,
+        (lowest.height + offset) * this.tile_size,
+        lowest.pos.y * this.tile_size));
     } else {
       // Stop at shoreline.
       const ratio_x = (highest.pos.x - lowest.pos.x) /
@@ -273,7 +277,10 @@ export class Display_3d extends DisplayBase {
                       (highest.height - lowest.height);
       let x = highest.pos.x - ((highest.height - sealevel) * ratio_x);
       let y = highest.pos.y - ((highest.height - sealevel) * ratio_y);
-      river.push(new BABYLON.Vector3(x * this.tile_size, sealevel + offset, y * this.tile_size));
+      river.push(new BABYLON.Vector3(
+        x * this.tile_size,
+        (sealevel + offset) * this.tile_size,
+        y * this.tile_size));
     }
 
     this.rivers.push(river);
@@ -317,7 +324,8 @@ export class Display_3d extends DisplayBase {
   // Move the height of the sea mesh on the Z axis.
   set_sealevel(sealevel: number): void {
     const mapsize = this.tile_size * this.enviroment.tile_count;
-    this.sea_mesh.position = new BABYLON.Vector3(mapsize / 2, sealevel + 0.02, mapsize / 2);
+    this.sea_mesh.position = new BABYLON.Vector3(
+      mapsize / 2, (sealevel + 0.02) * this.tile_size, mapsize / 2);
 
     // Now recalculate the rivers as they now meet the sea at a different height
     // so length will be different.

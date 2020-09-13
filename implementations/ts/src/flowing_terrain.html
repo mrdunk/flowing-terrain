@@ -83,63 +83,67 @@
                 <div class="row">
 
                   <div class="col-sm">
-                    <canvas id="2d_seed"></canvas><br>
+                    <canvas id="2d_seed_map"></canvas><br>
                     <div class="border">
                       <div class="form-group">
                         <label for="seed_points">Seed points</label>
-                        <input type="button" class="btn btn-primary" id="seed_points" name="seed_points" value="regenerate" title="Generate a new seedpoint map">
+                        <button type="button" class="btn btn-primary" id="seed_points" name="seed_points" value="regenerate" title="Generate a new seedpoint map">
+                          <img src="./assets/arrow-clockwise.svg" alt="" width="16" height="16" title="Generate a new seedpoint map">
+                        </button>
                       </div>
                     </div>
                     <div class="border">
                       <div class="form-group show-tooltip range-wrap input-wrap" title="Left=More land less water&#010;Right=More water less land">
-                        <label for="seed_threshold">Threashold: <output class="bubble"></output> </label>
+                        <label for="seed_threshold">Threshold: <output class="bubble"></output> </label>
                         <input type="range" class="form-control-range range input" id="seed_threshold" name="seed_points.threshold" min="0.15" max="0.26" value="0.22" step="0.002">
                       </div>
                     </div>
                   </div>
 
                   <div class="col-sm">
-                    <canvas id="2d_heights"></canvas><br>
+                    <canvas id="2d_noise_map"></canvas><br>
                     <div class="border">
                       <div class="form-group">
                         <label for="noise">Height noise</label>
-                        <input type="button" class="btn btn-primary" id="noise" name="noise" value="regenerate" title="Generate a new noise map">
+                        <button type="button" class="btn btn-primary" id="noise" name="noise" value="regenerate" title="Generate a new noise map">
+                          <img src="./assets/arrow-clockwise.svg" alt="" width="16" height="16" title="Generate a new noise map">
+                        </button>
                       </div>
                     </div>
                     <div class="border">
                       <div class="form-group range-wrap input-wrap m-0" title="Set number of low frequency (long wavelength) octaves">
-                        <label for="noise_low_octave" class="m-0 p-0">Low octaves: <output class="bubble"></output> </label>
+                        <label for="noise_low_octave" class="m-0 p-0">Low octave components: <output class="bubble"></output> </label>
                         <input type="range" class="form-control-range range input" id="noise_low_octave" name="noise.low_octave" min="0" max="10" value="3">
                       </div>
-                      <div class="form-group form-check input-wrap m-0" title="Set number of low frequency (long wavelength) octaves">
-                        <input type="checkbox" class="form-check-input input" id="noise_low_octave_rand" name="noise.low_octave_rand">
-                        <label class="form-check-label" for="noise_low_octave_rand">Random</label>
+                      <div class="form-group range-wrap input-wrap m-0" title="Weight of low frequency (long wavelength) octaves">
+                        <label for="noise_low_octave_weight" class="m-0 p-0">Weight: <output class="bubble"></output> </label>
+                        <input type="range" class="form-control-range range input" id="noise_low_octave_weight" name="noise.low_octave_weight" min="0" max="4" value="1" step="0.01">
                       </div>
                     </div>
                     <div class="border">
                       <div class="form-group range-wrap input-wrap m-0" title="Set number of mid frequency octaves">
-                        <label for="noise_mid_octave" class="m-0 p-0">Mid octaves: <output class="bubble"></output> </label>
+                        <label for="noise_mid_octave" class="m-0 p-0">Mid octave components: <output class="bubble"></output> </label>
                         <input type="range" class="form-control-range range input" id="noise_mid_octave" name="noise.mid_octave" min="0" max="10" value="3">
                       </div>
-                      <div class="form-group form-check input-wrap m-0" title="Set number of mid frequency octaves">
-                        <input type="checkbox" class="form-check-input input" id="noise_mid_octave_rand" name="noise.mid_octave_rand">
-                        <label class="form-check-label" for="noise_mid_octave_rand">Random</label>
+                      <div class="form-group range-wrap input-wrap m-0" title="Weight of mid frequency (long wavelength) octaves">
+                        <label for="noise_mid_octave_weight" class="m-0 p-0">Weight: <output class="bubble"></output> </label>
+                        <input type="range" class="form-control-range range input" id="noise_mid_octave_weight" name="noise.mid_octave_weight" min="0" max="3" value="1" step="0.01">
                       </div>
                     </div>
                     <div class="border">
                       <div class="form-group range-wrap input-wrap m-0" title="Set number of high frequency (short wavelength) octaves">
-                        <label for="noise_high_octave" class="m-0 p-0">High octaves: <output class="bubble"></output> </label>
-                        <input type="range" class="form-control-range range input" id="noise_high_octave" name="noise.high_octave" min="0" max="10" value="3">
+                        <label for="noise_high_octave" class="m-0 p-0">High octave components: <output class="bubble"></output> </label>
+                        <input type="range" class="form-control-range range input" id="noise_high_octave" name="noise.high_octave" min="0" max="20" value="10">
                       </div>
-                      <div class="form-group form-check input-wrap m-0" title="Set number of high frequency (short wavelength) octaves">
-                        <input type="checkbox" class="form-check-input input" id="noise_high_octave_rand" name="noise.high_octave_rand">
-                        <label class="form-check-label" for="noise_high_octave_rand">Random</label>
+                      <div class="form-group range-wrap input-wrap m-0" title="Weight of high frequency (long wavelength) octaves">
+                        <label for="noise_high_octave_weight" class="m-0 p-0">Weight: <output class="bubble"></output> </label>
+                        <input type="range" class="form-control-range range input" id="noise_high_octave_weight" name="noise.high_octave_weight" min="0" max="2" value="1" step="0.01">
                       </div>
                     </div>
                   </div>
 
                   <div class="col-sm">
-                    <canvas id="2d_output"></canvas><br>
+                    <canvas id="2d_height_map"></canvas><br>
                     <p>Output</p>
 
                     <input type="button" id="overhead_view" name="overhead_view" value="Overhead View">

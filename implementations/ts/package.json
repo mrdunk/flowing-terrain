@@ -30,6 +30,7 @@
     "@types/seedrandom": "^2.4.28",
     "babylonjs": "^4.1.0",
     "bootstrap": "^4.5.2",
+    "bootstrap-icons": "^1.0.0",
     "gulp-cli": "^2.3.0",
     "jquery": "^3.0.0",
     "seedrandom": "^3.0.5"

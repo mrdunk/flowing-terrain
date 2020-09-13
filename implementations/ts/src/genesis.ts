@@ -140,77 +140,171 @@ export function seed_points(config: Config, tile_count: number): Set<string> {
   return seabed;
 }
 
-export function get_noise(config: Config, tile_count: number): Array<Array<number>> {
-  const random = seedrandom(config.get("noise.random_seed"));
+export class Noise {
+  config: Config;
 
-  // Get ranges of octaves to use from config.
-  const low_octave = config.get("noise.low_octave");
-  const low_octave_range = (
-    config.get("noise.low_octave_rand") ? 
-    Math.round(random() * low_octave) : low_octave);
-  const mid_octave = config.get("noise.mid_octave");
-  const mid_octave_range = (
-    config.get("noise.mid_octave_rand") ? 
-    Math.round(random() * mid_octave) : mid_octave);
-  const high_octave = config.get("noise.high_octave");
-  const high_octave_range = (
-    config.get("noise.high_octave_rand") ? 
-    Math.round(random() * high_octave) : high_octave);
+  coefficients_x_low: Array<number>;
+  coefficients_y_low: Array<number>;
+  coefficients_x_mid: Array<number>;
+  coefficients_y_mid: Array<number>;
+  coefficients_x_high: Array<number>;
+  coefficients_y_high: Array<number>;
 
-  let pass_x: Array<number> = [];
-  let pass_y: Array<number> = [];
-  let multiplier: Array<number> = [];
+  data_low: Array<Array<number>>;
+  data_mid: Array<Array<number>>;
+  data_high: Array<Array<number>>;
+  data_combined: Array<Array<number>>;
 
-  let coefficient = 20 / tile_count;
-  for(let i = 0; i < low_octave_range; i++) {
-    pass_x.push(random() * coefficient - coefficient / 2);
-    pass_y.push(random() * coefficient - coefficient / 2);
-    multiplier.push(1);
+  constructor(config: Config) {
+    this.config = config;
   }
 
-  coefficient = 100 / tile_count;
-  for(let i = 0; i < mid_octave_range; i++) {
-    pass_x.push(random() * coefficient - coefficient / 2);
-    pass_y.push(random() * coefficient - coefficient / 2);
-    multiplier.push(0.5);
-  }
+  set_octave(octave: string) {
+    const tile_count = this.config.get("enviroment.tile_count");
+    let scale: number = 1;
+    let coefficients_x: Array<number> = null;
+    let coefficients_y: Array<number> = null;
+    let random: seedrandom.prng = null;
 
-  coefficient = 10;
-  for(let i = 0; i < high_octave_range; i++) {
-    pass_x.push(random() * coefficient - coefficient / 2);
-    pass_y.push(random() * coefficient - coefficient / 2);
-    multiplier.push(0.2);
-  }
-
-  let data: Array<Array<number>> = [];
-  let min = 99999999999;
-  let max = -99999999999;
-  for(let y = 0; y < tile_count; y++){
-    let row: Array<number> = [];
-    for(let x = 0; x < tile_count; x++){
-      let val = 0;
-      pass_x.forEach((mod, index) => {
-        val += multiplier[index] * Math.sin(mod * x + pass_y[index] * y);
-      });
-      row.push(val);
-
-      if(val > max) {
-        max = val;
-      } else if(val < min) {
-        min = val;
-      }
+    switch (octave) {
+      case "low":
+        scale = 20 / tile_count;
+        this.coefficients_x_low = [];
+        this.coefficients_y_low = [];
+        coefficients_x = this.coefficients_x_low;
+        coefficients_y = this.coefficients_y_low;
+        random = seedrandom(this.config.get("noise.random_seed_low"));
+        break;
+      case "mid":
+        scale = 100 / tile_count;
+        this.coefficients_x_mid = [];
+        this.coefficients_y_mid = [];
+        coefficients_x = this.coefficients_x_mid;
+        coefficients_y = this.coefficients_y_mid;
+        random = seedrandom(this.config.get("noise.random_seed_mid"));
+        break;
+      case "high":
+        scale = 10;
+        this.coefficients_x_high = [];
+        this.coefficients_y_high = [];
+        coefficients_x = this.coefficients_x_high;
+        coefficients_y = this.coefficients_y_high;
+        random = seedrandom(this.config.get("noise.random_seed_high"));
+        break;
+      default:
+        console.trace();
     }
-    data.push(row);
+
+    // Get ranges of octaves to use from config.
+    const octave_count = this.config.get(`noise.${octave}_octave`);
+
+    for(let i = 0; i < octave_count; i++) {
+      coefficients_x.push(random() * scale - scale / 2);
+      coefficients_y.push(random() * scale - scale / 2);
+    }
   }
 
-  // Normalize data.
-  const range = max - min;
-  for(let x = 0; x < tile_count; x++){
+  generate_octave(octave: string): void {
+    const tile_count = this.config.get("enviroment.tile_count");
+
+    let weight: number = 1;
+    let coefficients_x: Array<number> = null;
+    let coefficients_y: Array<number> = null;
+    let data: Array<Array<number>> = null;
+
+    switch (octave) {
+      case "low":
+        weight = this.config.get("noise.low_octave_weight");
+        coefficients_x = this.coefficients_x_low;
+        coefficients_y = this.coefficients_y_low;
+        this.data_low = [];
+        data = this.data_low;
+        break;
+      case "mid":
+        weight = this.config.get("noise.mid_octave_weight");
+        coefficients_x = this.coefficients_x_mid;
+        coefficients_y = this.coefficients_y_mid;
+        this.data_mid = [];
+        data = this.data_mid;
+        break;
+      case "high":
+        weight = this.config.get("noise.high_octave_weight");
+        coefficients_x = this.coefficients_x_high;
+        coefficients_y = this.coefficients_y_high;
+        this.data_high = [];
+        data = this.data_high;
+        break;
+      default:
+        console.trace();
+    }
+
+    //console.info("generate_octave", octave);
+    //console.table(coefficients_x);
+    //console.table(coefficients_y);
+
     for(let y = 0; y < tile_count; y++){
-      data[x][y] -= min;
-      data[x][y] /= range;
+      let row: Array<number> = [];
+      for(let x = 0; x < tile_count; x++){
+        let val = 0;
+        coefficients_x.forEach((mod, index) => {
+          val += Math.sin(mod * x + coefficients_y[index] * y);
+        });
+        if(coefficients_x.length > 0) {
+          val /= Math.sqrt(coefficients_x.length);
+        }
+        val *= weight;
+        row.push(val);
+      }
+      data.push(row);
     }
   }
 
-  return data;
+  combine_octaves(): void {
+    const tile_count = this.config.get("enviroment.tile_count");
+    this.data_combined = [];
+
+    for(let y = 0; y < tile_count; y++){
+      let row: Array<number> = [];
+      for(let x = 0; x < tile_count; x++){
+        let val = (this.data_low[y][x] + this.data_mid[y][x] + this.data_high[y][x]) / 3;
+        row.push(val);
+      }
+      this.data_combined.push(row);
+    }
+    //console.table(this.data_low);
+    //console.table(this.data_mid);
+    //console.table(this.data_high);
+    //console.table(this.data_combined);
+  }
+
+  generate(regenerate: boolean = false) {
+    if(regenerate) {
+      // Do not use same values again.
+      this.config.set("noise.random_seed_low", `low ${(new Date()).getTime()}`);
+      this.config.set("noise.random_seed_mid", `mid ${(new Date()).getTime()}`);
+      this.config.set("noise.random_seed_high", `high ${(new Date()).getTime()}`);
+    }
+
+    let octave = "all";
+
+    switch (octave) {
+      case "low":
+      case "mid":
+      case "high":
+        this.set_octave(octave);
+        this.generate_octave(octave);
+        break;
+      case "all":
+        this.set_octave("low");
+        this.set_octave("mid");
+        this.set_octave("high");
+        this.generate_octave("low");
+        this.generate_octave("mid");
+        this.generate_octave("high");
+        break;
+      default:
+        console.trace();
+    }
+    this.combine_octaves();
+  }
 }

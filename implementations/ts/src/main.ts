@@ -29,7 +29,7 @@ import * as $ from "jquery";
 import "bootstrap";
 
 import {Enviroment, Geography, Tile} from "./flowing_terrain"
-import {seed_points, seed_points_to_array, get_noise} from "./genesis"
+import {seed_points, seed_points_to_array, Noise} from "./genesis"
 import {draw_2d} from "./2d_view"
 import {Display_3d} from "./3d_view"
 import {Config} from "./config"
@@ -48,35 +48,39 @@ window.onload = () => {
   const enviroment: Enviroment = new Enviroment;
   const config: Config = new Config();
   let seabed: Set<string> = null;
-  let noise: Array<Array<number>> = null;
+  //let noise: Array<Array<number>> = null;
+  let noise: Noise = null;
   let geography: Geography = null;
   let display: Display_3d = null;
 
+  config.set_if_null("enviroment.tile_count", 100);
   config.set_if_null("seed_points.random_seed", `${(new Date()).getTime()}`);
-  config.set_if_null("noise.random_seed", `${(new Date()).getTime()}`);
+  config.set_if_null("noise.random_seed_low", `low ${(new Date()).getTime()}`);
+  config.set_if_null("noise.random_seed_mid", `mid ${(new Date()).getTime()}`);
+  config.set_if_null("noise.random_seed_high", `high ${(new Date()).getTime()}`);
   
-  config.set_if_null("seed_points.threshold", 0.22);
+  config.set_if_null("seed_points.threshold", 0.18);
   config.set_callback("seed_points.threshold", seed_threshold_callback);
 
-  config.set_if_null("noise.low_octave", 5);
+  config.set_if_null("noise.low_octave", 3);
   config.set_callback("noise.low_octave", noise_octaves_callback);
-  config.set_if_null("noise.low_octave_rand", true);
-  config.set_callback("noise.low_octave_rand", noise_octaves_callback);
   config.set_if_null("noise.mid_octave", 5);
   config.set_callback("noise.mid_octave", noise_octaves_callback);
-  config.set_if_null("noise.mid_octave_rand", true);
-  config.set_callback("noise.mid_octave_rand", noise_octaves_callback);
-  config.set_if_null("noise.high_octave", 5);
+  config.set_if_null("noise.high_octave", 10);
   config.set_callback("noise.high_octave", noise_octaves_callback);
-  config.set_if_null("noise.high_octave_rand", false);
-  config.set_callback("noise.high_octave_rand", noise_octaves_callback);
+  config.set_if_null("noise.low_octave_weight", 1.5);
+  config.set_callback("noise.low_octave_weight", noise_octaves_callback);
+  config.set_if_null("noise.mid_octave_weight", 0.5);
+  config.set_callback("noise.mid_octave_weight", noise_octaves_callback);
+  config.set_if_null("noise.high_octave_weight", 0.2);
+  config.set_callback("noise.high_octave_weight", noise_octaves_callback);
 
   config.set_if_null("display.river_threshold", 3);
   config.set_callback("display.river_threshold", (key: string, value: any) => {
     display.set_rivers(value);
   });
   
-  config.set_if_null("geography.sealevel", 1);
+  config.set_if_null("geography.sealevel", 0.5);
   config.set_callback("geography.sealevel", (key: string, value: any) => {
     display.set_sealevel(value);
   });
@@ -90,28 +94,35 @@ window.onload = () => {
     seabed = time("seed_points", () => {
       return seed_points(config, enviroment.tile_count);
     });
-    draw_2d("2d_seed", seed_points_to_array(enviroment.tile_count, seabed));
+    time("2d_seed_map", () => {
+      draw_2d("2d_seed_map", seed_points_to_array(enviroment.tile_count, seabed));
+    });
   }
 
-  function generate_noise() {
-    noise = time("noise", () => {
-      return get_noise(config, enviroment.tile_count);
+  function generate_noise(regenerate: boolean = false) {
+    time("noise", () => {
+      if(noise === null) {
+        noise = new Noise(config);
+      }
+      noise.generate(regenerate);
     });
-    draw_2d("2d_heights", noise);
+    time("2d_noise_map", () => {
+      draw_2d("2d_noise_map", noise.data_combined);
+    });
   }
 
   function generate_terrain() {
     geography = time("geography", () => {
       if(geography === null) {
-        return new Geography(enviroment, seabed, noise);
+        return new Geography(enviroment, seabed, noise.data_combined);
       } else {
-        geography.terraform(enviroment, seabed, noise);
+        geography.terraform(enviroment, seabed, noise.data_combined);
         return geography;
       }
     });
 
-    time("2d_display", () => {
-      draw_2d("2d_output", 
+    time("2d_height_map", () => {
+      draw_2d("2d_height_map", 
         geography.tiles,
         (tile: Tile) => { return tile.height / enviroment.highest_point;});
     });
@@ -222,11 +233,10 @@ window.onload = () => {
   }
 
 
-  // Button to regenerate the noise map.
+  // Button to regenerate all aspects of the noise map.
   const menu_noise = document.getElementById("noise") as HTMLInputElement;
   menu_noise.addEventListener("click", (event) => {
-    config.set("noise.random_seed", `${(new Date()).getTime()}`);
-    generate_noise();
+    generate_noise(true);
     generate_terrain();
   });
 
@@ -236,10 +246,9 @@ window.onload = () => {
   let noise_timer_fast: ReturnType<typeof setTimeout> = 0;
   let noise_timer_slow: ReturnType<typeof setTimeout> = 0;
   function noise_octaves_callback(keys: string, value: any) {
-    // Only change the minimap every 200ms, even if more updates are sent.
+    // Only do this every 200ms, even if more updates are sent.
     if(noise_timer_fast === 0) {
       noise_timer_fast = setTimeout(() => {
-        config.set("noise.random_seed", `${(new Date()).getTime()}`);
         generate_noise();
         noise_timer_fast = 0;
       }, 200);
