@@ -14,35 +14,42 @@
       <div class="float-panel">
 
         <div class="collapse-menu" id="info-menu" group="left">
-          <div class="collapse-menu-collapser collapse-menu-button show">
+          <div class="collapse-menu-collapser collapse-menu-button">
             <button type="button" class="btn btn-primary" aria-label="toggle_menu">
               <img src="./assets/info-circle.svg" width="30" height="30" title="Wat? What is this all about then?">
             </button>
           </div>
 
-          <div class="collapse-menu-collapser collapse-menu-content border shadow rounded">
+          <div class="collapse-menu-collapser collapse-menu-content border shadow rounded show">
             <div class="transparent card card-body">
 
               <button type="button" class="close overlay collapse-menu-close" aria-label="toggle_menu">
                 <span aria-hidden="true">&times;</span>
               </button>
 
-                <div class="" id="about">
-                  <div class="border higher-vis">
-                    <div>This project is intended to document a simple algorithm for creating 3 dimensional terrain maps and their likely watercourses.</div>
-                    <div>The map you see is randomly generated. For a new map, regenerate one of the sources under the Geography tab.</div>
-                    <div>Cursor keys and mouse to move around.</div>
-                    <div>An explanation of the algorithm can be found here:
-                      <a href="https://github.com/mrdunk/flowing-terrain">https://github.com/mrdunk/flowing-terrain</a>
-                    </div>
-                    <div>This demonstration was made with the excellent
-                      <a href="https://www.babylonjs.com/">Babylon.js</a> web rendering library.
-                      <a href="https://www.babylonjs.com/">
-                        <img class="logo" src="https://raw.githubusercontent.com/BabylonJS/Brand-Toolkit/master/babylonjs_identity/fullColor/babylonjs_identity_color.svg" alt="Bablyon.js logo">
-                      </a>
-                    </div>
-                  </div>
+              <div class="border bg-white" id="about">
+                <div>This project is intended to document a simple algorithm for creating 3 dimensional terrain maps and their likely watercourses.</div>
+                <div>An explanation of the algorithm can be found here:
+                  <a href="https://github.com/mrdunk/flowing-terrain">https://github.com/mrdunk/flowing-terrain</a>
                 </div>
+                <div><br>The map you see is randomly generated. For a new map, regenerate one of the sources under the Tool->Geography menu.</div>
+                <div>Cursor keys and mouse to move around.</div>
+                <div><br>This demonstration is made posible by the following projects:</div>
+                <div>
+                  <a href="https://www.typescriptlang.org/">TypeScript</a>. A much saner alternative to vanilla JavaScript in my opinion.
+                </div>
+                <div>The excellent
+                  <a href="https://www.babylonjs.com/">Babylon.js</a> web rendering library.
+                </div>
+                <div>
+                  <a href="https://www.typescriptlang.org/">
+                    <img class="logo" src="./assets/ts-lettermark-white.svg" alt="TypeScript logo">
+                  </a>
+                  <a href="https://www.babylonjs.com/">
+                    <img class="logo" src="./assets/babylonjs_identity_color.svg" alt="Bablyon.js logo">
+                  </a>
+                </div>
+              </div>
 
             </div>
           </div>
@@ -63,8 +70,8 @@
               </button>
 
               <div class="nav nav-tabs" id="myTab" role="tablist">
-                <a class="nav-link active" id="profile-tab" data-toggle="tab" href="#environment" role="tab" aria-controls="profile" aria-selected="false">Enviroment</a>
-                <a class="nav-link" id="contact-tab" data-toggle="tab" href="#geography" role="tab" aria-controls="contact" aria-selected="false">Geography</a>
+                <a class="nav-link active" id="environment-tab" data-toggle="tab" href="#environment" role="tab" aria-controls="environment" aria-selected="false">Enviroment</a>
+                <a class="nav-link" id="geography-tab" data-toggle="tab" href="#geography" role="tab" aria-controls="geography" aria-selected="false">Geography</a>
               </div>
 
               <div class="tab-content">
@@ -88,7 +95,7 @@
                       <div class="border higher-vis">
                         <div class="form-group range-wrap input-wrap" title="Set how visible rivers are">
                           <label for="river_threshold">River Likelihood:&nbsp;<output class="bubble"></output></label>
-                          <input type="range" class="form-control-range range input" id="river_threshold" name="display.river_threshold" min="0" max="10" value="3">
+                          <input type="range" class="form-control-range range input" id="river_threshold" name="display.river_threshold" min="0" max="20" value="10">
                         </div>
                       </div>
                       <div class="border higher-vis">
@@ -193,49 +200,85 @@
       </div>
       <div class="float-panel right">
 
+        <div class="collapse-menu-button show">
+          <button id="link" type="button" class="btn btn-primary" aria-label="toggle_menu">
+            <img src="./assets/link-45deg.svg" width="30" height="30" title="Create permanent link to the current map">
+          </button>
+        </div>
+
         <div class="collapse-menu" id="view-menu">
-          <div class="collapse-menu-collapser collapse-menu-button show">
+          <div class="collapse-menu-collapser collapse-menu-button">
             <button type="button" class="btn btn-primary" aria-label="toggle_menu">
               <img src="./assets/globe2.svg" width="30" height="30" title="Adjust view options">
             </button>
           </div>
 
-          <div class="collapse-menu-collapser collapse-menu-content border shadow rounded">
+          <div class="collapse-menu-collapser collapse-menu-content border shadow rounded show">
             <div class="transparent card card-body">
 
               <button type="button" class="close overlay collapse-menu-close" aria-label="toggle_menu">
                 <span aria-hidden="true">&times;</span>
               </button>
 
-              <input type="button" id="overhead_view" name="overhead_view" value="Overhead View">
+              <div id="views">
+                <div>
+                  <div class="my-button">
+                    <button id="arrow-down-right" type="button" class="btn btn-primary">
+                      <img src="./assets/arrow-down-right.svg" width="30" height="30" title="Adjust view">
+                    </button>
+                  </div>
+                  <div class="my-button">
+                    <button id="arrow-down" type="button" class="btn btn-primary">
+                      <img src="./assets/arrow-down.svg" width="30" height="30" title="Adjust view">
+                    </button>
+                  </div>
+                  <div class="my-button">
+                    <button id="arrow-down-left" type="button" class="btn btn-primary">
+                      <img src="./assets/arrow-down-left.svg" width="30" height="30" title="Adjust view">
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <div class="my-button">
+                    <button id="arrow-right" type="button" class="btn btn-primary">
+                      <img src="./assets/arrow-right.svg" width="30" height="30" title="Adjust view">
+                    </button>
+                  </div>
+                  <div class="my-button">
+                    <button id="arrow-overhead" type="button" class="btn btn-primary">
+                      <img src="./assets/square.svg" width="30" height="30" title="Overhead view">
+                    </button>
+                  </div>
+                  <div class="my-button">
+                    <button id="arrow-left" type="button" class="btn btn-primary">
+                      <img src="./assets/arrow-left.svg" width="30" height="30" title="Adjust view">
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <div class="my-button">
+                    <button id="arrow-up-right" type="button" class="btn btn-primary">
+                      <img src="./assets/arrow-up-right.svg" width="30" height="30" title="Adjust view">
+                    </button>
+                  </div>
+                  <div class="my-button">
+                    <button id="arrow-up" type="button" class="btn btn-primary">
+                      <img src="./assets/arrow-up.svg" width="30" height="30" title="Adjust view">
+                    </button>
+                  </div>
+                  <div class="my-button">
+                    <button id="arrow-up-left" type="button" class="btn btn-primary">
+                      <img src="./assets/arrow-up-left.svg" width="30" height="30" title="Adjust view">
+                    </button>
+                  </div>
+                </div>
+              </div>
 
-            </div>
-          </div>
-        </div>
-
-        <div class="collapse-menu" id="link-menu">
-          <div class="collapse-menu-collapser collapse-menu-button show">
-            <button type="button" class="btn btn-primary" aria-label="toggle_menu">
-              <img src="./assets/link-45deg.svg" width="30" height="30" title="Link to this map">
-            </button>
-          </div>
-
-          <div class="collapse-menu-collapser collapse-menu-content border shadow rounded">
-            <div class="transparent card card-body">
-
-              <button type="button" class="close overlay collapse-menu-close" aria-label="toggle_menu">
-                <span aria-hidden="true">&times;</span>
-              </button>
-
-              <button id="link" class="btn btn-primary" type="button" aria-expanded="false" aria-controls="direct link" title="Create permanent link to the current map">
-                link
-              </button>
             </div>
           </div>
         </div>
 
       </div>
-
 
       <div class="toast hide" data-delay="5000">
         <div class="toast-header">
@@ -244,7 +287,8 @@
         </div>
         <div class="toast-body">
           Link saved to your computer's paste buffer.<br>
-          Click <a href="#" id="permalink">here</a> to visit.
+          Click <a href="#" id="permalink">here</a> to visit.<br>
+          Click <a href="./flowing_terrain.html" id="clear_link">here</a> to clear an existing permalink and generate a new map.
         </div>
       </div>
 

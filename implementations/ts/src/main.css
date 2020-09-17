@@ -40,7 +40,6 @@ img.logo{
   position: absolute;
   top: 0;
   left: 0;
-  //max-width: 800px;
 }
 
 .transparent {
@@ -53,8 +52,8 @@ img.logo{
 
 .toast {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 60px;
+  right: 200px;
 }
 
 .nav-tabs .nav-link, .higher-vis {
@@ -114,6 +113,11 @@ img.logo{
   padding: 0;
 }
 
+.my-button {
+  padding: 1px;
+  display: table-cell;
+}
+
 #info-menu .collapse-menu-content {
   width: 780px;
 }
@@ -125,7 +129,7 @@ img.logo{
 #view-menu, #view-menu .collapse-menu-collapser {
 }
 
-#link-menu, #link-menu .collapse-menu-collapser{
+#link{
 }
 
 #main {

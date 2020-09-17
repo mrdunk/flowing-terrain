@@ -160,8 +160,8 @@ export class Noise {
     const tile_count = this.config.get("enviroment.tile_count");
     let scale: number = 1;
     let coefficients: number[][] = null;
-    let coefficients_x: number[] = null;
-    let coefficients_y: number[] = null;
+    const coefficients_x: number[] = null;
+    const coefficients_y: number[] = null;
     let random: seedrandom.prng = null;
 
     switch (octave) {
@@ -201,8 +201,8 @@ export class Noise {
 
     let weight: number = 1;
     let coefficients: number[][] = null;
-    let coefficients_x: number[] = null;
-    let coefficients_y: number[] = null;
+    const coefficients_x: number[] = null;
+    const coefficients_y: number[] = null;
     let data: number[][] = null;
 
     switch (octave) {
@@ -270,7 +270,7 @@ export class Noise {
       this.config.set("noise.random_seed_high", `high ${(new Date()).getTime()}`);
     }
 
-    // TODO: Calculate what needs updating and do just that.
+    // TODO: Calculate what needs updating and do only that.
     let octave = "all";
 
     switch (octave) {
@@ -295,15 +295,15 @@ export class Noise {
   }
 
   text(element: HTMLElement): void {
-    const line = (weight: number, x: number, y: number): string => {
+    const line = (weight_: number, x: number, y: number): string => {
       x = Math.round(x * 100) / 100;
       y = Math.round(y * 100) / 100;
-      const formula = `${weight} * sin(${x}x + ${y}y)`;
+      const formula = `${weight_} * sin(${x}x + ${y}y)`;
       return `<code class="text-dark">&nbsp;&nbsp;+ ${formula}</code><br>`;
     };
 
-    let coefficients_x: number[] = null;
-    let coefficients_y: number[] = null;
+    const coefficients_x: number[] = null;
+    const coefficients_y: number[] = null;
     let text: string = "<code class='text-dark'>height =</code><br>";
     let weight: number = 0;
 

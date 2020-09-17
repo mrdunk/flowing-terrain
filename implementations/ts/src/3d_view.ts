@@ -41,6 +41,7 @@ export class Display3d extends DisplayBase {
   rivers_mesh: BABYLON.Mesh;
   update_rivers_timer: ReturnType<typeof setTimeout> = 0;
 
+  canvas: HTMLCanvasElement;
   engine: BABYLON.Engine;
   scene: BABYLON.Scene;
   camera: BABYLON.UniversalCamera;
@@ -54,8 +55,8 @@ export class Display3d extends DisplayBase {
 
     this.config = config;
 
-    const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
-    this.engine = new BABYLON.Engine(canvas, true);
+    this.canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
+    this.engine = new BABYLON.Engine(this.canvas, true);
     this.scene = new BABYLON.Scene(this.engine);
     const mapsize = this.tile_size * this.geography.enviroment.tile_count;
     this.camera = new BABYLON.UniversalCamera(
@@ -68,7 +69,7 @@ export class Display3d extends DisplayBase {
     this.camera.ellipsoid = new BABYLON.Vector3(0.5, 0.5, 0.5);
     this.camera.updateUpVectorFromRotation = true;
 
-    this.camera.attachControl(canvas, true);
+    this.camera.attachControl(this.canvas, true);
 
     const light_1 = new BABYLON.HemisphericLight(
       "light_1",
@@ -110,19 +111,82 @@ export class Display3d extends DisplayBase {
     document.getElementById("loader").style.display = "none";
   }
 
-  // Move camera to overhead view. Middle of map, looking straight down.
-  overhead_view() {
+  // Move camera to selected view.
+  set_view(direction: string): void {
     const mapsize = this.tile_size * this.enviroment.tile_count;
-    const position = new BABYLON.Vector3(mapsize / 2, mapsize * 2, mapsize / 2);
-    const rotation = new BABYLON.Vector3(Math.PI / 2, Math.PI, 0.001);
+    const map_center = new BABYLON.Vector3(mapsize / 2, 0, mapsize / 2);
+    const view_pos = 1.5 * mapsize
+    const view_pos_diag =  mapsize + mapsize / 2.8
+    const view_mid = mapsize / 2;
+    const view_neg = - mapsize / 2
+    const view_neg_diag = - mapsize / 2.8
 
     const ease = new BABYLON.CubicEase();
     ease.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEINOUT);
 
+    let position = new BABYLON.Vector3(view_mid, mapsize * 2, view_mid);
+
+    switch(direction) {
+      case "down-right":
+        position = new BABYLON.Vector3(view_pos_diag, view_mid, view_neg_diag);
+        break;
+      case "down":
+        position = new BABYLON.Vector3(view_mid, view_mid, view_neg);
+        break;
+      case "down-left":
+        position = new BABYLON.Vector3(view_neg_diag, view_mid, view_neg_diag);
+        break;
+      case "right":
+        position = new BABYLON.Vector3(view_pos, view_mid, view_mid);
+        break;
+      case "overhead":
+        position = new BABYLON.Vector3(view_mid, mapsize * 2, view_mid);
+        break;
+      case "left":
+        position = new BABYLON.Vector3(view_neg, view_mid, view_mid);
+        break;
+      case "up-right":
+        position = new BABYLON.Vector3(view_pos_diag, view_mid, view_pos_diag);
+        break;
+      case "up":
+        position = new BABYLON.Vector3(view_mid, view_mid, view_pos);
+        break;
+      case "up-left":
+        position = new BABYLON.Vector3(view_neg_diag, view_mid, view_pos_diag);
+        break;
+    }
+
+    // To get the final rotation, let's temporarily move the camera to it's final
+    // destination and then setTarget(map_center).
+    // When there we'll copy the expected rotation before moving the camera back.
+    // This all happens between frame draws so you don't see it.
+    const pos_start = this.camera.position;
+    const rot_start = this.camera.rotation.clone();
+
+    this.camera.position = position;
+    this.camera.setTarget(map_center);
+
+    const rot_target = this.camera.rotation.clone();
+
+    this.camera.rotation = rot_start;
+    this.camera.position = pos_start;
+    console.log(rot_start, rot_target, Math.abs(rot_start.y - rot_target.y));
+
+    if(Math.abs(rot_start.y - rot_target.y) > Math.PI) {
+      if(rot_start.y < 0) {
+        rot_start.y += 2 * Math.PI;
+      } else {
+        rot_start.y -= 2 * Math.PI;
+      }
+    }
+
     BABYLON.Animation.CreateAndStartAnimation(
-      "camPos", this.camera, "position", 10, 10, this.camera.position, position, 0, ease);
+      "camRot", this.camera, "rotation", 10, 10,
+      rot_start, rot_target, 0, ease);
+
     BABYLON.Animation.CreateAndStartAnimation(
-      "camRot", this.camera, "rotation", 10, 10, this.camera.rotation, rotation, 0, ease);
+      "camPos", this.camera, "position", 10, 10,
+      pos_start, position, 0, ease);
   }
 
   coordinate_to_index(coordinate: Coordinate): number {

@@ -19000,8 +19000,8 @@ var Display3d = function (_flowing_terrain_1$Di) {
         _this.rivers = [];
         _this.update_rivers_timer = 0;
         _this.config = config;
-        var canvas = document.getElementById("renderCanvas");
-        _this.engine = new BABYLON.Engine(canvas, true);
+        _this.canvas = document.getElementById("renderCanvas");
+        _this.engine = new BABYLON.Engine(_this.canvas, true);
         _this.scene = new BABYLON.Scene(_this.engine);
         var mapsize = _this.tile_size * _this.geography.enviroment.tile_count;
         _this.camera = new BABYLON.UniversalCamera("UniversalCamera", new BABYLON.Vector3(0, 0, 0), _this.scene);
@@ -19009,7 +19009,7 @@ var Display3d = function (_flowing_terrain_1$Di) {
         _this.camera.checkCollisions = true;
         _this.camera.ellipsoid = new BABYLON.Vector3(0.5, 0.5, 0.5);
         _this.camera.updateUpVectorFromRotation = true;
-        _this.camera.attachControl(canvas, true);
+        _this.camera.attachControl(_this.canvas, true);
         var light_1 = new BABYLON.HemisphericLight("light_1", new BABYLON.Vector3(1, 0.5, 0), _this.scene);
         light_1.diffuse = new BABYLON.Color3(1, 0, 1);
         light_1.specular = new BABYLON.Color3(0, 0, 0);
@@ -19036,19 +19036,72 @@ var Display3d = function (_flowing_terrain_1$Di) {
         document.getElementById("loader").style.display = "none";
         return _this;
     }
-    // Move camera to overhead view. Middle of map, looking straight down.
+    // Move camera to selected view.
 
 
     _createClass(Display3d, [{
-        key: "overhead_view",
-        value: function overhead_view() {
+        key: "set_view",
+        value: function set_view(direction) {
             var mapsize = this.tile_size * this.enviroment.tile_count;
-            var position = new BABYLON.Vector3(mapsize / 2, mapsize * 2, mapsize / 2);
-            var rotation = new BABYLON.Vector3(Math.PI / 2, Math.PI, 0.001);
+            var map_center = new BABYLON.Vector3(mapsize / 2, 0, mapsize / 2);
+            var view_pos = 1.5 * mapsize;
+            var view_pos_diag = mapsize + mapsize / 2.8;
+            var view_mid = mapsize / 2;
+            var view_neg = -mapsize / 2;
+            var view_neg_diag = -mapsize / 2.8;
             var ease = new BABYLON.CubicEase();
             ease.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEINOUT);
-            BABYLON.Animation.CreateAndStartAnimation("camPos", this.camera, "position", 10, 10, this.camera.position, position, 0, ease);
-            BABYLON.Animation.CreateAndStartAnimation("camRot", this.camera, "rotation", 10, 10, this.camera.rotation, rotation, 0, ease);
+            var position = new BABYLON.Vector3(view_mid, mapsize * 2, view_mid);
+            switch (direction) {
+                case "down-right":
+                    position = new BABYLON.Vector3(view_pos_diag, view_mid, view_neg_diag);
+                    break;
+                case "down":
+                    position = new BABYLON.Vector3(view_mid, view_mid, view_neg);
+                    break;
+                case "down-left":
+                    position = new BABYLON.Vector3(view_neg_diag, view_mid, view_neg_diag);
+                    break;
+                case "right":
+                    position = new BABYLON.Vector3(view_pos, view_mid, view_mid);
+                    break;
+                case "overhead":
+                    position = new BABYLON.Vector3(view_mid, mapsize * 2, view_mid);
+                    break;
+                case "left":
+                    position = new BABYLON.Vector3(view_neg, view_mid, view_mid);
+                    break;
+                case "up-right":
+                    position = new BABYLON.Vector3(view_pos_diag, view_mid, view_pos_diag);
+                    break;
+                case "up":
+                    position = new BABYLON.Vector3(view_mid, view_mid, view_pos);
+                    break;
+                case "up-left":
+                    position = new BABYLON.Vector3(view_neg_diag, view_mid, view_pos_diag);
+                    break;
+            }
+            // To get the final rotation, let's temporarily move the camera to it's final
+            // destination and then setTarget(map_center).
+            // When there we'll copy the expected rotation before moving the camera back.
+            // This all happens between frame draws so you don't see it.
+            var pos_start = this.camera.position;
+            var rot_start = this.camera.rotation.clone();
+            this.camera.position = position;
+            this.camera.setTarget(map_center);
+            var rot_target = this.camera.rotation.clone();
+            this.camera.rotation = rot_start;
+            this.camera.position = pos_start;
+            console.log(rot_start, rot_target, Math.abs(rot_start.y - rot_target.y));
+            if (Math.abs(rot_start.y - rot_target.y) > Math.PI) {
+                if (rot_start.y < 0) {
+                    rot_start.y += 2 * Math.PI;
+                } else {
+                    rot_start.y -= 2 * Math.PI;
+                }
+            }
+            BABYLON.Animation.CreateAndStartAnimation("camRot", this.camera, "rotation", 10, 10, rot_start, rot_target, 0, ease);
+            BABYLON.Animation.CreateAndStartAnimation("camPos", this.camera, "position", 10, 10, pos_start, position, 0, ease);
         }
     }, {
         key: "coordinate_to_index",
@@ -20151,7 +20204,7 @@ var Noise = function () {
                 this.config.set("noise.random_seed_mid", "mid " + new Date().getTime());
                 this.config.set("noise.random_seed_high", "high " + new Date().getTime());
             }
-            // TODO: Calculate what needs updating and do just that.
+            // TODO: Calculate what needs updating and do only that.
             var octave = "all";
             switch (octave) {
                 case "low":
@@ -20176,10 +20229,10 @@ var Noise = function () {
     }, {
         key: "text",
         value: function text(element) {
-            var line = function line(weight, x, y) {
+            var line = function line(weight_, x, y) {
                 x = Math.round(x * 100) / 100;
                 y = Math.round(y * 100) / 100;
-                var formula = weight + " * sin(" + x + "x + " + y + "y)";
+                var formula = weight_ + " * sin(" + x + "x + " + y + "y)";
                 return "<code class=\"text-dark\">&nbsp;&nbsp;+ " + formula + "</code><br>";
             };
             var coefficients_x = null;
@@ -20261,6 +20314,7 @@ function time(label, to_time) {
     return return_val;
 }
 window.onload = function () {
+    var canvas = document.getElementById("renderCanvas");
     var enviroment = new flowing_terrain_1.Enviroment();
     var config = new config_1.Config();
     var seabed = null;
@@ -20286,7 +20340,7 @@ window.onload = function () {
     config.set_callback("noise.mid_octave_weight", noise_octaves_callback);
     config.set_if_null("noise.high_octave_weight", 0.2);
     config.set_callback("noise.high_octave_weight", noise_octaves_callback);
-    config.set_if_null("display.river_threshold", 3);
+    config.set_if_null("display.river_threshold", 10);
     config.set_callback("display.river_threshold", function (key, value) {
         display.set_rivers(value);
     });
@@ -20433,19 +20487,21 @@ window.onload = function () {
             var content = menu.getElementsByClassName("collapse-menu-content")[0];
             var closer = menu.getElementsByClassName("collapse-menu-close")[0];
             var buddies = [];
-            var show = function show(button, content) {
-                if (!content.classList.contains("show")) {
-                    button.classList.remove("show");
-                    content.classList.add("show");
+            // Show the current menu.
+            var show = function show(button_, content_) {
+                if (!content_.classList.contains("show")) {
+                    button_.classList.remove("show");
+                    content_.classList.add("show");
                 }
             };
-            var hide = function hide(button, content) {
-                if (content.classList.contains("show")) {
-                    content.classList.remove("show");
-                    button.classList.add("show");
+            // Hide the current menu.
+            var hide = function hide(button_, content_) {
+                if (content_.classList.contains("show")) {
+                    content_.classList.remove("show");
+                    button_.classList.add("show");
                 }
             };
-            console.log(menu, menu.getAttribute("group"));
+            // Get list of menus with the same "group" attribute set.
             var _iteratorNormalCompletion3 = true;
             var _didIteratorError3 = false;
             var _iteratorError3 = undefined;
@@ -20475,6 +20531,7 @@ window.onload = function () {
 
             button.addEventListener("click", function (event) {
                 show(button, content);
+                // Close other menus in same group.
                 buddies.forEach(function (buddy) {
                     var buddy_but = buddy.getElementsByClassName("collapse-menu-button")[0];
                     var buddy_cont = buddy.getElementsByClassName("collapse-menu-content")[0];
@@ -20558,9 +20615,19 @@ window.onload = function () {
             }, 2000);
         }
     }
-    // Move camera to overhead view.
-    var overhead_view = document.getElementById("overhead_view");
-    overhead_view.addEventListener("click", display.overhead_view.bind(display));
+    // Move camera to selected view.
+    var views = document.getElementById("views").querySelectorAll(".btn");
+    views.forEach(function (view) {
+        view.addEventListener("click", function (event) {
+            var parts = view.id.split("-", 3);
+            var direction = parts[1];
+            if (parts.length > 2) {
+                direction += "-";
+                direction += parts[2];
+            }
+            display.set_view(direction);
+        });
+    });
     // Launch Babylon.js debug panel.
     function menu_inspector_handler(event) {
         display.scene.debugLayer.show({ embedMode: true });
@@ -20582,6 +20649,12 @@ window.onload = function () {
     }
     var menu_link_button = document.getElementById("link");
     menu_link_button.addEventListener("click", menu_link_button_handler);
+    canvas.onblur = function (envent) {
+        canvas.focus();
+    };
+    document.onclick = function (envent) {
+        canvas.focus();
+    };
 };
 
 },{"./2d_view":14,"./3d_view":15,"./config":16,"./flowing_terrain":17,"./genesis":18,"bootstrap":2,"jquery":4}],20:[function(require,module,exports){
