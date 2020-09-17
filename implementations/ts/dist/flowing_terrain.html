@@ -4,158 +4,238 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <title>Hello Flowing World!</title>
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
-                           integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
+    <link rel="stylesheet" href="./bootstrap.css">
     <link rel="stylesheet" href="./main.css">
   </head>
   <body>
-    <div class="container-fluid clearfix" id="main">
 
-      <div class="overlay container">
-        <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#menu" aria-expanded="false" aria-controls="menu" title="Options to tweak map generation">
-          menu
-        </button>
-        <button id="link" class="btn btn-primary" type="button" aria-expanded="false" aria-controls="direct link" title="Create permanent link to the current map">
-          link
-        </button>
+    <div class="" id="main">
 
-        <div class="collapse show" id="menu" aria-expanded="true">
-          <div class="menu card card-body">
-            <div>
-              <button type="button" class="close" data-toggle="collapse" data-target="#menu" aria-label="Close" style="position: relative; top: 0; right: 0;">
+      <div class="float-panel">
+
+        <div class="collapse-menu" id="info-menu" group="left">
+          <div class="collapse-menu-collapser collapse-menu-button show">
+            <button type="button" class="btn btn-primary" aria-label="toggle_menu">
+              <img src="./assets/info-circle.svg" width="30" height="30" title="Wat? What is this all about then?">
+            </button>
+          </div>
+
+          <div class="collapse-menu-collapser collapse-menu-content border shadow rounded">
+            <div class="transparent card card-body">
+
+              <button type="button" class="close overlay collapse-menu-close" aria-label="toggle_menu">
+                <span aria-hidden="true">&times;</span>
+              </button>
+
+                <div class="" id="about">
+                  <div class="border higher-vis">
+                    <div>This project is intended to document a simple algorithm for creating 3 dimensional terrain maps and their likely watercourses.</div>
+                    <div>The map you see is randomly generated. For a new map, regenerate one of the sources under the Geography tab.</div>
+                    <div>Cursor keys and mouse to move around.</div>
+                    <div>An explanation of the algorithm can be found here:
+                      <a href="https://github.com/mrdunk/flowing-terrain">https://github.com/mrdunk/flowing-terrain</a>
+                    </div>
+                    <div>This demonstration was made with the excellent
+                      <a href="https://www.babylonjs.com/">Babylon.js</a> web rendering library.
+                      <a href="https://www.babylonjs.com/">
+                        <img class="logo" src="https://raw.githubusercontent.com/BabylonJS/Brand-Toolkit/master/babylonjs_identity/fullColor/babylonjs_identity_color.svg" alt="Bablyon.js logo">
+                      </a>
+                    </div>
+                  </div>
+                </div>
+
+            </div>
+          </div>
+        </div>
+
+        <div class="collapse-menu" id="config-menu" group="left">
+          <div class="collapse-menu-collapser collapse-menu-button show">
+            <button type="button" class="btn btn-primary" aria-label="toggle_menu">
+              <img src="./assets/wrench.svg" width="30" height="30" title="Configure your world">
+            </button>
+          </div>
+
+          <div class="collapse-menu-collapser collapse-menu-content border shadow rounded">
+            <div class="transparent card card-body">
+
+              <button type="button" class="close overlay collapse-menu-close" aria-label="toggle_menu">
                 <span aria-hidden="true">&times;</span>
               </button>
 
               <div class="nav nav-tabs" id="myTab" role="tablist">
-                  <a class="nav-link active" id="home-tab" data-toggle="tab" href="#about" role="tab" aria-controls="home" aria-selected="true">About</a>
-                  <a class="nav-link" id="profile-tab" data-toggle="tab" href="#environment" role="tab" aria-controls="profile" aria-selected="false">Enviroment</a>
-                  <a class="nav-link" id="contact-tab" data-toggle="tab" href="#geography" role="tab" aria-controls="contact" aria-selected="false">Geography</a>
+                <a class="nav-link active" id="profile-tab" data-toggle="tab" href="#environment" role="tab" aria-controls="profile" aria-selected="false">Enviroment</a>
+                <a class="nav-link" id="contact-tab" data-toggle="tab" href="#geography" role="tab" aria-controls="contact" aria-selected="false">Geography</a>
               </div>
+
+              <div class="tab-content">
+
+                <div class="tab-pane fade show active" id="environment" role="tabpanel">
+                  <div class="row">
+
+                    <div class="col-sm">
+                      <div class="border higher-vis">
+                        <div class="form-group range-wrap input-wrap" title="Set the sealevel">
+                          <label for="seaLevel">Sea Level:&nbsp;<output class="bubble"></output></label>
+                          <input type="range" class="form-control-range range input" id="seaLevel" name="geography.sealevel" min="0" max="10" step="0.1" value="1">
+                        </div>
+                      </div>
+                      <div class="border higher-vis">
+                        <div class="form-group range-wrap input-wrap" title="Set the transparency of the sea">
+                          <label for="sea_transparency">Sea Transparency:&nbsp;<output class="bubble"></output></label>
+                          <input type="range" class="form-control-range range input" id="sea_transparency" name="display.sea_transparency" min="0" max="1" step="0.05" value="0.5">
+                        </div>
+                      </div>
+                      <div class="border higher-vis">
+                        <div class="form-group range-wrap input-wrap" title="Set how visible rivers are">
+                          <label for="river_threshold">River Likelihood:&nbsp;<output class="bubble"></output></label>
+                          <input type="range" class="form-control-range range input" id="river_threshold" name="display.river_threshold" min="0" max="10" value="3">
+                        </div>
+                      </div>
+                      <div class="border higher-vis">
+                        <div>
+                          <input type="button" id="inspector" name="inspector" value="Launch Inspector">
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="col-sm">
+                    </div>
+
+                    <div class="col-sm">
+                    </div>
+
+                  </div>
+                </div>
+
+                <div class="tab-pane fade" id="geography" role="tabpanel">
+                  <div class="row">
+
+                    <div class="col-sm border">
+                      <canvas id="2d_seed_map"></canvas><br>
+                      <div class="border higher-vis">
+                        <div class="form-group">
+                          <label for="seed_points">Seed points</label>
+                          <button type="button" class="btn btn-primary" id="seed_points" name="seed_points" value="regenerate" title="Generate a new seedpoint map">
+                            <img src="./assets/arrow-clockwise.svg" alt="" width="16" height="16" title="Generate a new seedpoint map">
+                          </button>
+                        </div>
+                      </div>
+                      <div class="border higher-vis">
+                        <div class="form-group show-tooltip range-wrap input-wrap" title="Left=More land less water&#010;Right=More water less land">
+                          <label for="seed_threshold">Threshold: <output class="bubble"></output> </label>
+                          <input type="range" class="form-control-range range input" id="seed_threshold" name="seed_points.threshold" min="0.15" max="0.26" value="0.22" step="0.002">
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="col-sm border">
+                      <canvas id="2d_noise_map"></canvas><br>
+                      <div class="border higher-vis">
+                        <div class="form-group">
+                          <label for="noise">Height noise</label>
+                          <button type="button" class="btn btn-primary" id="noise" name="noise" value="regenerate" title="Generate a new noise map">
+                            <img src="./assets/arrow-clockwise.svg" alt="" width="16" height="16" title="Generate a new noise map">
+                          </button>
+                        </div>
+                      </div>
+                      <div class="border higher-vis">
+                        <div class="form-group range-wrap input-wrap m-0" title="Set number of low frequency (long wavelength) octaves">
+                          <label for="noise_low_octave" class="m-0 p-0">Low octave components: <output class="bubble"></output> </label>
+                          <input type="range" class="form-control-range range input" id="noise_low_octave" name="noise.low_octave" min="0" max="10" value="3">
+                        </div>
+                        <div class="form-group range-wrap input-wrap m-0" title="Weight of low frequency (long wavelength) octaves">
+                          <label for="noise_low_octave_weight" class="m-0 p-0">Weight: <output class="bubble"></output> </label>
+                          <input type="range" class="form-control-range range input" id="noise_low_octave_weight" name="noise.low_octave_weight" min="0" max="4" value="1" step="0.01">
+                        </div>
+                      </div>
+                      <div class="border higher-vis">
+                        <div class="form-group range-wrap input-wrap m-0" title="Set number of mid frequency octaves">
+                          <label for="noise_mid_octave" class="m-0 p-0">Mid octave components: <output class="bubble"></output> </label>
+                          <input type="range" class="form-control-range range input" id="noise_mid_octave" name="noise.mid_octave" min="0" max="10" value="3">
+                        </div>
+                        <div class="form-group range-wrap input-wrap m-0" title="Weight of mid frequency (long wavelength) octaves">
+                          <label for="noise_mid_octave_weight" class="m-0 p-0">Weight: <output class="bubble"></output> </label>
+                          <input type="range" class="form-control-range range input" id="noise_mid_octave_weight" name="noise.mid_octave_weight" min="0" max="3" value="1" step="0.01">
+                        </div>
+                      </div>
+                      <div class="border higher-vis">
+                        <div class="form-group range-wrap input-wrap m-0" title="Set number of high frequency (short wavelength) octaves">
+                          <label for="noise_high_octave" class="m-0 p-0">High octave components: <output class="bubble"></output> </label>
+                          <input type="range" class="form-control-range range input" id="noise_high_octave" name="noise.high_octave" min="0" max="20" value="10">
+                        </div>
+                        <div class="form-group range-wrap input-wrap m-0" title="Weight of high frequency (long wavelength) octaves">
+                          <label for="noise_high_octave_weight" class="m-0 p-0">Weight: <output class="bubble"></output> </label>
+                          <input type="range" class="form-control-range range input" id="noise_high_octave_weight" name="noise.high_octave_weight" min="0" max="2" value="1" step="0.01">
+                        </div>
+                      </div>
+                      <div class="collapse show border higher-vis" aria-expanded="true">
+                        <div style="height: 200px;" class="small overflow-auto mh-10 text-nowrap" id="height_debug">
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="col-sm border">
+                      <canvas id="2d_height_map"></canvas><br>
+                      <div class="border higher-vis">
+                        <p>Output</p>
+                      </div>
+
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+
             </div>
-
-            <div class="tab-content">
-              <div class="tab-pane fade show active" id="about" role="tabpanel">
-                <div>This project is intended to document a simple algorithm for creating 3 dimensional terrain maps and their likely watercourses.</div>
-                <div>The map you see is randomly generated. For a new map, regenerate one of the sources under the Geography tab.</div>
-                <div>Cursor keys and mouse to move around.</div>
-                <div>An explanation of the algorithm can be found here:
-                  <a href="https://github.com/mrdunk/flowing-terrain">https://github.com/mrdunk/flowing-terrain</a>
-                </div>
-                <div>This demonstration was made with the excellent
-                  <a href="https://www.babylonjs.com/">Babylon.js</a> web rendering library.
-                  <a href="https://www.babylonjs.com/">
-                    <img class="logo" src="https://raw.githubusercontent.com/BabylonJS/Brand-Toolkit/master/babylonjs_identity/fullColor/babylonjs_identity_color.svg" alt="Bablyon.js logo">
-                  </a>
-                </div>
-              </div>
-
-              <div class="tab-pane fade" id="environment" role="tabpanel">
-                <div class="row">
-
-                  <div class="col-sm">
-                    <div class="form-group range-wrap input-wrap" title="Set the sealevel">
-                      <label for="seaLevel">Sea Level:&nbsp;<output class="bubble"></output></label>
-                      <input type="range" class="form-control-range range input" id="seaLevel" name="geography.sealevel" min="0" max="10" step="0.1" value="1">
-                    </div>
-                    <div class="form-group range-wrap input-wrap" title="Set the transparency of the sea">
-                      <label for="sea_transparency">Sea Transparency:&nbsp;<output class="bubble"></output></label>
-                      <input type="range" class="form-control-range range input" id="sea_transparency" name="display.sea_transparency" min="0" max="1" step="0.05" value="0.5">
-                    </div>
-                    <div class="form-group range-wrap input-wrap" title="Set how visible rivers are">
-                      <label for="river_threshold">River Likelihood:&nbsp;<output class="bubble"></output></label>
-                      <input type="range" class="form-control-range range input" id="river_threshold" name="display.river_threshold" min="0" max="10" value="3">
-                    </div>
-                    <div>
-                      <input type="button" id="inspector" name="inspector" value="Launch Inspector">
-                    </div>
-                  </div>
-
-                  <div class="col-sm">
-                  </div>
-
-                  <div class="col-sm">
-                  </div>
-
-                </div>
-              </div>
-
-              <div class="tab-pane fade" id="geography" role="tabpanel">
-                <div class="row">
-
-                  <div class="col-sm">
-                    <canvas id="2d_seed_map"></canvas><br>
-                    <div class="border">
-                      <div class="form-group">
-                        <label for="seed_points">Seed points</label>
-                        <button type="button" class="btn btn-primary" id="seed_points" name="seed_points" value="regenerate" title="Generate a new seedpoint map">
-                          <img src="./assets/arrow-clockwise.svg" alt="" width="16" height="16" title="Generate a new seedpoint map">
-                        </button>
-                      </div>
-                    </div>
-                    <div class="border">
-                      <div class="form-group show-tooltip range-wrap input-wrap" title="Left=More land less water&#010;Right=More water less land">
-                        <label for="seed_threshold">Threshold: <output class="bubble"></output> </label>
-                        <input type="range" class="form-control-range range input" id="seed_threshold" name="seed_points.threshold" min="0.15" max="0.26" value="0.22" step="0.002">
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="col-sm">
-                    <canvas id="2d_noise_map"></canvas><br>
-                    <div class="border">
-                      <div class="form-group">
-                        <label for="noise">Height noise</label>
-                        <button type="button" class="btn btn-primary" id="noise" name="noise" value="regenerate" title="Generate a new noise map">
-                          <img src="./assets/arrow-clockwise.svg" alt="" width="16" height="16" title="Generate a new noise map">
-                        </button>
-                      </div>
-                    </div>
-                    <div class="border">
-                      <div class="form-group range-wrap input-wrap m-0" title="Set number of low frequency (long wavelength) octaves">
-                        <label for="noise_low_octave" class="m-0 p-0">Low octave components: <output class="bubble"></output> </label>
-                        <input type="range" class="form-control-range range input" id="noise_low_octave" name="noise.low_octave" min="0" max="10" value="3">
-                      </div>
-                      <div class="form-group range-wrap input-wrap m-0" title="Weight of low frequency (long wavelength) octaves">
-                        <label for="noise_low_octave_weight" class="m-0 p-0">Weight: <output class="bubble"></output> </label>
-                        <input type="range" class="form-control-range range input" id="noise_low_octave_weight" name="noise.low_octave_weight" min="0" max="4" value="1" step="0.01">
-                      </div>
-                    </div>
-                    <div class="border">
-                      <div class="form-group range-wrap input-wrap m-0" title="Set number of mid frequency octaves">
-                        <label for="noise_mid_octave" class="m-0 p-0">Mid octave components: <output class="bubble"></output> </label>
-                        <input type="range" class="form-control-range range input" id="noise_mid_octave" name="noise.mid_octave" min="0" max="10" value="3">
-                      </div>
-                      <div class="form-group range-wrap input-wrap m-0" title="Weight of mid frequency (long wavelength) octaves">
-                        <label for="noise_mid_octave_weight" class="m-0 p-0">Weight: <output class="bubble"></output> </label>
-                        <input type="range" class="form-control-range range input" id="noise_mid_octave_weight" name="noise.mid_octave_weight" min="0" max="3" value="1" step="0.01">
-                      </div>
-                    </div>
-                    <div class="border">
-                      <div class="form-group range-wrap input-wrap m-0" title="Set number of high frequency (short wavelength) octaves">
-                        <label for="noise_high_octave" class="m-0 p-0">High octave components: <output class="bubble"></output> </label>
-                        <input type="range" class="form-control-range range input" id="noise_high_octave" name="noise.high_octave" min="0" max="20" value="10">
-                      </div>
-                      <div class="form-group range-wrap input-wrap m-0" title="Weight of high frequency (long wavelength) octaves">
-                        <label for="noise_high_octave_weight" class="m-0 p-0">Weight: <output class="bubble"></output> </label>
-                        <input type="range" class="form-control-range range input" id="noise_high_octave_weight" name="noise.high_octave_weight" min="0" max="2" value="1" step="0.01">
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="col-sm">
-                    <canvas id="2d_height_map"></canvas><br>
-                    <p>Output</p>
-
-                    <input type="button" id="overhead_view" name="overhead_view" value="Overhead View">
-                  </div>
-
-                </div>
-              </div>
-            </div>
-
           </div>
         </div>
+
       </div>
+      <div class="float-panel right">
+
+        <div class="collapse-menu" id="view-menu">
+          <div class="collapse-menu-collapser collapse-menu-button show">
+            <button type="button" class="btn btn-primary" aria-label="toggle_menu">
+              <img src="./assets/globe2.svg" width="30" height="30" title="Adjust view options">
+            </button>
+          </div>
+
+          <div class="collapse-menu-collapser collapse-menu-content border shadow rounded">
+            <div class="transparent card card-body">
+
+              <button type="button" class="close overlay collapse-menu-close" aria-label="toggle_menu">
+                <span aria-hidden="true">&times;</span>
+              </button>
+
+              <input type="button" id="overhead_view" name="overhead_view" value="Overhead View">
+
+            </div>
+          </div>
+        </div>
+
+        <div class="collapse-menu" id="link-menu">
+          <div class="collapse-menu-collapser collapse-menu-button show">
+            <button type="button" class="btn btn-primary" aria-label="toggle_menu">
+              <img src="./assets/link-45deg.svg" width="30" height="30" title="Link to this map">
+            </button>
+          </div>
+
+          <div class="collapse-menu-collapser collapse-menu-content border shadow rounded">
+            <div class="transparent card card-body">
+
+              <button type="button" class="close overlay collapse-menu-close" aria-label="toggle_menu">
+                <span aria-hidden="true">&times;</span>
+              </button>
+
+              <button id="link" class="btn btn-primary" type="button" aria-expanded="false" aria-controls="direct link" title="Create permanent link to the current map">
+                link
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
 
       <div class="toast hide" data-delay="5000">
         <div class="toast-header">
@@ -169,10 +249,10 @@
       </div>
 
       <canvas id="renderCanvas" touch-action="none"></canvas>
+
+
+      <div id="loader"><div id="loader_content">Loading...</div></div>
+      <script src="bundle.js"></script>
     </div>
-
-
-    <div id="loader"><div id="loader_content">Loading...</div></div>
-    <script src="bundle.js"></script>
   </body>
 </html>

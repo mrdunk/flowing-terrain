@@ -54,20 +54,21 @@ export class Display3d extends DisplayBase {
 
     this.config = config;
 
-    const renderCanvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
-    this.engine = new BABYLON.Engine(renderCanvas, true);
+    const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
+    this.engine = new BABYLON.Engine(canvas, true);
     this.scene = new BABYLON.Scene(this.engine);
+    const mapsize = this.tile_size * this.geography.enviroment.tile_count;
     this.camera = new BABYLON.UniversalCamera(
       "UniversalCamera",
       new BABYLON.Vector3(0, 0, 0),
       this.scene);
 
-    const mapsize = this.tile_size * this.geography.enviroment.tile_count;
     this.camera.position = new BABYLON.Vector3(-mapsize / 4, mapsize / 4, -mapsize / 4);
     this.camera.checkCollisions = true;
     this.camera.ellipsoid = new BABYLON.Vector3(0.5, 0.5, 0.5);
-    this.camera.attachControl(renderCanvas);
     this.camera.updateUpVectorFromRotation = true;
+
+    this.camera.attachControl(canvas, true);
 
     const light_1 = new BABYLON.HemisphericLight(
       "light_1",

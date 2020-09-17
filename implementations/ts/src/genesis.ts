@@ -143,12 +143,9 @@ export function seed_points(config: Config, tile_count: number): Set<string> {
 export class Noise {
   config: Config;
 
-  coefficients_x_low: number[];
-  coefficients_y_low: number[];
-  coefficients_x_mid: number[];
-  coefficients_y_mid: number[];
-  coefficients_x_high: number[];
-  coefficients_y_high: number[];
+  coefficients_low: number[][];
+  coefficients_mid: number[][];
+  coefficients_high: number[][];
 
   data_low: number[][];
   data_mid: number[][];
@@ -162,6 +159,7 @@ export class Noise {
   set_octave(octave: string) {
     const tile_count = this.config.get("enviroment.tile_count");
     let scale: number = 1;
+    let coefficients: number[][] = null;
     let coefficients_x: number[] = null;
     let coefficients_y: number[] = null;
     let random: seedrandom.prng = null;
@@ -169,26 +167,20 @@ export class Noise {
     switch (octave) {
       case "low":
         scale = 20 / tile_count;
-        this.coefficients_x_low = [];
-        this.coefficients_y_low = [];
-        coefficients_x = this.coefficients_x_low;
-        coefficients_y = this.coefficients_y_low;
+        this.coefficients_low = [];
+        coefficients = this.coefficients_low;
         random = seedrandom(this.config.get("noise.random_seed_low"));
         break;
       case "mid":
         scale = 100 / tile_count;
-        this.coefficients_x_mid = [];
-        this.coefficients_y_mid = [];
-        coefficients_x = this.coefficients_x_mid;
-        coefficients_y = this.coefficients_y_mid;
+        this.coefficients_mid = [];
+        coefficients = this.coefficients_mid;
         random = seedrandom(this.config.get("noise.random_seed_mid"));
         break;
       case "high":
         scale = 10;
-        this.coefficients_x_high = [];
-        this.coefficients_y_high = [];
-        coefficients_x = this.coefficients_x_high;
-        coefficients_y = this.coefficients_y_high;
+        this.coefficients_high = [];
+        coefficients = this.coefficients_high;
         random = seedrandom(this.config.get("noise.random_seed_high"));
         break;
       default:
@@ -199,8 +191,8 @@ export class Noise {
     const octave_count = this.config.get(`noise.${octave}_octave`);
 
     for(let i = 0; i < octave_count; i++) {
-      coefficients_x.push(random() * scale - scale / 2);
-      coefficients_y.push(random() * scale - scale / 2);
+      coefficients.push([random() * scale - scale / 2,
+                         random() * scale - scale / 2]);
     }
   }
 
@@ -208,6 +200,7 @@ export class Noise {
     const tile_count = this.config.get("enviroment.tile_count");
 
     let weight: number = 1;
+    let coefficients: number[][] = null;
     let coefficients_x: number[] = null;
     let coefficients_y: number[] = null;
     let data: number[][] = null;
@@ -215,22 +208,19 @@ export class Noise {
     switch (octave) {
       case "low":
         weight = this.config.get("noise.low_octave_weight");
-        coefficients_x = this.coefficients_x_low;
-        coefficients_y = this.coefficients_y_low;
+        coefficients = this.coefficients_low;
         this.data_low = [];
         data = this.data_low;
         break;
       case "mid":
         weight = this.config.get("noise.mid_octave_weight");
-        coefficients_x = this.coefficients_x_mid;
-        coefficients_y = this.coefficients_y_mid;
+        coefficients = this.coefficients_mid;
         this.data_mid = [];
         data = this.data_mid;
         break;
       case "high":
         weight = this.config.get("noise.high_octave_weight");
-        coefficients_x = this.coefficients_x_high;
-        coefficients_y = this.coefficients_y_high;
+        coefficients = this.coefficients_high;
         this.data_high = [];
         data = this.data_high;
         break;
@@ -242,11 +232,14 @@ export class Noise {
       const row: number[] = [];
       for(let x = 0; x < tile_count; x++){
         let val = 0;
-        coefficients_x.forEach((mod, index) => {
-          val += Math.sin(mod * x + coefficients_y[index] * y);
+        coefficients.forEach((both) => {
+          const coef_x = both[0];
+          const coef_y = both[1];
+          val += Math.sin(coef_x * x + coef_y * y);
         });
-        if(coefficients_x.length > 0) {
-          val /= Math.sqrt(coefficients_x.length);
+        if(coefficients.length > 0) {
+          // Normalize output.
+          val /= Math.sqrt(coefficients.length);
         }
         val *= weight;
         row.push(val);
@@ -299,5 +292,45 @@ export class Noise {
         console.trace();
     }
     this.combine_octaves();
+  }
+
+  text(element: HTMLElement): void {
+    const line = (weight: number, x: number, y: number): string => {
+      x = Math.round(x * 100) / 100;
+      y = Math.round(y * 100) / 100;
+      const formula = `${weight} * sin(${x}x + ${y}y)`;
+      return `<code class="text-dark">&nbsp;&nbsp;+ ${formula}</code><br>`;
+    };
+
+    let coefficients_x: number[] = null;
+    let coefficients_y: number[] = null;
+    let text: string = "<code class='text-dark'>height =</code><br>";
+    let weight: number = 0;
+
+    weight = this.config.get("noise.low_octave_weight");
+    if(weight > 0) {
+      text += "<code class='text-info'>// low frequency</code><br>";
+      this.coefficients_low.forEach((both) => {
+        text += line(weight, both[0], both[1]);
+      });
+    }
+
+    weight = this.config.get("noise.mid_octave_weight");
+    if(weight > 0) {
+      text += "<code class='text-info'>// mid frequency</code><br>";
+      this.coefficients_mid.forEach((both) => {
+        text += line(weight, both[0], both[1]);
+      });
+    }
+
+    weight = this.config.get("noise.high_octave_weight");
+    if(weight > 0) {
+      text += "<code class='text-info'>// high frequency</code><br>";
+      this.coefficients_high.forEach((both) => {
+        text += line(weight, both[0], both[1]);
+      });
+    }
+
+    element.innerHTML = text;
   }
 }

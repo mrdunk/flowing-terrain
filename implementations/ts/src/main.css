@@ -2,7 +2,6 @@
   width: 100%;
   height: 100%;
   touch-action: none;
-  position: absolute;
   top: 0;
   left: 0;
   z-index: -1;
@@ -19,7 +18,6 @@ img.logo{
 }
 
 #loader {
-  position: absolute;
   align-content: center;
   width: 100%;
   height: 100%;
@@ -42,14 +40,14 @@ img.logo{
   position: absolute;
   top: 0;
   left: 0;
-  max-width: 800px;
+  //max-width: 800px;
 }
 
-.menu {
+.transparent {
   background: rgba(255, 255, 255, 0.2);
 }
 
-.menu:hover {
+.transparent:hover {
   background: rgba(255, 255, 255, 0.6);
 }
 
@@ -59,3 +57,79 @@ img.logo{
   right: 10px;
 }
 
+.nav-tabs .nav-link, .higher-vis {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.float-panel {
+  position: absolute;
+  display: flex;
+}
+
+.float-panel.right {
+  right: 0;
+}
+
+.collapse-menu {
+  position: relative;
+  max-width: 800px;
+  display: table;
+}
+
+.collapse-menu-collapser{
+  -webkit-transition-property: max-height max-width visibility padding;
+  -webkit-transition-duration: 0.3s;
+  -webkit-transition-timing-function: ease;
+  transition-property: max-height max-width visibility padding;
+  transition-duration: 0.3s;
+  transition-timing-function: ease;
+  overflow: hidden;
+}
+
+.collapse-menu-button.show {
+  max-height: 60px;
+  max-width: 60px;
+  visibility: visible;
+  padding: 1px;
+}
+
+.collapse-menu-content.show {
+  max-height: 800px;
+  max-width: 800px;
+  visibility: visible;
+  padding: 1px;
+}
+
+.collapse-menu-button:not(.show) {
+  visibility: hidden;
+  max-height: 0;
+  max-width: 0;
+  padding: 0;
+}
+
+.collapse-menu-content:not(.show) {
+  visibility: hidden;
+  max-height: 0;
+  max-width: 0;
+  padding: 0;
+}
+
+#info-menu .collapse-menu-content {
+  width: 780px;
+}
+
+#config-menu .collapse-menu-content {
+  width: 780px;
+}
+
+#view-menu, #view-menu .collapse-menu-collapser {
+}
+
+#link-menu, #link-menu .collapse-menu-collapser{
+}
+
+#main {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+}

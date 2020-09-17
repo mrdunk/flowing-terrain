@@ -107,6 +107,7 @@ window.onload = () => {
     });
     time("2d_noise_map", () => {
       draw_2d("2d_noise_map", noise.data_combined);
+      noise.text(document.getElementById("height_debug"));
     });
   }
 
@@ -154,7 +155,7 @@ window.onload = () => {
 
   // UI components below this point.
 
-  // Configure HTML input elements.
+  // Slider controls.
   for(const input_wrap of document.getElementsByClassName("input-wrap")) {
     const input = input_wrap.getElementsByClassName("input")[0] as HTMLInputElement;
     const bubble = input_wrap.getElementsByClassName("bubble")[0] as HTMLInputElement;
@@ -198,6 +199,56 @@ window.onload = () => {
       }
     });
   }
+
+
+  // Menu controls
+  for(const menu of document.getElementsByClassName("collapse-menu")) {
+    const button = menu.getElementsByClassName("collapse-menu-button")[0] as HTMLInputElement;
+    const content = menu.getElementsByClassName("collapse-menu-content")[0] as HTMLInputElement;
+    const closer = menu.getElementsByClassName("collapse-menu-close")[0] as HTMLInputElement;
+    const buddies: Element[] = [];
+
+    // Show the current menu.
+    const show = (button: HTMLInputElement, content: HTMLElement) => {
+      if(!content.classList.contains("show")) {
+        button.classList.remove("show");
+        content.classList.add("show");
+      }
+    };
+
+    // Hide the current menu.
+    const hide = (button: HTMLInputElement, content: HTMLElement) => {
+      if(content.classList.contains("show")) {
+        content.classList.remove("show");
+        button.classList.add("show");
+      }
+    };
+
+    // Get list of menus with the same "group" attribute set.
+    for(const other_menu of document.getElementsByClassName("collapse-menu")) {
+      if(menu.id !== other_menu.id &&
+          menu.getAttribute("group") &&
+          menu.getAttribute("group") === other_menu.getAttribute("group")) {
+        buddies.push(other_menu);
+      }
+    }
+
+    button.addEventListener("click", (event) => {
+      show(button, content);
+      // Close other menus in same group.
+      buddies.forEach((buddy) => {
+        const buddy_but = buddy.getElementsByClassName(
+          "collapse-menu-button")[0] as HTMLInputElement;
+        const buddy_cont = buddy.getElementsByClassName(
+          "collapse-menu-content")[0] as HTMLInputElement;
+        hide(buddy_but, buddy_cont);
+      });
+    });
+
+    closer.addEventListener("click", (event) => {
+      hide(button, content);
+    });
+  };
 
 
   // Button to regenerate the seed_point map.
@@ -288,5 +339,4 @@ window.onload = () => {
   }
   const menu_link_button = document.getElementById("link") as HTMLInputElement;
   menu_link_button.addEventListener("click", menu_link_button_handler);
-
 }
