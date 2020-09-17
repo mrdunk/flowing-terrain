@@ -45,6 +45,7 @@ function time(label: string, to_time: () => any) {
 }
 
 window.onload = () => {
+  const canvas = document.getElementById("renderCanvas");
   const enviroment: Enviroment = new Enviroment();
   const config: Config = new Config();
   let seabed: Set<string> = null;
@@ -74,7 +75,7 @@ window.onload = () => {
   config.set_if_null("noise.high_octave_weight", 0.2);
   config.set_callback("noise.high_octave_weight", noise_octaves_callback);
 
-  config.set_if_null("display.river_threshold", 3);
+  config.set_if_null("display.river_threshold", 10);
   config.set_callback("display.river_threshold", (key: string, value: any) => {
     display.set_rivers(value);
   });
@@ -107,6 +108,7 @@ window.onload = () => {
     });
     time("2d_noise_map", () => {
       draw_2d("2d_noise_map", noise.data_combined);
+      noise.text(document.getElementById("height_debug"));
     });
   }
 
@@ -154,7 +156,7 @@ window.onload = () => {
 
   // UI components below this point.
 
-  // Configure HTML input elements.
+  // Slider controls.
   for(const input_wrap of document.getElementsByClassName("input-wrap")) {
     const input = input_wrap.getElementsByClassName("input")[0] as HTMLInputElement;
     const bubble = input_wrap.getElementsByClassName("bubble")[0] as HTMLInputElement;
@@ -198,6 +200,57 @@ window.onload = () => {
       }
     });
   }
+
+
+  // Menu controls
+  for(const menu of document.getElementsByClassName("collapse-menu")) {
+    const button = menu.getElementsByClassName("collapse-menu-button")[0] as HTMLInputElement;
+    const content = menu.getElementsByClassName("collapse-menu-content")[0] as HTMLInputElement;
+    const closer = menu.getElementsByClassName("collapse-menu-close")[0] as HTMLInputElement;
+    const buddies: Element[] = [];
+
+
+    // Show the current menu.
+    const show = (button_: HTMLInputElement, content_: HTMLElement) => {
+      if(!content_.classList.contains("show")) {
+        button_.classList.remove("show");
+        content_.classList.add("show");
+      }
+    };
+
+    // Hide the current menu.
+    const hide = (button_: HTMLInputElement, content_: HTMLElement) => {
+      if(content_.classList.contains("show")) {
+        content_.classList.remove("show");
+        button_.classList.add("show");
+      }
+    };
+
+    // Get list of menus with the same "group" attribute set.
+    for(const other_menu of document.getElementsByClassName("collapse-menu")) {
+      if(menu.id !== other_menu.id &&
+          menu.getAttribute("group") &&
+          menu.getAttribute("group") === other_menu.getAttribute("group")) {
+        buddies.push(other_menu);
+      }
+    }
+
+    button.addEventListener("click", (event) => {
+      show(button, content);
+      // Close other menus in same group.
+      buddies.forEach((buddy) => {
+        const buddy_but = buddy.getElementsByClassName(
+          "collapse-menu-button")[0] as HTMLInputElement;
+        const buddy_cont = buddy.getElementsByClassName(
+          "collapse-menu-content")[0] as HTMLInputElement;
+        hide(buddy_but, buddy_cont);
+      });
+    });
+
+    closer.addEventListener("click", (event) => {
+      hide(button, content);
+    });
+  };
 
 
   // Button to regenerate the seed_point map.
@@ -260,10 +313,19 @@ window.onload = () => {
     }
   }
 
-  // Move camera to overhead view.
-  const overhead_view = document.getElementById("overhead_view") as HTMLInputElement;
-  overhead_view.addEventListener("click", display.overhead_view.bind(display));
-
+  // Move camera to selected view.
+  const views = document.getElementById("views").querySelectorAll(".btn");
+  views.forEach((view) => {
+    view.addEventListener("click", (event) => {
+      const parts = view.id.split("-", 3);
+      let direction = parts[1];
+      if(parts.length > 2) {
+        direction += "-";
+        direction += parts[2];
+      }
+      display.set_view(direction);
+    });
+  });
 
   // Launch Babylon.js debug panel.
   function menu_inspector_handler(event: Event) {
@@ -289,4 +351,12 @@ window.onload = () => {
   const menu_link_button = document.getElementById("link") as HTMLInputElement;
   menu_link_button.addEventListener("click", menu_link_button_handler);
 
+
+  canvas.onblur = (envent) => {
+    canvas.focus();
+  };
+
+  document.onclick = (envent) => {
+    canvas.focus();
+  };
 }
