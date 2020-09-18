@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
     <title>Hello Flowing World!</title>
     <link rel="stylesheet" href="./bootstrap.css">
     <link rel="stylesheet" href="./main.css">
@@ -70,13 +70,13 @@
               </button>
 
               <div class="nav nav-tabs" id="myTab" role="tablist">
-                <a class="nav-link active" id="environment-tab" data-toggle="tab" href="#environment" role="tab" aria-controls="environment" aria-selected="false">Enviroment</a>
-                <a class="nav-link" id="geography-tab" data-toggle="tab" href="#geography" role="tab" aria-controls="geography" aria-selected="false">Geography</a>
+                <a class="nav-link active" id="geography-tab" data-toggle="tab" href="#geography" role="tab" aria-controls="geography" aria-selected="false">Geography</a>
+                <a class="nav-link" id="environment-tab" data-toggle="tab" href="#environment" role="tab" aria-controls="environment" aria-selected="false">Enviroment</a>
               </div>
 
               <div class="tab-content">
 
-                <div class="tab-pane fade show active" id="environment" role="tabpanel">
+                <div class="tab-pane fade" id="environment" role="tabpanel">
                   <div class="row">
 
                     <div class="col-sm">
@@ -114,7 +114,7 @@
                   </div>
                 </div>
 
-                <div class="tab-pane fade" id="geography" role="tabpanel">
+                <div class="tab-pane fade show active" id="geography" role="tabpanel">
                   <div class="row">
 
                     <div class="col-sm border">
@@ -295,8 +295,12 @@
       <canvas id="renderCanvas" touch-action="none"></canvas>
 
 
-      <div id="loader"><div id="loader_content">Loading...</div></div>
-      <script src="bundle.js"></script>
     </div>
+    <div id="loader">
+      <div id="loader_content" class="spinner-grow text-success" role="status">
+        <span class="sr-only">Loading...</span>
+      </div>
+    </div>
+    <script src="bundle.js"></script>
   </body>
 </html>

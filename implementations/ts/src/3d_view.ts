@@ -68,9 +68,12 @@ export class Display3d extends DisplayBase {
     this.camera.checkCollisions = true;
     this.camera.ellipsoid = new BABYLON.Vector3(0.5, 0.5, 0.5);
     this.camera.updateUpVectorFromRotation = true;
+    
+    // Higher the less sensitive.
+    this.camera.touchMoveSensibility = 200;
+    this.camera.touchAngularSensibility = 60000;
 
     this.camera.attachControl(this.canvas, true);
-
     const light_1 = new BABYLON.HemisphericLight(
       "light_1",
       new BABYLON.Vector3(1, 0.5, 0),
