@@ -18,22 +18,20 @@ img.logo{
 }
 
 #loader {
-  align-content: center;
   width: 100%;
   height: 100%;
+  z-index: 10000;
+  background-color: white;
+  position: absolute;
 }
 
 #loader_content {
-  width: 200px;
-  height: 50px;
-  background-color: green;
-  display: block;
-  text-align: center;
-  font-size: xx-large;
   position: absolute;
-  top: 50%;
-  left: 50%;
-  margin: -25px 0 0 -25px;
+  top: calc(50% - 1.5rem);
+  left: calc(50% - 5rem);
+  margin: 0;
+  width: 10rem;
+  height: 3rem;
 }
 
 .overlay {
@@ -120,10 +118,33 @@ img.logo{
 
 #info-menu .collapse-menu-content {
   width: 780px;
+  overflow: auto;
+}
+
+@media screen and (max-width: 1060px) {
+  #info-menu {
+    z-index: 1;
+  }
+
+  #info-menu .collapse-menu-content {
+    width: 600px;
+  }
+}
+
+@media screen and (max-width: 880px) {
+  #info-menu .collapse-menu-content {
+    width: 400px;
+  }
 }
 
 #config-menu .collapse-menu-content {
   width: 780px;
+}
+
+@media screen and (max-width: 1120px) {
+  #config-menu {
+    display: none;
+  }
 }
 
 #view-menu, #view-menu .collapse-menu-collapser {

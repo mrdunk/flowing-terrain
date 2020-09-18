@@ -19009,6 +19009,9 @@ var Display3d = function (_flowing_terrain_1$Di) {
         _this.camera.checkCollisions = true;
         _this.camera.ellipsoid = new BABYLON.Vector3(0.5, 0.5, 0.5);
         _this.camera.updateUpVectorFromRotation = true;
+        // Higher the less sensitive.
+        _this.camera.touchMoveSensibility = 200;
+        _this.camera.touchAngularSensibility = 60000;
         _this.camera.attachControl(_this.canvas, true);
         var light_1 = new BABYLON.HemisphericLight("light_1", new BABYLON.Vector3(1, 0.5, 0), _this.scene);
         light_1.diffuse = new BABYLON.Color3(1, 0, 1);
