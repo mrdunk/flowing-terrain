@@ -28,11 +28,16 @@
 import * as $ from "jquery";
 import "bootstrap";
 
-import {Enviroment, Geography, Tile} from "./flowing_terrain"
-import {seed_points, seed_points_to_array, Noise} from "./genesis"
-import {draw_2d} from "./2d_view"
-import {Display3d} from "./3d_view"
-import {Config} from "./config"
+import {Enviroment, Geography, Tile} from "./flowing_terrain";
+import {seed_points, seed_points_to_array, Noise} from "./genesis";
+import {draw_2d} from "./2d_view";
+import {Display3d} from "./3d_view";
+import {Config} from "./config";
+import '@webcomponents/webcomponentsjs/custom-elements-es5-adapter.js'; 
+import {CollapsibleMenu} from "./custom_html_elements";
+
+// Hack to force ./custom_html_elements to be loaded.
+new CollapsibleMenu();
 
 const stats: Record<string, number> = {};
 
@@ -149,12 +154,84 @@ window.onload = () => {
     display.scene.render();
   })
 
+
+  // UI components below this point.
+
   window.addEventListener("resize", () => {
     display.engine.resize();
   });
 
+  // Menu controls
+  function menu_groups() {
+    // Clear any existing event listeners.
+    for(let menu of document.getElementsByClassName("collapse-menu")) {
+      console.log(menu.id);
+      var button = menu.getElementsByClassName("collapse-menu-button")[0] as HTMLInputElement;
+      var closer = menu.getElementsByClassName("collapse-menu-close")[0] as HTMLInputElement;
 
-  // UI components below this point.
+      if(button && closer) {
+        var button_clone = button.cloneNode(true) as Element;
+        var closer_clone = closer.cloneNode(true) as Element;
+        button.parentNode.replaceChild(button_clone, button);
+        closer.parentNode.replaceChild(closer_clone, closer);
+      }
+    }
+
+    for(const menu of document.getElementsByClassName("collapse-menu")) {
+      const button = menu.getElementsByClassName("collapse-menu-button")[0] as HTMLInputElement;
+      const content = menu.getElementsByClassName("collapse-menu-content")[0] as HTMLInputElement;
+      const closer = menu.getElementsByClassName("collapse-menu-close")[0] as HTMLInputElement;
+      const buddies: Element[] = [];
+
+      if(content) {
+        // Show the current menu.
+        const show = (button_: HTMLInputElement, content_: HTMLElement) => {
+          if(!content_.classList.contains("show")) {
+            button_.classList.remove("show");
+            content_.classList.add("show");
+          }
+        };
+
+        // Hide the current menu.
+        const hide = (button_: HTMLInputElement, content_: HTMLElement) => {
+          if(button_ === undefined || content_ === undefined) {
+            return;
+          }
+          if(content_.classList.contains("show")) {
+            content_.classList.remove("show");
+            button_.classList.add("show");
+          }
+        };
+
+        // Get list of menus with the same "group" attribute set.
+        for(const other_menu of document.getElementsByClassName("collapse-menu")) {
+          if(menu.id !== other_menu.id &&
+            menu.getAttribute("group") &&
+            menu.getAttribute("group") === other_menu.getAttribute("group")) {
+            buddies.push(other_menu);
+          }
+        }
+
+        button.addEventListener("click", (event) => {
+          show(button, content);
+          // Close other menus in same group.
+          buddies.forEach((buddy) => {
+            const buddy_but = buddy.getElementsByClassName(
+              "collapse-menu-button")[0] as HTMLInputElement;
+            const buddy_cont = buddy.getElementsByClassName(
+              "collapse-menu-content")[0] as HTMLInputElement;
+            hide(buddy_but, buddy_cont);
+          });
+        });
+
+        closer.addEventListener("click", (event) => {
+          hide(button, content);
+        });
+      }
+    };
+  }
+  menu_groups();
+
 
   // Slider controls.
   for(const input_wrap of document.getElementsByClassName("input-wrap")) {
@@ -200,57 +277,6 @@ window.onload = () => {
       }
     });
   }
-
-
-  // Menu controls
-  for(const menu of document.getElementsByClassName("collapse-menu")) {
-    const button = menu.getElementsByClassName("collapse-menu-button")[0] as HTMLInputElement;
-    const content = menu.getElementsByClassName("collapse-menu-content")[0] as HTMLInputElement;
-    const closer = menu.getElementsByClassName("collapse-menu-close")[0] as HTMLInputElement;
-    const buddies: Element[] = [];
-
-
-    // Show the current menu.
-    const show = (button_: HTMLInputElement, content_: HTMLElement) => {
-      if(!content_.classList.contains("show")) {
-        button_.classList.remove("show");
-        content_.classList.add("show");
-      }
-    };
-
-    // Hide the current menu.
-    const hide = (button_: HTMLInputElement, content_: HTMLElement) => {
-      if(content_.classList.contains("show")) {
-        content_.classList.remove("show");
-        button_.classList.add("show");
-      }
-    };
-
-    // Get list of menus with the same "group" attribute set.
-    for(const other_menu of document.getElementsByClassName("collapse-menu")) {
-      if(menu.id !== other_menu.id &&
-          menu.getAttribute("group") &&
-          menu.getAttribute("group") === other_menu.getAttribute("group")) {
-        buddies.push(other_menu);
-      }
-    }
-
-    button.addEventListener("click", (event) => {
-      show(button, content);
-      // Close other menus in same group.
-      buddies.forEach((buddy) => {
-        const buddy_but = buddy.getElementsByClassName(
-          "collapse-menu-button")[0] as HTMLInputElement;
-        const buddy_cont = buddy.getElementsByClassName(
-          "collapse-menu-content")[0] as HTMLInputElement;
-        hide(buddy_but, buddy_cont);
-      });
-    });
-
-    closer.addEventListener("click", (event) => {
-      hide(button, content);
-    });
-  };
 
 
   // Button to regenerate the seed_point map.

@@ -67,6 +67,10 @@ img.logo{
   right: 0;
 }
 
+.float-panel.bottom {
+  bottom: 0;
+}
+
 .collapse-menu {
   position: relative;
   max-width: 800px;
@@ -121,29 +125,39 @@ img.logo{
   overflow: auto;
 }
 
-@media screen and (max-width: 1060px) {
-  #info-menu {
-    z-index: 1;
-  }
+#config-menu .collapse-menu-content {
+  width: 780px;
+  overflow: auto;
+}
 
+@media screen and (max-width: 1110px) {
   #info-menu .collapse-menu-content {
+    width: 600px;
+  }
+  #config-menu .collapse-menu-content {
     width: 600px;
   }
 }
 
-@media screen and (max-width: 880px) {
+@media screen and (max-width: 940px) {
+  #info-menu {
+    z-index: 1;
+  }
+  #config-menu {
+    z-index: 1;
+  }
+
   #info-menu .collapse-menu-content {
+    width: 400px;
+  }
+  #config-menu .collapse-menu-content {
     width: 400px;
   }
 }
 
-#config-menu .collapse-menu-content {
-  width: 780px;
-}
-
-@media screen and (max-width: 1120px) {
+@media screen and (max-width: 735px) {
   #config-menu {
-    display: none;
+    //display: none;
   }
 }
 
@@ -157,4 +171,8 @@ img.logo{
   position: absolute;
   width: 100%;
   height: 100%;
+}
+
+collapsable-menu .content {
+  width: 600px;
 }

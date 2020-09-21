@@ -28,12 +28,13 @@
     "@types/bootstrap": "^4.5.0",
     "@types/jquery": "^3.5.1",
     "@types/seedrandom": "^2.4.28",
+    "@webcomponents/webcomponentsjs": "^2.4.4",
     "babylonjs": "^4.1.0",
     "bootstrap": "^4.5.2",
     "bootstrap-icons": "^1.0.0",
     "gulp-cli": "^2.3.0",
-    "seedrandom": "^3.0.5",
-    "jquery": "^3.5.0"
+    "jquery": "^3.5.0",
+    "seedrandom": "^3.0.5"
   },
   "devDependencies": {
     "@babylonjs/materials": "^4.1.0",
