@@ -157,123 +157,71 @@ window.onload = () => {
 
   // UI components below this point.
 
-  window.addEventListener("resize", () => {
+
+  // Resize the window.
+  function onResize() {
     display.engine.resize();
-  });
 
-  // Menu controls
-  function menu_groups() {
-    // Clear any existing event listeners.
-    for(let menu of document.getElementsByClassName("collapse-menu")) {
-      console.log(menu.id);
-      var button = menu.getElementsByClassName("collapse-menu-button")[0] as HTMLInputElement;
-      var closer = menu.getElementsByClassName("collapse-menu-close")[0] as HTMLInputElement;
+    const width = window.innerWidth
+      || document.documentElement.clientWidth
+      || document.body.clientWidth;
+    const minimum_width = 1110;
 
-      if(button && closer) {
-        var button_clone = button.cloneNode(true) as Element;
-        var closer_clone = closer.cloneNode(true) as Element;
-        button.parentNode.replaceChild(button_clone, button);
-        closer.parentNode.replaceChild(closer_clone, closer);
+    let menus_open = 0;
+    for(const menu of document.getElementsByTagName("collapsable-menu")) {
+      // Count how many menus are open.
+      if(menu.hasAttribute("active") &&
+          menu.getAttribute("active").toLowerCase() === "true") {
+        menus_open += 1;
+      }
+
+      if(width <= minimum_width) {
+        // For narrow display, put all menus in same group so only one will be
+        // open at a time.
+        if(!menu.hasAttribute("original-group")) {
+          menu.setAttribute("original-group", menu.getAttribute("group"));
+        }
+        menu.setAttribute("group", "left");
+      } else {
+        // For wider displays, put menus in separate groups.
+        if(menu.hasAttribute("original-group")) {
+          menu.setAttribute("group", menu.getAttribute("original-group"));
+        }
       }
     }
-
-    for(const menu of document.getElementsByClassName("collapse-menu")) {
-      const button = menu.getElementsByClassName("collapse-menu-button")[0] as HTMLInputElement;
-      const content = menu.getElementsByClassName("collapse-menu-content")[0] as HTMLInputElement;
-      const closer = menu.getElementsByClassName("collapse-menu-close")[0] as HTMLInputElement;
-      const buddies: Element[] = [];
-
-      if(content) {
-        // Show the current menu.
-        const show = (button_: HTMLInputElement, content_: HTMLElement) => {
-          if(!content_.classList.contains("show")) {
-            button_.classList.remove("show");
-            content_.classList.add("show");
-          }
-        };
-
-        // Hide the current menu.
-        const hide = (button_: HTMLInputElement, content_: HTMLElement) => {
-          if(button_ === undefined || content_ === undefined) {
-            return;
-          }
-          if(content_.classList.contains("show")) {
-            content_.classList.remove("show");
-            button_.classList.add("show");
-          }
-        };
-
-        // Get list of menus with the same "group" attribute set.
-        for(const other_menu of document.getElementsByClassName("collapse-menu")) {
-          if(menu.id !== other_menu.id &&
-            menu.getAttribute("group") &&
-            menu.getAttribute("group") === other_menu.getAttribute("group")) {
-            buddies.push(other_menu);
-          }
-        }
-
-        button.addEventListener("click", (event) => {
-          show(button, content);
-          // Close other menus in same group.
-          buddies.forEach((buddy) => {
-            const buddy_but = buddy.getElementsByClassName(
-              "collapse-menu-button")[0] as HTMLInputElement;
-            const buddy_cont = buddy.getElementsByClassName(
-              "collapse-menu-content")[0] as HTMLInputElement;
-            hide(buddy_but, buddy_cont);
-          });
-        });
-
-        closer.addEventListener("click", (event) => {
-          hide(button, content);
-        });
+    if(width <= minimum_width && menus_open > 1) {
+      // Wave more than one menu open when display is too narrow to fit them.
+      // Close all menus.
+      for(const menu of document.getElementsByTagName("collapsable-menu")) {
+        menu.setAttribute("active", "false");
       }
-    };
+    }
   }
-  menu_groups();
+  window.addEventListener("resize", onResize);
+  onResize();
 
 
-  // Slider controls.
-  for(const input_wrap of document.getElementsByClassName("input-wrap")) {
-    const input = input_wrap.getElementsByClassName("input")[0] as HTMLInputElement;
-    const bubble = input_wrap.getElementsByClassName("bubble")[0] as HTMLInputElement;
+  // Initialise Slider controls.
+  for(const node of document.getElementsByTagName("feedback-slider")) {
+    const slider = node as HTMLInputElement;
+    const name = slider.getAttribute("name");
+    console.assert(name !== null && name !== undefined);
+    const stored_value = config.get(name, false);
 
-    const stored_value = config.get(input.name, false);
-
-    // console.log(
-    //  input.name,
-    //  input.type === "checkbox" ? input.checked : input.value,
-    //  stored_value
-    // );
-
-    // Make the HTML element match the stored state.
+    // Make the HTML element match the stored state at startup.
     if(stored_value !== null) {
-      if(input.type === "checkbox") {
-        input.checked = stored_value;
-      } else {
-        input.value = stored_value;
-      }
+      slider.setAttribute("value", stored_value);
     } else {
       console.warn(
-        `Range element does not have coresponding entry in config: ${input.name}`);
-    }
-    if(bubble) {
-      bubble.innerHTML = input.value;
+        `Range element does not have coresponding entry in config: ${name}`);
     }
 
-    // Set up HTML element callback.
-    input.addEventListener("input", () => {
-      const value = input.type === "checkbox" ? input.checked : input.value
-      if(bubble) {
-        bubble.innerHTML = `${value}`;
-      }
-      if(config.get(input.name, false) !== null) {
-        // Callback happens as part of the config.set(...).
-        if(typeof value === "string") {
-          config.set(input.name, parseFloat(value));
-        } else {
-          config.set(input.name, value);
-        }
+    // Set up callback when slider moves.
+    slider.addEventListener("input", () => {
+      if(config.get(name, false) !== null) {
+        // Callback to update map happens as part of the config.set(...).
+        console.assert(typeof slider.value === "string");
+        config.set(name, parseFloat(slider.value));
       }
     });
   }
@@ -339,6 +287,7 @@ window.onload = () => {
     }
   }
 
+
   // Move camera to selected view.
   const views = document.getElementById("views").querySelectorAll(".btn");
   views.forEach((view) => {
@@ -352,6 +301,7 @@ window.onload = () => {
       display.set_view(direction);
     });
   });
+
 
   // Launch Babylon.js debug panel.
   function menu_inspector_handler(event: Event) {
@@ -379,10 +329,12 @@ window.onload = () => {
 
 
   canvas.onblur = (envent) => {
+    // Force focus to canvas so keyboard commands always work.
     canvas.focus();
   };
 
   document.onclick = (envent) => {
+    // Force focus to canvas so keyboard commands always work.
     canvas.focus();
   };
 }

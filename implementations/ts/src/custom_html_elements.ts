@@ -22,12 +22,13 @@
  * SOFTWARE.
  */
 
-/* A custom collapsible menu. */
 
+/* A custom collapsible menu. */
 export class CollapsibleMenu extends HTMLElement {
   shadow: ShadowRoot;
   button_wrapper: HTMLElement;
   content_wrapper: HTMLElement;
+  content_inner_wrapper: HTMLElement;
   open_button: HTMLElement;
   close_button: HTMLElement;
   open_callbacks: any[] = [];
@@ -43,39 +44,6 @@ export class CollapsibleMenu extends HTMLElement {
 
     this.shadow = this.attachShadow({mode: "open"});
 
-    const inline_style = document.createElement('style');
-    inline_style.textContent = "";
-    inline_style.textContent += ".wrapper {";
-    inline_style.textContent += "  -webkit-transition-property: ";
-    inline_style.textContent += "    max-height max-width visibility padding;";
-    inline_style.textContent += "  -webkit-transition-duration: 0.3s;";
-    inline_style.textContent += "  -webkit-transition-timing-function: ease;";
-    inline_style.textContent += "  transition-property: ";
-    inline_style.textContent += "    max-height max-width visibility padding;";
-    inline_style.textContent += "  transition-duration: 0.5s;";
-    inline_style.textContent += "  transition-timing-function: ease;";
-    inline_style.textContent += "}";
-    inline_style.textContent += ".show { ";
-    inline_style.textContent += "  visibility: visible;";
-    inline_style.textContent += "  max-height: 800px;";
-    inline_style.textContent += "  max-width: 800px;";
-    inline_style.textContent += "  padding: 1px;";
-    inline_style.textContent +=  "}";
-    inline_style.textContent += ".button-wrapper:not(.show) {";
-    inline_style.textContent += "  visibility: hidden;";
-    inline_style.textContent += "  max-height: 0;";
-    inline_style.textContent += "  max-width: 0;";
-    inline_style.textContent += "  padding: 0;";
-    inline_style.textContent += "}";
-    inline_style.textContent += ".content-wrapper:not(.show) {";
-    inline_style.textContent += "  visibility: hidden;";
-    inline_style.textContent += "  max-height: 0;";
-    inline_style.textContent += "  max-width: 0;";
-    inline_style.textContent += "  padding: 0;";
-    inline_style.textContent += "}";
-    this.shadow.appendChild(inline_style);
-
-
     if(!this.hasAttribute("group")) {
       this.setAttribute("group", "default");
     }
@@ -86,6 +54,11 @@ export class CollapsibleMenu extends HTMLElement {
     linkElem.setAttribute("href", "./bootstrap.css");
     this.shadow.appendChild(linkElem);
 
+    const linkElem2 = document.createElement("link");
+    linkElem2.setAttribute("rel", "stylesheet");
+    linkElem2.setAttribute("href", "./collapsable_menu.css");
+    this.shadow.appendChild(linkElem2);
+
     // Open button.
     this.button_wrapper = document.createElement("div");
     this.button_wrapper.setAttribute("class", "button-wrapper wrapper");
@@ -94,6 +67,8 @@ export class CollapsibleMenu extends HTMLElement {
     if(this.hasAttribute("img")) {
       const button_content = document.createElement("img");
       button_content.src = this.getAttribute("img");
+      button_content.width = 30;
+      button_content.height = 30;
       this.open_button.appendChild(button_content);
     } else if(this.hasAttribute("label")) {
       this.open_button.textContent = this.getAttribute("label");
@@ -104,15 +79,20 @@ export class CollapsibleMenu extends HTMLElement {
     // Content
     this.content_wrapper = document.createElement("div");
     this.content_wrapper.setAttribute(
-      "class", "content-wrapper wrapper card card-body");
+      "class", "content-wrapper wrapper transparent card card-body border radius");
 
     this.close_button = document.createElement("button");
     this.close_button.setAttribute("class", "close");
-    this.close_button.textContent = "X";
+    this.close_button.innerHTML = "&times;";
     this.content_wrapper.appendChild(this.close_button);
 
+    this.content_inner_wrapper = document.createElement("div");
+    this.content_inner_wrapper.setAttribute(
+      "class", "content-inner-wrapper");
+    this.content_wrapper.appendChild(this.content_inner_wrapper);
+
     const content = document.createElement("slot");
-    this.content_wrapper.appendChild(content);
+    this.content_inner_wrapper.appendChild(content);
 
     this.shadow.appendChild(this.content_wrapper);
 
@@ -122,7 +102,6 @@ export class CollapsibleMenu extends HTMLElement {
   }
 
   attributeChangedCallback(name: string, oldValue: string, newValue: string): void {
-    console.log(this.id, name, oldValue, newValue);
     if(name.toLowerCase() === "active" && oldValue !== newValue) {
       if(newValue !== null && newValue.toLowerCase() === "true") {
         this.content_wrapper.classList.add("show");
@@ -170,3 +149,94 @@ export class CollapsibleMenu extends HTMLElement {
 }
 
 customElements.define("collapsable-menu", CollapsibleMenu);
+
+
+let id_counter: number = 0;
+
+/* A slider element with feedback window. */
+export class FeedbackSlider extends HTMLElement {
+  shadow: ShadowRoot;
+  wrapper: HTMLElement;
+  slider: HTMLInputElement;
+  label: HTMLElement;
+  output: HTMLElement;
+  value: string;
+
+  // Specify observed attributes so that attributeChangedCallback will work
+  static get observedAttributes() {
+    return ["value"];
+  }
+
+  constructor() {
+    super();
+
+    if(!this.id) {
+      this.id = `autoGenId${id_counter}`;
+      id_counter += 1;
+    }
+
+    this.shadow = this.attachShadow({mode: "open"});
+
+    // Apply external styles to the shadow DOM.
+    const linkElem = document.createElement("link");
+    linkElem.setAttribute("rel", "stylesheet");
+    linkElem.setAttribute("href", "./feedback_slider.css");
+    this.shadow.appendChild(linkElem);
+
+    const min = this.getAttribute("min") || "0";
+    const max = this.getAttribute("max") || "100";
+    const step = this.getAttribute("step") || "1";
+    const value = this.getAttribute("value") || "50";
+    const title = this.getAttribute("title") || "";
+
+    this.wrapper = document.createElement("div");
+    this.wrapper.setAttribute("class", "form-group range-wrap input-wrap");
+    this.wrapper.setAttribute("title", title);
+
+    this.slider = document.createElement("input");
+    this.slider.setAttribute("class", "form-control-range range input");
+    this.slider.setAttribute("type", "range");
+    this.slider.setAttribute("id", `${this.id}--slider`);
+    this.slider.setAttribute("min", min);
+    this.slider.setAttribute("max", max);
+    this.slider.setAttribute("step", step);
+    this.slider.setAttribute("value", value);
+
+    this.label = document.createElement("label");
+    this.label.setAttribute("class", "label");
+    this.label.setAttribute("for", this.slider.id);
+
+    const content = document.createElement("slot");
+    this.label.appendChild(content);
+
+    this.output = document.createElement("output");
+    this.label.appendChild(this.output);
+
+    this.wrapper.appendChild(this.label);
+    this.wrapper.appendChild(this.slider);
+    this.shadow.appendChild(this.wrapper);
+
+    this.onSlider(null);
+    this.attributeChangedCallback("value", "", this.getAttribute("value"));
+  }
+
+  attributeChangedCallback(name: string, oldValue: string, newValue: string): void {
+    if(name === "value") {
+      this.value = newValue;
+      this.slider.value = newValue;
+      this.output.innerHTML = `: ${this.value}`;
+    }
+  }
+
+  onSlider(event: Event): void {
+    this.value = this.slider.value;
+    this.output.innerHTML = `: ${this.value}`;
+  }
+
+  connectedCallback() {
+    this.slider.addEventListener("input", this.onSlider.bind(this));
+  }
+}
+
+customElements.define("feedback-slider", FeedbackSlider);
+

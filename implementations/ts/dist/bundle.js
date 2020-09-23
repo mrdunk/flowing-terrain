@@ -19360,7 +19360,7 @@ var Display3d = function (_flowing_terrain_1$Di) {
 
 exports.Display3d = Display3d;
 
-},{"./flowing_terrain":18,"babylonjs":2}],17:[function(require,module,exports){
+},{"./flowing_terrain":19,"babylonjs":2}],17:[function(require,module,exports){
 "use strict";
 /*
  * MIT License
@@ -19631,6 +19631,276 @@ var Config = function () {
 exports.Config = Config;
 
 },{}],18:[function(require,module,exports){
+"use strict";
+/*
+ * MIT License
+ *
+ * Copyright (c) 2020 duncan law
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.FeedbackSlider = exports.CollapsibleMenu = void 0;
+/* A custom collapsible menu. */
+
+var CollapsibleMenu = function (_HTMLElement) {
+    _inherits(CollapsibleMenu, _HTMLElement);
+
+    function CollapsibleMenu() {
+        _classCallCheck(this, CollapsibleMenu);
+
+        var _this = _possibleConstructorReturn(this, (CollapsibleMenu.__proto__ || Object.getPrototypeOf(CollapsibleMenu)).call(this));
+
+        _this.open_callbacks = [];
+        _this.close_callbacks = [];
+        _this.shadow = _this.attachShadow({ mode: "open" });
+        if (!_this.hasAttribute("group")) {
+            _this.setAttribute("group", "default");
+        }
+        // Apply external styles to the shadow DOM.
+        var linkElem = document.createElement("link");
+        linkElem.setAttribute("rel", "stylesheet");
+        linkElem.setAttribute("href", "./bootstrap.css");
+        _this.shadow.appendChild(linkElem);
+        var linkElem2 = document.createElement("link");
+        linkElem2.setAttribute("rel", "stylesheet");
+        linkElem2.setAttribute("href", "./collapsable_menu.css");
+        _this.shadow.appendChild(linkElem2);
+        // Open button.
+        _this.button_wrapper = document.createElement("div");
+        _this.button_wrapper.setAttribute("class", "button-wrapper wrapper");
+        _this.open_button = document.createElement("button");
+        _this.open_button.setAttribute("class", "btn btn-primary");
+        if (_this.hasAttribute("img")) {
+            var button_content = document.createElement("img");
+            button_content.src = _this.getAttribute("img");
+            button_content.width = 30;
+            button_content.height = 30;
+            _this.open_button.appendChild(button_content);
+        } else if (_this.hasAttribute("label")) {
+            _this.open_button.textContent = _this.getAttribute("label");
+        }
+        _this.button_wrapper.appendChild(_this.open_button);
+        _this.shadow.appendChild(_this.button_wrapper);
+        // Content
+        _this.content_wrapper = document.createElement("div");
+        _this.content_wrapper.setAttribute("class", "content-wrapper wrapper transparent card card-body border radius");
+        _this.close_button = document.createElement("button");
+        _this.close_button.setAttribute("class", "close");
+        _this.close_button.innerHTML = "&times;";
+        _this.content_wrapper.appendChild(_this.close_button);
+        _this.content_inner_wrapper = document.createElement("div");
+        _this.content_inner_wrapper.setAttribute("class", "content-inner-wrapper");
+        _this.content_wrapper.appendChild(_this.content_inner_wrapper);
+        var content = document.createElement("slot");
+        _this.content_inner_wrapper.appendChild(content);
+        _this.shadow.appendChild(_this.content_wrapper);
+        _this.set_callbacks();
+        _this.hide_same_group();
+        _this.attributeChangedCallback("active", "", _this.getAttribute("active"));
+        return _this;
+    }
+    // Specify observed attributes so that attributeChangedCallback will work
+
+
+    _createClass(CollapsibleMenu, [{
+        key: "attributeChangedCallback",
+        value: function attributeChangedCallback(name, oldValue, newValue) {
+            if (name.toLowerCase() === "active" && oldValue !== newValue) {
+                if (newValue !== null && newValue.toLowerCase() === "true") {
+                    this.content_wrapper.classList.add("show");
+                    this.button_wrapper.classList.remove("show");
+                } else {
+                    this.content_wrapper.classList.remove("show");
+                    this.button_wrapper.classList.add("show");
+                }
+            }
+        }
+    }, {
+        key: "hide_same_group",
+        value: function hide_same_group() {
+            var elements = document.getElementsByTagName("collapsable-menu");
+            var _iteratorNormalCompletion = true;
+            var _didIteratorError = false;
+            var _iteratorError = undefined;
+
+            try {
+                for (var _iterator = elements[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+                    var element = _step.value;
+
+                    if (element !== this && element.getAttribute("group") === this.getAttribute("group")) {
+                        element.setAttribute("active", "false");
+                    }
+                }
+            } catch (err) {
+                _didIteratorError = true;
+                _iteratorError = err;
+            } finally {
+                try {
+                    if (!_iteratorNormalCompletion && _iterator.return) {
+                        _iterator.return();
+                    }
+                } finally {
+                    if (_didIteratorError) {
+                        throw _iteratorError;
+                    }
+                }
+            }
+        }
+    }, {
+        key: "show",
+        value: function show() {
+            this.hide_same_group();
+            this.setAttribute("active", "true");
+        }
+    }, {
+        key: "hide",
+        value: function hide() {
+            this.setAttribute("active", "false");
+        }
+    }, {
+        key: "set_callbacks",
+        value: function set_callbacks() {
+            this.set_close_callback(this.hide);
+            this.set_open_callback(this.show);
+        }
+    }, {
+        key: "set_open_callback",
+        value: function set_open_callback(callback) {
+            this.open_button.addEventListener("click", callback.bind(this));
+            this.open_callbacks.push(callback);
+        }
+    }, {
+        key: "set_close_callback",
+        value: function set_close_callback(callback) {
+            this.close_button.addEventListener("click", callback.bind(this));
+            this.close_callbacks.push(callback);
+        }
+    }], [{
+        key: "observedAttributes",
+        get: function get() {
+            return ["active"];
+        }
+    }]);
+
+    return CollapsibleMenu;
+}(HTMLElement);
+
+exports.CollapsibleMenu = CollapsibleMenu;
+customElements.define("collapsable-menu", CollapsibleMenu);
+var id_counter = 0;
+/* A slider element with feedback window. */
+
+var FeedbackSlider = function (_HTMLElement2) {
+    _inherits(FeedbackSlider, _HTMLElement2);
+
+    function FeedbackSlider() {
+        _classCallCheck(this, FeedbackSlider);
+
+        var _this2 = _possibleConstructorReturn(this, (FeedbackSlider.__proto__ || Object.getPrototypeOf(FeedbackSlider)).call(this));
+
+        if (!_this2.id) {
+            _this2.id = "autoGenId" + id_counter;
+            id_counter += 1;
+        }
+        _this2.shadow = _this2.attachShadow({ mode: "open" });
+        // Apply external styles to the shadow DOM.
+        var linkElem = document.createElement("link");
+        linkElem.setAttribute("rel", "stylesheet");
+        linkElem.setAttribute("href", "./feedback_slider.css");
+        _this2.shadow.appendChild(linkElem);
+        var min = _this2.getAttribute("min") || "0";
+        var max = _this2.getAttribute("max") || "100";
+        var step = _this2.getAttribute("step") || "1";
+        var value = _this2.getAttribute("value") || "50";
+        var title = _this2.getAttribute("title") || "";
+        _this2.wrapper = document.createElement("div");
+        _this2.wrapper.setAttribute("class", "form-group range-wrap input-wrap");
+        _this2.wrapper.setAttribute("title", title);
+        _this2.slider = document.createElement("input");
+        _this2.slider.setAttribute("class", "form-control-range range input");
+        _this2.slider.setAttribute("type", "range");
+        _this2.slider.setAttribute("id", _this2.id + "--slider");
+        _this2.slider.setAttribute("min", min);
+        _this2.slider.setAttribute("max", max);
+        _this2.slider.setAttribute("step", step);
+        _this2.slider.setAttribute("value", value);
+        _this2.label = document.createElement("label");
+        _this2.label.setAttribute("class", "label");
+        _this2.label.setAttribute("for", _this2.slider.id);
+        var content = document.createElement("slot");
+        _this2.label.appendChild(content);
+        _this2.output = document.createElement("output");
+        _this2.label.appendChild(_this2.output);
+        _this2.wrapper.appendChild(_this2.label);
+        _this2.wrapper.appendChild(_this2.slider);
+        _this2.shadow.appendChild(_this2.wrapper);
+        _this2.onSlider(null);
+        _this2.attributeChangedCallback("value", "", _this2.getAttribute("value"));
+        return _this2;
+    }
+    // Specify observed attributes so that attributeChangedCallback will work
+
+
+    _createClass(FeedbackSlider, [{
+        key: "attributeChangedCallback",
+        value: function attributeChangedCallback(name, oldValue, newValue) {
+            if (name === "value") {
+                this.value = newValue;
+                this.slider.value = newValue;
+                this.output.innerHTML = ": " + this.value;
+            }
+        }
+    }, {
+        key: "onSlider",
+        value: function onSlider(event) {
+            this.value = this.slider.value;
+            this.output.innerHTML = ": " + this.value;
+        }
+    }, {
+        key: "connectedCallback",
+        value: function connectedCallback() {
+            this.slider.addEventListener("input", this.onSlider.bind(this));
+        }
+    }], [{
+        key: "observedAttributes",
+        get: function get() {
+            return ["value"];
+        }
+    }]);
+
+    return FeedbackSlider;
+}(HTMLElement);
+
+exports.FeedbackSlider = FeedbackSlider;
+customElements.define("feedback-slider", FeedbackSlider);
+
+},{}],19:[function(require,module,exports){
 "use strict";
 /*
  * MIT License
@@ -19965,7 +20235,7 @@ var DisplayBase = function () {
 
 exports.DisplayBase = DisplayBase;
 
-},{"./ordered_set":21}],19:[function(require,module,exports){
+},{"./ordered_set":22}],20:[function(require,module,exports){
 "use strict";
 /*
  * MIT License
@@ -20289,7 +20559,7 @@ var Noise = function () {
 
 exports.Noise = Noise;
 
-},{"./ordered_set":21,"seedrandom":7}],20:[function(require,module,exports){
+},{"./ordered_set":22,"seedrandom":7}],21:[function(require,module,exports){
 "use strict";
 /*
  * MIT License
@@ -20326,8 +20596,9 @@ var _2d_view_1 = require("./2d_view");
 var _3d_view_1 = require("./3d_view");
 var config_1 = require("./config");
 require("@webcomponents/webcomponentsjs/custom-elements-es5-adapter.js");
+var custom_html_elements_1 = require("./custom_html_elements");
 // Hack to force ./custom_html_elements to be loaded.
-//new CollapsibleMenu();
+new custom_html_elements_1.CollapsibleMenu();
 var stats = {};
 // TODO: Use console.timer() instead.
 function time(label, to_time) {
@@ -20429,28 +20700,36 @@ window.onload = function () {
         display.scene.render();
     });
     // UI components below this point.
-    window.addEventListener("resize", function () {
+    // Resize the window.
+    function onResize() {
         display.engine.resize();
-    });
-    // Menu controls
-    function menu_groups() {
-        // Clear any existing event listeners.
+        var width = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
+        var minimum_width = 1110;
+        var menus_open = 0;
         var _iteratorNormalCompletion = true;
         var _didIteratorError = false;
         var _iteratorError = undefined;
 
         try {
-            for (var _iterator = document.getElementsByClassName("collapse-menu")[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
-                var menu = _step.value;
+            for (var _iterator = document.getElementsByTagName("collapsable-menu")[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+                var _menu = _step.value;
 
-                console.log(menu.id);
-                var button = menu.getElementsByClassName("collapse-menu-button")[0];
-                var closer = menu.getElementsByClassName("collapse-menu-close")[0];
-                if (button && closer) {
-                    var button_clone = button.cloneNode(true);
-                    var closer_clone = closer.cloneNode(true);
-                    button.parentNode.replaceChild(button_clone, button);
-                    closer.parentNode.replaceChild(closer_clone, closer);
+                // Count how many menus are open.
+                if (_menu.hasAttribute("active") && _menu.getAttribute("active").toLowerCase() === "true") {
+                    menus_open += 1;
+                }
+                if (width <= minimum_width) {
+                    // For narrow display, put all menus in same group so only one will be
+                    // open at a time.
+                    if (!_menu.hasAttribute("original-group")) {
+                        _menu.setAttribute("original-group", _menu.getAttribute("group"));
+                    }
+                    _menu.setAttribute("group", "left");
+                } else {
+                    // For wider displays, put menus in separate groups.
+                    if (_menu.hasAttribute("original-group")) {
+                        _menu.setAttribute("group", _menu.getAttribute("original-group"));
+                    }
                 }
             }
         } catch (err) {
@@ -20468,101 +20747,84 @@ window.onload = function () {
             }
         }
 
-        var _iteratorNormalCompletion2 = true;
-        var _didIteratorError2 = false;
-        var _iteratorError2 = undefined;
+        if (width <= minimum_width && menus_open > 1) {
+            // Wave more than one menu open when display is too narrow to fit them.
+            // Close all menus.
+            var _iteratorNormalCompletion2 = true;
+            var _didIteratorError2 = false;
+            var _iteratorError2 = undefined;
 
-        try {
-            var _loop = function _loop() {
-                var menu = _step2.value;
-
-                var button = menu.getElementsByClassName("collapse-menu-button")[0];
-                var content = menu.getElementsByClassName("collapse-menu-content")[0];
-                var closer = menu.getElementsByClassName("collapse-menu-close")[0];
-                var buddies = [];
-                if (content) {
-                    // Show the current menu.
-                    var show = function show(button_, content_) {
-                        if (!content_.classList.contains("show")) {
-                            button_.classList.remove("show");
-                            content_.classList.add("show");
-                        }
-                    };
-                    // Hide the current menu.
-                    var hide = function hide(button_, content_) {
-                        if (button_ === undefined || content_ === undefined) {
-                            return;
-                        }
-                        if (content_.classList.contains("show")) {
-                            content_.classList.remove("show");
-                            button_.classList.add("show");
-                        }
-                    };
-                    // Get list of menus with the same "group" attribute set.
-                    var _iteratorNormalCompletion3 = true;
-                    var _didIteratorError3 = false;
-                    var _iteratorError3 = undefined;
-
-                    try {
-                        for (var _iterator3 = document.getElementsByClassName("collapse-menu")[Symbol.iterator](), _step3; !(_iteratorNormalCompletion3 = (_step3 = _iterator3.next()).done); _iteratorNormalCompletion3 = true) {
-                            var other_menu = _step3.value;
-
-                            if (menu.id !== other_menu.id && menu.getAttribute("group") && menu.getAttribute("group") === other_menu.getAttribute("group")) {
-                                buddies.push(other_menu);
-                            }
-                        }
-                    } catch (err) {
-                        _didIteratorError3 = true;
-                        _iteratorError3 = err;
-                    } finally {
-                        try {
-                            if (!_iteratorNormalCompletion3 && _iterator3.return) {
-                                _iterator3.return();
-                            }
-                        } finally {
-                            if (_didIteratorError3) {
-                                throw _iteratorError3;
-                            }
-                        }
-                    }
-
-                    button.addEventListener("click", function (event) {
-                        show(button, content);
-                        // Close other menus in same group.
-                        buddies.forEach(function (buddy) {
-                            var buddy_but = buddy.getElementsByClassName("collapse-menu-button")[0];
-                            var buddy_cont = buddy.getElementsByClassName("collapse-menu-content")[0];
-                            hide(buddy_but, buddy_cont);
-                        });
-                    });
-                    closer.addEventListener("click", function (event) {
-                        hide(button, content);
-                    });
-                }
-            };
-
-            for (var _iterator2 = document.getElementsByClassName("collapse-menu")[Symbol.iterator](), _step2; !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {
-                _loop();
-            }
-        } catch (err) {
-            _didIteratorError2 = true;
-            _iteratorError2 = err;
-        } finally {
             try {
-                if (!_iteratorNormalCompletion2 && _iterator2.return) {
-                    _iterator2.return();
+                for (var _iterator2 = document.getElementsByTagName("collapsable-menu")[Symbol.iterator](), _step2; !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {
+                    var menu = _step2.value;
+
+                    menu.setAttribute("active", "false");
                 }
+            } catch (err) {
+                _didIteratorError2 = true;
+                _iteratorError2 = err;
             } finally {
-                if (_didIteratorError2) {
-                    throw _iteratorError2;
+                try {
+                    if (!_iteratorNormalCompletion2 && _iterator2.return) {
+                        _iterator2.return();
+                    }
+                } finally {
+                    if (_didIteratorError2) {
+                        throw _iteratorError2;
+                    }
                 }
             }
         }
-
-        ;
     }
-    menu_groups();
+    window.addEventListener("resize", onResize);
+    onResize();
     // Slider controls.
+    var _iteratorNormalCompletion3 = true;
+    var _didIteratorError3 = false;
+    var _iteratorError3 = undefined;
+
+    try {
+        var _loop = function _loop() {
+            var node = _step3.value;
+
+            var slider = node;
+            var name = slider.getAttribute("name");
+            console.assert(name !== null && name !== undefined);
+            var stored_value = config.get(name, false);
+            // Make the HTML element match the stored state at startup.
+            if (stored_value !== null) {
+                slider.setAttribute("value", stored_value);
+            } else {
+                console.warn("Range element does not have coresponding entry in config: " + name);
+            }
+            // Set up callback.
+            slider.addEventListener("input", function () {
+                if (config.get(name, false) !== null) {
+                    // Callback happens as part of the config.set(...).
+                    console.assert(typeof slider.value === "string");
+                    config.set(name, parseFloat(slider.value));
+                }
+            });
+        };
+
+        for (var _iterator3 = document.getElementsByTagName("feedback-slider")[Symbol.iterator](), _step3; !(_iteratorNormalCompletion3 = (_step3 = _iterator3.next()).done); _iteratorNormalCompletion3 = true) {
+            _loop();
+        }
+    } catch (err) {
+        _didIteratorError3 = true;
+        _iteratorError3 = err;
+    } finally {
+        try {
+            if (!_iteratorNormalCompletion3 && _iterator3.return) {
+                _iterator3.return();
+            }
+        } finally {
+            if (_didIteratorError3) {
+                throw _iteratorError3;
+            }
+        }
+    }
+
     var _iteratorNormalCompletion4 = true;
     var _didIteratorError4 = false;
     var _iteratorError4 = undefined;
@@ -20715,14 +20977,16 @@ window.onload = function () {
     var menu_link_button = document.getElementById("link");
     menu_link_button.addEventListener("click", menu_link_button_handler);
     canvas.onblur = function (envent) {
+        // Force focus to canvas so keyboard commands always work.
         canvas.focus();
     };
     document.onclick = function (envent) {
+        // Force focus to canvas so keyboard commands always work.
         canvas.focus();
     };
 };
 
-},{"./2d_view":15,"./3d_view":16,"./config":17,"./flowing_terrain":18,"./genesis":19,"@webcomponents/webcomponentsjs/custom-elements-es5-adapter.js":1,"bootstrap":3,"jquery":5}],21:[function(require,module,exports){
+},{"./2d_view":15,"./3d_view":16,"./config":17,"./custom_html_elements":18,"./flowing_terrain":19,"./genesis":20,"@webcomponents/webcomponentsjs/custom-elements-es5-adapter.js":1,"bootstrap":3,"jquery":5}],22:[function(require,module,exports){
 "use strict";
 /*
 # MIT License
@@ -20853,6 +21117,6 @@ var SortedSet = function () {
 
 exports.SortedSet = SortedSet;
 
-},{}]},{},[20])
+},{}]},{},[21])
 
 //# sourceMappingURL=bundle.js.map
