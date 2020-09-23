@@ -18,7 +18,7 @@
     <div class="" id="main">
 
       <div class="float-panel">
-        <collapsable-menu label="info" img="./assets/info-circle.svg" id="info" group="left">
+        <collapsable-menu label="info" img="./assets/info-circle.svg" id="info" group="left" active="true">
           <div class="content border">
             <div>This project is intended to document a simple algorithm for creating 3 dimensional terrain maps and their likely watercourses.</div>
             <div>An explanation of the algorithm can be found here:
@@ -43,12 +43,14 @@
             </div>
           </div>
         </collapsable-menu>
+
         <collapsable-menu label="config" img="./assets/wrench.svg" id="config" group="left">
           <div class="content border">
 
               <div class="nav nav-tabs" id="myTab" role="tablist">
                 <a class="nav-link active" id="geography-tab" data-toggle="tab" href="#geography" role="tab" aria-controls="geography" aria-selected="false">Geography</a>
                 <a class="nav-link" id="environment-tab" data-toggle="tab" href="#environment" role="tab" aria-controls="environment" aria-selected="false">Enviroment</a>
+                <a class="nav-link" id="debug-tab" data-toggle="tab" href="#debug" role="tab" aria-controls="debug" aria-selected="false">Debug</a>
               </div>
 
               <div class="tab-content">
@@ -67,11 +69,6 @@
                         <feedback-slider id="river_threshold" title="Set how visible rivers are" name="display.river_threshold" min="0" max="20" value="10">
                           River Likelihood
                         </feedback-slider>
-                      </div>
-                      <div class="border higher-vis">
-                        <div>
-                          <input type="button" id="inspector" name="inspector" value="Launch Inspector">
-                        </div>
                       </div>
                     </div>
 
@@ -160,8 +157,16 @@
 
                   </div>
                 </div>
-              </div>
 
+                <div class="tab-pane fade" id="debug" role="tabpanel">
+                      <div class="border higher-vis">
+                        <div>
+                          <input type="button" id="inspector" name="inspector" value="Launch Inspector">
+                        </div>
+                      </div>
+                </div>
+
+              </div>
           </div>
         </collapsable-menu>
       </div>

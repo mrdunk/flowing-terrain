@@ -97,8 +97,8 @@ export class CollapsibleMenu extends HTMLElement {
     this.shadow.appendChild(this.content_wrapper);
 
     this.set_callbacks();
-    this.hide_same_group();
     this.attributeChangedCallback("active", "", this.getAttribute("active"));
+    this.hide_same_group();
   }
 
   attributeChangedCallback(name: string, oldValue: string, newValue: string): void {
@@ -114,6 +114,10 @@ export class CollapsibleMenu extends HTMLElement {
   }
 
   hide_same_group(): void {
+    if(!this.hasAttribute("active") ||
+        this.getAttribute("active").toLowerCase() !== "true") {
+      return;
+    }
     const elements = document.getElementsByTagName("collapsable-menu");
     for(const element of elements) {
       if(element !== this &&
@@ -124,8 +128,8 @@ export class CollapsibleMenu extends HTMLElement {
   }
 
   show(): void {
-    this.hide_same_group();
     this.setAttribute("active", "true");
+    this.hide_same_group();
   }
 
   hide(): void {
@@ -221,7 +225,7 @@ export class FeedbackSlider extends HTMLElement {
   }
 
   attributeChangedCallback(name: string, oldValue: string, newValue: string): void {
-    if(name === "value") {
+    if(name.toLowerCase() === "value" && oldValue !== newValue) {
       this.value = newValue;
       this.slider.value = newValue;
       this.output.innerHTML = `: ${this.value}`;

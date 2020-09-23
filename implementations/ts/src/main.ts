@@ -236,7 +236,7 @@ window.onload = () => {
   });
 
 
-  // Callabck for adjusting detail of the seed_point map.
+  // Callback for adjusting detail of the seed_point map.
   let seed_threshold_timer_fast: ReturnType<typeof setTimeout> = 0;
   let seed_threshold_timer_slow: ReturnType<typeof setTimeout> = 0;
   function seed_threshold_callback(keys: string, value: any) {
@@ -313,13 +313,16 @@ window.onload = () => {
 
   // Create a permanent link to the current map.
   function menu_link_button_handler(event: Event) {
-    navigator.clipboard.writeText(config.url.toString()).then(() => {
-      /* clipboard successfully set */
-      $('.toast').toast('show');
-    }, () => {
-      /* clipboard write failed */
-      console.log(`Failed to copy ${config.url.toString()} to paste buffer.`);
-    });
+    if(navigator.clipboard) {
+      // TODO: Fix this for mobile.
+      navigator.clipboard.writeText(config.url.toString()).then(() => {
+        /* clipboard successfully set */
+        $('.toast').toast('show');
+      }, () => {
+        /* clipboard write failed */
+        console.log(`Failed to copy ${config.url.toString()} to paste buffer.`);
+      });
+    }
     // window.open(config.url.toString());
     const hyperlink: HTMLAnchorElement = document.getElementById("permalink") as HTMLAnchorElement;
     hyperlink.href = config.url.toString();
@@ -328,13 +331,15 @@ window.onload = () => {
   menu_link_button.addEventListener("click", menu_link_button_handler);
 
 
+  // Return focus to canvas whenever any menu is clicked so keyboard controls
+  // work.
   canvas.onblur = (envent) => {
     // Force focus to canvas so keyboard commands always work.
-    canvas.focus();
+    window.setTimeout(() => canvas.focus(), 0);
   };
 
   document.onclick = (envent) => {
     // Force focus to canvas so keyboard commands always work.
-    canvas.focus();
+    window.setTimeout(() => canvas.focus(), 0);
   };
 }

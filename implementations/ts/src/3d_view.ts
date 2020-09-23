@@ -173,7 +173,6 @@ export class Display3d extends DisplayBase {
 
     this.camera.rotation = rot_start;
     this.camera.position = pos_start;
-    console.log(rot_start, rot_target, Math.abs(rot_start.y - rot_target.y));
 
     if(Math.abs(rot_start.y - rot_target.y) > Math.PI) {
       if(rot_start.y < 0) {

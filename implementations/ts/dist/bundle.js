@@ -19721,8 +19721,8 @@ var CollapsibleMenu = function (_HTMLElement) {
         _this.content_inner_wrapper.appendChild(content);
         _this.shadow.appendChild(_this.content_wrapper);
         _this.set_callbacks();
-        _this.hide_same_group();
         _this.attributeChangedCallback("active", "", _this.getAttribute("active"));
+        _this.hide_same_group();
         return _this;
     }
     // Specify observed attributes so that attributeChangedCallback will work
@@ -19744,6 +19744,9 @@ var CollapsibleMenu = function (_HTMLElement) {
     }, {
         key: "hide_same_group",
         value: function hide_same_group() {
+            if (!this.hasAttribute("active") || this.getAttribute("active").toLowerCase() !== "true") {
+                return;
+            }
             var elements = document.getElementsByTagName("collapsable-menu");
             var _iteratorNormalCompletion = true;
             var _didIteratorError = false;
@@ -19775,8 +19778,8 @@ var CollapsibleMenu = function (_HTMLElement) {
     }, {
         key: "show",
         value: function show() {
-            this.hide_same_group();
             this.setAttribute("active", "true");
+            this.hide_same_group();
         }
     }, {
         key: "hide",
@@ -19870,7 +19873,7 @@ var FeedbackSlider = function (_HTMLElement2) {
     _createClass(FeedbackSlider, [{
         key: "attributeChangedCallback",
         value: function attributeChangedCallback(name, oldValue, newValue) {
-            if (name === "value") {
+            if (name.toLowerCase() === "value" && oldValue !== newValue) {
                 this.value = newValue;
                 this.slider.value = newValue;
                 this.output.innerHTML = ": " + this.value;
@@ -20778,7 +20781,7 @@ window.onload = function () {
     }
     window.addEventListener("resize", onResize);
     onResize();
-    // Slider controls.
+    // Initialise Slider controls.
     var _iteratorNormalCompletion3 = true;
     var _didIteratorError3 = false;
     var _iteratorError3 = undefined;
@@ -20797,10 +20800,10 @@ window.onload = function () {
             } else {
                 console.warn("Range element does not have coresponding entry in config: " + name);
             }
-            // Set up callback.
+            // Set up callback when slider moves.
             slider.addEventListener("input", function () {
                 if (config.get(name, false) !== null) {
-                    // Callback happens as part of the config.set(...).
+                    // Callback to update map happens as part of the config.set(...).
                     console.assert(typeof slider.value === "string");
                     config.set(name, parseFloat(slider.value));
                 }
@@ -20810,6 +20813,7 @@ window.onload = function () {
         for (var _iterator3 = document.getElementsByTagName("feedback-slider")[Symbol.iterator](), _step3; !(_iteratorNormalCompletion3 = (_step3 = _iterator3.next()).done); _iteratorNormalCompletion3 = true) {
             _loop();
         }
+        // Button to regenerate the seed_point map.
     } catch (err) {
         _didIteratorError3 = true;
         _iteratorError3 = err;
@@ -20825,78 +20829,13 @@ window.onload = function () {
         }
     }
 
-    var _iteratorNormalCompletion4 = true;
-    var _didIteratorError4 = false;
-    var _iteratorError4 = undefined;
-
-    try {
-        var _loop2 = function _loop2() {
-            var input_wrap = _step4.value;
-
-            var input = input_wrap.getElementsByClassName("input")[0];
-            var bubble = input_wrap.getElementsByClassName("bubble")[0];
-            var stored_value = config.get(input.name, false);
-            // console.log(
-            //  input.name,
-            //  input.type === "checkbox" ? input.checked : input.value,
-            //  stored_value
-            // );
-            // Make the HTML element match the stored state.
-            if (stored_value !== null) {
-                if (input.type === "checkbox") {
-                    input.checked = stored_value;
-                } else {
-                    input.value = stored_value;
-                }
-            } else {
-                console.warn("Range element does not have coresponding entry in config: " + input.name);
-            }
-            if (bubble) {
-                bubble.innerHTML = input.value;
-            }
-            // Set up HTML element callback.
-            input.addEventListener("input", function () {
-                var value = input.type === "checkbox" ? input.checked : input.value;
-                if (bubble) {
-                    bubble.innerHTML = "" + value;
-                }
-                if (config.get(input.name, false) !== null) {
-                    // Callback happens as part of the config.set(...).
-                    if (typeof value === "string") {
-                        config.set(input.name, parseFloat(value));
-                    } else {
-                        config.set(input.name, value);
-                    }
-                }
-            });
-        };
-
-        for (var _iterator4 = document.getElementsByClassName("input-wrap")[Symbol.iterator](), _step4; !(_iteratorNormalCompletion4 = (_step4 = _iterator4.next()).done); _iteratorNormalCompletion4 = true) {
-            _loop2();
-        }
-        // Button to regenerate the seed_point map.
-    } catch (err) {
-        _didIteratorError4 = true;
-        _iteratorError4 = err;
-    } finally {
-        try {
-            if (!_iteratorNormalCompletion4 && _iterator4.return) {
-                _iterator4.return();
-            }
-        } finally {
-            if (_didIteratorError4) {
-                throw _iteratorError4;
-            }
-        }
-    }
-
     var menu_seed_points = document.getElementById("seed_points");
     menu_seed_points.addEventListener("click", function (event) {
         config.set("seed_points.random_seed", "" + new Date().getTime());
         generate_seed_points();
         generate_terrain();
     });
-    // Callabck for adjusting detail of the seed_point map.
+    // Callback for adjusting detail of the seed_point map.
     var seed_threshold_timer_fast = 0;
     var seed_threshold_timer_slow = 0;
     function seed_threshold_callback(keys, value) {
@@ -20919,6 +20858,7 @@ window.onload = function () {
     // Button to regenerate all aspects of the noise map.
     var menu_noise = document.getElementById("noise");
     menu_noise.addEventListener("click", function (event) {
+        console.log("menu_noise");
         generate_noise(true);
         generate_terrain();
     });
@@ -20963,13 +20903,15 @@ window.onload = function () {
     menu_inspector.addEventListener("click", menu_inspector_handler);
     // Create a permanent link to the current map.
     function menu_link_button_handler(event) {
-        navigator.clipboard.writeText(config.url.toString()).then(function () {
-            /* clipboard successfully set */
-            $('.toast').toast('show');
-        }, function () {
-            /* clipboard write failed */
-            console.log("Failed to copy " + config.url.toString() + " to paste buffer.");
-        });
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(config.url.toString()).then(function () {
+                /* clipboard successfully set */
+                $('.toast').toast('show');
+            }, function () {
+                /* clipboard write failed */
+                console.log("Failed to copy " + config.url.toString() + " to paste buffer.");
+            });
+        }
         // window.open(config.url.toString());
         var hyperlink = document.getElementById("permalink");
         hyperlink.href = config.url.toString();
@@ -20978,11 +20920,15 @@ window.onload = function () {
     menu_link_button.addEventListener("click", menu_link_button_handler);
     canvas.onblur = function (envent) {
         // Force focus to canvas so keyboard commands always work.
-        canvas.focus();
+        window.setTimeout(function () {
+            return canvas.focus();
+        }, 0);
     };
     document.onclick = function (envent) {
         // Force focus to canvas so keyboard commands always work.
-        canvas.focus();
+        window.setTimeout(function () {
+            return canvas.focus();
+        }, 0);
     };
 };
 
