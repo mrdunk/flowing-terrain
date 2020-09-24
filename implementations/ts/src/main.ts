@@ -217,6 +217,13 @@ window.onload = () => {
     }
 
     // Set up callback when slider moves.
+    slider.addEventListener("change", () => {
+      if(config.get(name, false) !== null) {
+        // Callback to update map happens as part of the config.set(...).
+        console.assert(typeof slider.value === "string");
+        config.set(name, parseFloat(slider.value));
+      }
+    });
     slider.addEventListener("input", () => {
       if(config.get(name, false) !== null) {
         // Callback to update map happens as part of the config.set(...).
@@ -313,8 +320,8 @@ window.onload = () => {
 
   // Create a permanent link to the current map.
   function menu_link_button_handler(event: Event) {
-    if(navigator.clipboard) {
-      // TODO: Fix this for mobile.
+    console.log(navigator.clipboard);
+    if(navigator.clipboard !== undefined) {
       navigator.clipboard.writeText(config.url.toString()).then(() => {
         /* clipboard successfully set */
         $('.toast').toast('show');
@@ -322,7 +329,10 @@ window.onload = () => {
         /* clipboard write failed */
         console.log(`Failed to copy ${config.url.toString()} to paste buffer.`);
       });
+    } else {
+      console.log(`Failed to copy ${config.url.toString()} to paste buffer.`);
     }
+
     // window.open(config.url.toString());
     const hyperlink: HTMLAnchorElement = document.getElementById("permalink") as HTMLAnchorElement;
     hyperlink.href = config.url.toString();
@@ -331,15 +341,9 @@ window.onload = () => {
   menu_link_button.addEventListener("click", menu_link_button_handler);
 
 
-  // Return focus to canvas whenever any menu is clicked so keyboard controls
+  // Return focus to canvas after any menu is clicked so keyboard controls
   // work.
-  canvas.onblur = (envent) => {
-    // Force focus to canvas so keyboard commands always work.
+  window.addEventListener("mouseup", (event) => {
     window.setTimeout(() => canvas.focus(), 0);
-  };
-
-  document.onclick = (envent) => {
-    // Force focus to canvas so keyboard commands always work.
-    window.setTimeout(() => canvas.focus(), 0);
-  };
+  });
 }

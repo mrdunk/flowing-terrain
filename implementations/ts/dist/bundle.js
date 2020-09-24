@@ -19112,7 +19112,6 @@ var Display3d = function (_flowing_terrain_1$Di) {
             var rot_target = this.camera.rotation.clone();
             this.camera.rotation = rot_start;
             this.camera.position = pos_start;
-            console.log(rot_start, rot_target, Math.abs(rot_start.y - rot_target.y));
             if (Math.abs(rot_start.y - rot_target.y) > Math.PI) {
                 if (rot_start.y < 0) {
                     rot_start.y += 2 * Math.PI;
@@ -19889,6 +19888,7 @@ var FeedbackSlider = function (_HTMLElement2) {
         key: "connectedCallback",
         value: function connectedCallback() {
             this.slider.addEventListener("input", this.onSlider.bind(this));
+            this.slider.addEventListener("change", this.onSlider.bind(this));
         }
     }], [{
         key: "observedAttributes",
@@ -20801,6 +20801,13 @@ window.onload = function () {
                 console.warn("Range element does not have coresponding entry in config: " + name);
             }
             // Set up callback when slider moves.
+            slider.addEventListener("change", function () {
+                if (config.get(name, false) !== null) {
+                    // Callback to update map happens as part of the config.set(...).
+                    console.assert(typeof slider.value === "string");
+                    config.set(name, parseFloat(slider.value));
+                }
+            });
             slider.addEventListener("input", function () {
                 if (config.get(name, false) !== null) {
                     // Callback to update map happens as part of the config.set(...).
@@ -20858,7 +20865,6 @@ window.onload = function () {
     // Button to regenerate all aspects of the noise map.
     var menu_noise = document.getElementById("noise");
     menu_noise.addEventListener("click", function (event) {
-        console.log("menu_noise");
         generate_noise(true);
         generate_terrain();
     });
@@ -20903,7 +20909,9 @@ window.onload = function () {
     menu_inspector.addEventListener("click", menu_inspector_handler);
     // Create a permanent link to the current map.
     function menu_link_button_handler(event) {
-        if (navigator.clipboard) {
+        console.log(navigator.clipboard);
+        if (navigator.clipboard !== undefined) {
+            // TODO: This only works on chrome.
             navigator.clipboard.writeText(config.url.toString()).then(function () {
                 /* clipboard successfully set */
                 $('.toast').toast('show');
@@ -20918,18 +20926,13 @@ window.onload = function () {
     }
     var menu_link_button = document.getElementById("link");
     menu_link_button.addEventListener("click", menu_link_button_handler);
-    canvas.onblur = function (envent) {
-        // Force focus to canvas so keyboard commands always work.
+    // Return focus to canvas after any menu is clicked so keyboard controls
+    // work.
+    window.addEventListener("mouseup", function (event) {
         window.setTimeout(function () {
             return canvas.focus();
         }, 0);
-    };
-    document.onclick = function (envent) {
-        // Force focus to canvas so keyboard commands always work.
-        window.setTimeout(function () {
-            return canvas.focus();
-        }, 0);
-    };
+    });
 };
 
 },{"./2d_view":15,"./3d_view":16,"./config":17,"./custom_html_elements":18,"./flowing_terrain":19,"./genesis":20,"@webcomponents/webcomponentsjs/custom-elements-es5-adapter.js":1,"bootstrap":3,"jquery":5}],22:[function(require,module,exports){

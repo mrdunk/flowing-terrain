@@ -239,6 +239,7 @@ export class FeedbackSlider extends HTMLElement {
 
   connectedCallback() {
     this.slider.addEventListener("input", this.onSlider.bind(this));
+    this.slider.addEventListener("change", this.onSlider.bind(this));
   }
 }
 
