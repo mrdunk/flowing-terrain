@@ -150,6 +150,10 @@ export class CollapsibleMenu extends HTMLElement {
     this.close_button.addEventListener("click", callback.bind(this));
     this.close_callbacks.push(callback);
   }
+
+  connectedCallback() {
+    this.open_button.addEventListener("click", (event) => {console.log(event.target);});
+  }
 }
 
 customElements.define("collapsable-menu", CollapsibleMenu);

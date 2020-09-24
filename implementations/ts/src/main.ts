@@ -80,6 +80,17 @@ window.onload = () => {
   config.set_if_null("noise.high_octave_weight", 0.2);
   config.set_callback("noise.high_octave_weight", noise_octaves_callback);
 
+  config.set_if_null("terrain.height_constant", 0.01);
+  config.set_callback("terrain.height_constant", terrain_callback);
+  config.set_if_null("terrain.noise_height_weight", 1.0);
+  config.set_callback("terrain.noise_height_weight", terrain_callback);
+  config.set_if_null("terrain.noise_height_polarize", 1.0);
+  config.set_callback("terrain.noise_height_polarize", terrain_callback);
+  config.set_if_null("terrain.noise_gradient_weight", 1.0);
+  config.set_callback("terrain.noise_gradient_weight", terrain_callback);
+  config.set_if_null("terrain.noise_gradient_polarize", 1.0);
+  config.set_callback("terrain.noise_gradient_polarize", terrain_callback);
+  
   config.set_if_null("display.river_threshold", 10);
   config.set_callback("display.river_threshold", (key: string, value: any) => {
     display.set_rivers(value);
@@ -120,7 +131,7 @@ window.onload = () => {
   function generate_terrain() {
     geography = time("geography", () => {
       if(geography === null) {
-        return new Geography(enviroment, seabed, noise.data_combined);
+        return new Geography(enviroment, config, seabed, noise.data_combined);
       } else {
         geography.terraform(enviroment, seabed, noise.data_combined);
         return geography;
@@ -154,6 +165,7 @@ window.onload = () => {
     display.scene.render();
   })
 
+  display.set_view("up");
 
   // UI components below this point.
 
@@ -244,24 +256,17 @@ window.onload = () => {
 
 
   // Callback for adjusting detail of the seed_point map.
-  let seed_threshold_timer_fast: ReturnType<typeof setTimeout> = 0;
-  let seed_threshold_timer_slow: ReturnType<typeof setTimeout> = 0;
+  let timer_fast: ReturnType<typeof setTimeout> = 0;
   function seed_threshold_callback(keys: string, value: any) {
     // Only change the minimap every 200ms, even if more updates are sent.
-    if(seed_threshold_timer_fast === 0) {
-      seed_threshold_timer_fast = setTimeout(() => {
+    if(timer_fast === 0) {
+      timer_fast = setTimeout(() => {
         config.set("seed_points.random_seed", `${(new Date()).getTime()}`);
         generate_seed_points();
-        seed_threshold_timer_fast = 0;
+        timer_fast = 0;
       }, 200);
     }
-    // Only change the 3d display every 2 seconds.
-    if(seed_threshold_timer_slow === 0) {
-      seed_threshold_timer_slow = setTimeout(() => {
-        generate_terrain();
-        seed_threshold_timer_slow = 0;
-      }, 2000);
-    }
+    terrain_callback(keys, value);
   }
 
 
@@ -275,21 +280,25 @@ window.onload = () => {
 
   // Callback to set noise octaves.
   // This single callback will work for all octaves.
-  let noise_timer_fast: ReturnType<typeof setTimeout> = 0;
-  let noise_timer_slow: ReturnType<typeof setTimeout> = 0;
   function noise_octaves_callback(keys: string, value: any) {
     // Only do this every 200ms, even if more updates are sent.
-    if(noise_timer_fast === 0) {
-      noise_timer_fast = setTimeout(() => {
+    if(timer_fast === 0) {
+      timer_fast = setTimeout(() => {
         generate_noise();
-        noise_timer_fast = 0;
+        timer_fast = 0;
       }, 200);
     }
+    terrain_callback(keys, value);
+  }
+
+  // Callback to regenerate terrain after settings change.
+  let timer_slow: ReturnType<typeof setTimeout> = 0;
+  function terrain_callback(keys: string, value: any) {
     // Only change the 3d display every 2 seconds.
-    if(noise_timer_slow === 0) {
-      noise_timer_slow = setTimeout(() => {
+    if(timer_slow === 0) {
+      timer_slow = setTimeout(() => {
         generate_terrain();
-        noise_timer_slow = 0;
+        timer_slow = 0;
       }, 2000);
     }
   }
@@ -321,12 +330,15 @@ window.onload = () => {
   // Create a permanent link to the current map.
   function menu_link_button_handler(event: Event) {
     console.log(navigator.clipboard);
+    const menu_link = document.getElementById("link");
+
     if(navigator.clipboard !== undefined) {
       navigator.clipboard.writeText(config.url.toString()).then(() => {
-        /* clipboard successfully set */
-        $('.toast').toast('show');
+        // clipboard write success.
+        menu_link.querySelector(".success").classList.add("show");
       }, () => {
-        /* clipboard write failed */
+        // clipboard write failed
+        menu_link.querySelector(".fail").classList.add("show");
         console.log(`Failed to copy ${config.url.toString()} to paste buffer.`);
       });
     } else {
@@ -337,8 +349,9 @@ window.onload = () => {
     const hyperlink: HTMLAnchorElement = document.getElementById("permalink") as HTMLAnchorElement;
     hyperlink.href = config.url.toString();
   }
-  const menu_link_button = document.getElementById("link") as HTMLInputElement;
-  menu_link_button.addEventListener("click", menu_link_button_handler);
+  const menu_link = document.getElementById("link");
+  const button = menu_link.shadowRoot.querySelector("button");
+  button.addEventListener("click", menu_link_button_handler, false);
 
 
   // Return focus to canvas after any menu is clicked so keyboard controls

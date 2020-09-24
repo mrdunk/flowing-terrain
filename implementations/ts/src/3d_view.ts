@@ -248,7 +248,7 @@ export class Display3d extends DisplayBase {
     if(height00 === 0 && height10 === 0 && height01 === 0 && height11 === 0) {
       // The tile we are considering drawing is at the same height as the seabed.
       // More efficient to just draw a single "seabed" tile under the whole map.
-      return;
+      //return;
     }
 
     const height_lowest = Math.min(Math.min(Math.min(height00, height10), height01), height11);

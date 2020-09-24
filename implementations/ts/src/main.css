@@ -17,6 +17,9 @@ img.logo{
   top: 0;
   left: 0;
   z-index: -1;
+  border: 0;
+  margin: 0;
+  padding: 0;
 }
 
 #embed-host {
@@ -78,6 +81,10 @@ img.logo{
   //height: 400px;
 }
 
+#link .content {
+  width: 200px;
+}
+
 @media screen and (max-width: 974px) {
   #config .content {
     width: 600px;
@@ -110,3 +117,6 @@ collapsable-menu .content {
   background: rgba(255, 255, 255, 0.4);
 }
 
+.sucess, .fail {
+  display: none;
+}

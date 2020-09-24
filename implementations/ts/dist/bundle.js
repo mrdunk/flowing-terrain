@@ -19178,7 +19178,7 @@ var Display3d = function (_flowing_terrain_1$Di) {
             if (height00 === 0 && height10 === 0 && height01 === 0 && height11 === 0) {
                 // The tile we are considering drawing is at the same height as the seabed.
                 // More efficient to just draw a single "seabed" tile under the whole map.
-                return;
+                //return;
             }
             var height_lowest = Math.min(Math.min(Math.min(height00, height10), height01), height11);
             // Each square on the map is tiled with 2 triangles. It is important to
@@ -19803,6 +19803,13 @@ var CollapsibleMenu = function (_HTMLElement) {
             this.close_button.addEventListener("click", callback.bind(this));
             this.close_callbacks.push(callback);
         }
+    }, {
+        key: "connectedCallback",
+        value: function connectedCallback() {
+            this.open_button.addEventListener("click", function (event) {
+                console.log(event.target);
+            });
+        }
     }], [{
         key: "observedAttributes",
         get: function get() {
@@ -19986,11 +19993,12 @@ exports.Tile = Tile;
 // Data for a procedurally generated map.
 
 var Geography = function () {
-    function Geography(enviroment, seed_points, noise) {
+    function Geography(enviroment, config, seed_points, noise) {
         _classCallCheck(this, Geography);
 
         this.tiles = [];
         this.open_set_sorted = new ordered_set_1.SortedSet([], this.compare_tiles);
+        this.config = config;
         this.terraform(enviroment, seed_points, noise);
     }
     // Calculate the terrain.
@@ -20083,6 +20091,12 @@ var Geography = function () {
         value: function heights_algorithm() {
             var _this = this;
 
+            var height_constant = this.config.get("terrain.height_constant");
+            var noise_height_weight = this.config.get("terrain.noise_height_weight");
+            var noise_height_polarize = this.config.get("terrain.noise_height_polarize");
+            var noise_gradient_weight = this.config.get("terrain.noise_gradient_weight");
+            var noise_gradient_polarize = this.config.get("terrain.noise_gradient_polarize");
+
             var _loop = function _loop() {
                 var tile = _this.open_set_sorted.shift();
                 _this.get_neighbours(tile).forEach(function (neighbour) {
@@ -20093,14 +20107,13 @@ var Geography = function () {
                         var ny = neighbour.pos.y;
                         // Diagonal neighbours are further away so they should be affected more.
                         var orientation_mod = x !== nx && y !== ny ? 1.414 : 1;
-                        var height_diff = Math.max(_this.noise[x][y], 0);
-                        var unevenness = Math.max(_this.noise[x][y] - _this.noise[nx][ny] + 0.03, 0);
-                        var jitter = _this.noise[x][y] - _this.noise[nx][ny] + 0.3;
-                        neighbour.height = tile.height + 0.01;
-                        neighbour.height += orientation_mod * Math.pow(height_diff, 3);
-                        neighbour.height += orientation_mod * unevenness;
-                        // neighbour.height += orientation_mod * jitter;
-                        // neighbour.height += orientation_mod * Math.random() * 0.2;
+                        // Basic value of the point on the noise map.
+                        var height_diff = noise_height_weight * Math.max(_this.noise[x][y], 0);
+                        // Gradient of the slope between point and the one the algorithm is flooding out to.
+                        var unevenness = noise_gradient_weight * 2 * Math.max(_this.noise[x][y] - _this.noise[nx][ny] + 0.03, 0);
+                        neighbour.height = tile.height + height_constant;
+                        neighbour.height += orientation_mod * Math.pow(height_diff, noise_height_polarize);
+                        neighbour.height += orientation_mod * Math.pow(unevenness, noise_gradient_polarize);
                         _this.open_set_sorted.push(neighbour);
                     }
                     if (neighbour.height > _this.enviroment.highest_point) {
@@ -20589,9 +20602,6 @@ exports.Noise = Noise;
  */
 
 Object.defineProperty(exports, "__esModule", { value: true });
-/* A sample frontend for the algorithm described at
- * https://github.com/mrdunk/flowing-terrain */
-var $ = require("jquery");
 require("bootstrap");
 var flowing_terrain_1 = require("./flowing_terrain");
 var genesis_1 = require("./genesis");
@@ -20637,6 +20647,16 @@ window.onload = function () {
     config.set_callback("noise.mid_octave_weight", noise_octaves_callback);
     config.set_if_null("noise.high_octave_weight", 0.2);
     config.set_callback("noise.high_octave_weight", noise_octaves_callback);
+    config.set_if_null("terrain.height_constant", 0.01);
+    config.set_callback("terrain.height_constant", terrain_callback);
+    config.set_if_null("terrain.noise_height_weight", 1.0);
+    config.set_callback("terrain.noise_height_weight", terrain_callback);
+    config.set_if_null("terrain.noise_height_polarize", 1.0);
+    config.set_callback("terrain.noise_height_polarize", terrain_callback);
+    config.set_if_null("terrain.noise_gradient_weight", 1.0);
+    config.set_callback("terrain.noise_gradient_weight", terrain_callback);
+    config.set_if_null("terrain.noise_gradient_polarize", 1.0);
+    config.set_callback("terrain.noise_gradient_polarize", terrain_callback);
     config.set_if_null("display.river_threshold", 10);
     config.set_callback("display.river_threshold", function (key, value) {
         display.set_rivers(value);
@@ -20674,7 +20694,7 @@ window.onload = function () {
     function generate_terrain() {
         geography = time("geography", function () {
             if (geography === null) {
-                return new flowing_terrain_1.Geography(enviroment, seabed, noise.data_combined);
+                return new flowing_terrain_1.Geography(enviroment, config, seabed, noise.data_combined);
             } else {
                 geography.terraform(enviroment, seabed, noise.data_combined);
                 return geography;
@@ -20702,6 +20722,7 @@ window.onload = function () {
     display.engine.runRenderLoop(function () {
         display.scene.render();
     });
+    display.set_view("up");
     // UI components below this point.
     // Resize the window.
     function onResize() {
@@ -20843,24 +20864,17 @@ window.onload = function () {
         generate_terrain();
     });
     // Callback for adjusting detail of the seed_point map.
-    var seed_threshold_timer_fast = 0;
-    var seed_threshold_timer_slow = 0;
+    var timer_fast = 0;
     function seed_threshold_callback(keys, value) {
         // Only change the minimap every 200ms, even if more updates are sent.
-        if (seed_threshold_timer_fast === 0) {
-            seed_threshold_timer_fast = setTimeout(function () {
+        if (timer_fast === 0) {
+            timer_fast = setTimeout(function () {
                 config.set("seed_points.random_seed", "" + new Date().getTime());
                 generate_seed_points();
-                seed_threshold_timer_fast = 0;
+                timer_fast = 0;
             }, 200);
         }
-        // Only change the 3d display every 2 seconds.
-        if (seed_threshold_timer_slow === 0) {
-            seed_threshold_timer_slow = setTimeout(function () {
-                generate_terrain();
-                seed_threshold_timer_slow = 0;
-            }, 2000);
-        }
+        terrain_callback(keys, value);
     }
     // Button to regenerate all aspects of the noise map.
     var menu_noise = document.getElementById("noise");
@@ -20870,21 +20884,24 @@ window.onload = function () {
     });
     // Callback to set noise octaves.
     // This single callback will work for all octaves.
-    var noise_timer_fast = 0;
-    var noise_timer_slow = 0;
     function noise_octaves_callback(keys, value) {
         // Only do this every 200ms, even if more updates are sent.
-        if (noise_timer_fast === 0) {
-            noise_timer_fast = setTimeout(function () {
+        if (timer_fast === 0) {
+            timer_fast = setTimeout(function () {
                 generate_noise();
-                noise_timer_fast = 0;
+                timer_fast = 0;
             }, 200);
         }
+        terrain_callback(keys, value);
+    }
+    // Callback to regenerate terrain after settings change.
+    var timer_slow = 0;
+    function terrain_callback(keys, value) {
         // Only change the 3d display every 2 seconds.
-        if (noise_timer_slow === 0) {
-            noise_timer_slow = setTimeout(function () {
+        if (timer_slow === 0) {
+            timer_slow = setTimeout(function () {
                 generate_terrain();
-                noise_timer_slow = 0;
+                timer_slow = 0;
             }, 2000);
         }
     }
@@ -20910,22 +20927,26 @@ window.onload = function () {
     // Create a permanent link to the current map.
     function menu_link_button_handler(event) {
         console.log(navigator.clipboard);
+        var menu_link = document.getElementById("link");
         if (navigator.clipboard !== undefined) {
-            // TODO: This only works on chrome.
             navigator.clipboard.writeText(config.url.toString()).then(function () {
-                /* clipboard successfully set */
-                $('.toast').toast('show');
+                // clipboard write success.
+                menu_link.querySelector(".success").classList.add("show");
             }, function () {
-                /* clipboard write failed */
+                // clipboard write failed
+                menu_link.querySelector(".fail").classList.add("show");
                 console.log("Failed to copy " + config.url.toString() + " to paste buffer.");
             });
+        } else {
+            console.log("Failed to copy " + config.url.toString() + " to paste buffer.");
         }
         // window.open(config.url.toString());
         var hyperlink = document.getElementById("permalink");
         hyperlink.href = config.url.toString();
     }
-    var menu_link_button = document.getElementById("link");
-    menu_link_button.addEventListener("click", menu_link_button_handler);
+    var menu_link = document.getElementById("link");
+    var button = menu_link.shadowRoot.querySelector("button");
+    button.addEventListener("click", menu_link_button_handler, false);
     // Return focus to canvas after any menu is clicked so keyboard controls
     // work.
     window.addEventListener("mouseup", function (event) {
@@ -20935,7 +20956,7 @@ window.onload = function () {
     });
 };
 
-},{"./2d_view":15,"./3d_view":16,"./config":17,"./custom_html_elements":18,"./flowing_terrain":19,"./genesis":20,"@webcomponents/webcomponentsjs/custom-elements-es5-adapter.js":1,"bootstrap":3,"jquery":5}],22:[function(require,module,exports){
+},{"./2d_view":15,"./3d_view":16,"./config":17,"./custom_html_elements":18,"./flowing_terrain":19,"./genesis":20,"@webcomponents/webcomponentsjs/custom-elements-es5-adapter.js":1,"bootstrap":3}],22:[function(require,module,exports){
 "use strict";
 /*
 # MIT License
