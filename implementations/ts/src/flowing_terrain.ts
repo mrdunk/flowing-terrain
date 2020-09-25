@@ -161,7 +161,7 @@ export class Geography {
           // Basic value of the point on the noise map.
           const height_diff = noise_height_weight * Math.max(this.noise[x][y], 0);
           // Gradient of the slope between point and the one the algorithm is flooding out to.
-          const unevenness = ( noise_gradient_weight * 2 * 
+          const unevenness = ( noise_gradient_weight * 2 *
             Math.max((this.noise[x][y] - this.noise[nx][ny]) + 0.03, 0));
 
           neighbour.height = tile.height + height_constant;

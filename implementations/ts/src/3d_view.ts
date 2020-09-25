@@ -68,7 +68,7 @@ export class Display3d extends DisplayBase {
     this.camera.checkCollisions = true;
     this.camera.ellipsoid = new BABYLON.Vector3(0.5, 0.5, 0.5);
     this.camera.updateUpVectorFromRotation = true;
-    
+
     // Higher the less sensitive.
     this.camera.touchMoveSensibility = 200;
     this.camera.touchAngularSensibility = 60000;
@@ -248,7 +248,7 @@ export class Display3d extends DisplayBase {
     if(height00 === 0 && height10 === 0 && height01 === 0 && height11 === 0) {
       // The tile we are considering drawing is at the same height as the seabed.
       // More efficient to just draw a single "seabed" tile under the whole map.
-      //return;
+      // return;
     }
 
     const height_lowest = Math.min(Math.min(Math.min(height00, height10), height01), height11);

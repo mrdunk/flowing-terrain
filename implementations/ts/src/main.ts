@@ -33,7 +33,7 @@ import {seed_points, seed_points_to_array, Noise} from "./genesis";
 import {draw_2d} from "./2d_view";
 import {Display3d} from "./3d_view";
 import {Config} from "./config";
-import '@webcomponents/webcomponentsjs/custom-elements-es5-adapter.js'; 
+import '@webcomponents/webcomponentsjs/custom-elements-es5-adapter.js';
 import {CollapsibleMenu} from "./custom_html_elements";
 
 // Hack to force ./custom_html_elements to be loaded.
@@ -90,7 +90,7 @@ window.onload = () => {
   config.set_callback("terrain.noise_gradient_weight", terrain_callback);
   config.set_if_null("terrain.noise_gradient_polarize", 1.0);
   config.set_callback("terrain.noise_gradient_polarize", terrain_callback);
-  
+
   config.set_if_null("display.river_threshold", 10);
   config.set_callback("display.river_threshold", (key: string, value: any) => {
     display.set_rivers(value);
@@ -328,10 +328,10 @@ window.onload = () => {
 
 
   // Create a permanent link to the current map.
-  function menu_link_button_handler(event: Event) {
-    console.log(navigator.clipboard);
-    const menu_link = document.getElementById("link");
+  const menu_link = document.getElementById("link");
+  const button = menu_link.shadowRoot.querySelector("button");
 
+  function menu_link_button_handler(event: Event) {
     if(navigator.clipboard !== undefined) {
       navigator.clipboard.writeText(config.url.toString()).then(() => {
         // clipboard write success.
@@ -349,8 +349,6 @@ window.onload = () => {
     const hyperlink: HTMLAnchorElement = document.getElementById("permalink") as HTMLAnchorElement;
     hyperlink.href = config.url.toString();
   }
-  const menu_link = document.getElementById("link");
-  const button = menu_link.shadowRoot.querySelector("button");
   button.addEventListener("click", menu_link_button_handler, false);
 
 

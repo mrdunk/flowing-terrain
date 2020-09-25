@@ -19178,7 +19178,7 @@ var Display3d = function (_flowing_terrain_1$Di) {
             if (height00 === 0 && height10 === 0 && height01 === 0 && height11 === 0) {
                 // The tile we are considering drawing is at the same height as the seabed.
                 // More efficient to just draw a single "seabed" tile under the whole map.
-                //return;
+                // return;
             }
             var height_lowest = Math.min(Math.min(Math.min(height00, height10), height01), height11);
             // Each square on the map is tiled with 2 triangles. It is important to
@@ -20925,9 +20925,9 @@ window.onload = function () {
     var menu_inspector = document.getElementById("inspector");
     menu_inspector.addEventListener("click", menu_inspector_handler);
     // Create a permanent link to the current map.
+    var menu_link = document.getElementById("link");
+    var button = menu_link.shadowRoot.querySelector("button");
     function menu_link_button_handler(event) {
-        console.log(navigator.clipboard);
-        var menu_link = document.getElementById("link");
         if (navigator.clipboard !== undefined) {
             navigator.clipboard.writeText(config.url.toString()).then(function () {
                 // clipboard write success.
@@ -20944,8 +20944,6 @@ window.onload = function () {
         var hyperlink = document.getElementById("permalink");
         hyperlink.href = config.url.toString();
     }
-    var menu_link = document.getElementById("link");
-    var button = menu_link.shadowRoot.querySelector("button");
     button.addEventListener("click", menu_link_button_handler, false);
     // Return focus to canvas after any menu is clicked so keyboard controls
     // work.
