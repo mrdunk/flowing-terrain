@@ -26,6 +26,7 @@
  * https://github.com/mrdunk/flowing-terrain */
 
 import * as BABYLON from 'babylonjs';
+import {WaterMaterial} from 'babylonjs-materials';
 import {Geography, Tile, DisplayBase, Coordinate} from "./flowing_terrain"
 import {Config} from "./config"
 
@@ -59,11 +60,12 @@ export class Display3d extends DisplayBase {
     this.engine = new BABYLON.Engine(this.canvas, true);
     this.scene = new BABYLON.Scene(this.engine);
     const mapsize = this.tile_size * this.geography.enviroment.tile_count;
+
     this.camera = new BABYLON.UniversalCamera(
       "UniversalCamera",
       new BABYLON.Vector3(0, 0, 0),
       this.scene);
-
+    this.camera.inputs.addMouseWheel();
     this.camera.position = new BABYLON.Vector3(-mapsize / 4, mapsize / 4, -mapsize / 4);
     this.camera.checkCollisions = true;
     this.camera.ellipsoid = new BABYLON.Vector3(0.5, 0.5, 0.5);
@@ -95,7 +97,7 @@ export class Display3d extends DisplayBase {
     this.land_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
     // this.land_material.backFaceCulling = false;
 
-    this.seabed_material = new BABYLON.StandardMaterial("sea_material", this.scene);
+    this.seabed_material = new BABYLON.StandardMaterial("seabed_material", this.scene);
     this.seabed_material.diffuseColor = new BABYLON.Color3(0.3, 0.7, 0.2);
     this.seabed_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
     // this.seabed_material.backFaceCulling = false;
