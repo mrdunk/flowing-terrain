@@ -26,6 +26,7 @@
  * https://github.com/mrdunk/flowing-terrain */
 
 import * as BABYLON from 'babylonjs';
+import {WaterMaterial} from 'babylonjs-materials';
 import {Geography, Tile, DisplayBase, Coordinate} from "./flowing_terrain"
 import {Config} from "./config"
 
@@ -59,16 +60,17 @@ export class Display3d extends DisplayBase {
     this.engine = new BABYLON.Engine(this.canvas, true);
     this.scene = new BABYLON.Scene(this.engine);
     const mapsize = this.tile_size * this.geography.enviroment.tile_count;
+
     this.camera = new BABYLON.UniversalCamera(
       "UniversalCamera",
       new BABYLON.Vector3(0, 0, 0),
       this.scene);
-
+    this.camera.inputs.addMouseWheel();
     this.camera.position = new BABYLON.Vector3(-mapsize / 4, mapsize / 4, -mapsize / 4);
     this.camera.checkCollisions = true;
     this.camera.ellipsoid = new BABYLON.Vector3(0.5, 0.5, 0.5);
     this.camera.updateUpVectorFromRotation = true;
-    
+
     // Higher the less sensitive.
     this.camera.touchMoveSensibility = 200;
     this.camera.touchAngularSensibility = 60000;
@@ -95,7 +97,7 @@ export class Display3d extends DisplayBase {
     this.land_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
     // this.land_material.backFaceCulling = false;
 
-    this.seabed_material = new BABYLON.StandardMaterial("sea_material", this.scene);
+    this.seabed_material = new BABYLON.StandardMaterial("seabed_material", this.scene);
     this.seabed_material.diffuseColor = new BABYLON.Color3(0.3, 0.7, 0.2);
     this.seabed_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
     // this.seabed_material.backFaceCulling = false;
@@ -173,7 +175,6 @@ export class Display3d extends DisplayBase {
 
     this.camera.rotation = rot_start;
     this.camera.position = pos_start;
-    console.log(rot_start, rot_target, Math.abs(rot_start.y - rot_target.y));
 
     if(Math.abs(rot_start.y - rot_target.y) > Math.PI) {
       if(rot_start.y < 0) {
@@ -249,7 +250,7 @@ export class Display3d extends DisplayBase {
     if(height00 === 0 && height10 === 0 && height01 === 0 && height11 === 0) {
       // The tile we are considering drawing is at the same height as the seabed.
       // More efficient to just draw a single "seabed" tile under the whole map.
-      return;
+      // return;
     }
 
     const height_lowest = Math.min(Math.min(Math.min(height00, height10), height01), height11);

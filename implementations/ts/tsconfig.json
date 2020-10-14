@@ -6,15 +6,16 @@
      "src/config.ts",
      "src/genesis.ts",
      "src/main.ts",
-     "src/ordered_set.ts"
+     "src/ordered_set.ts",
+     "src/custom_html_elements.ts"
    ],
   "compilerOptions": {
     "noImplicitAny": true,
-		"target": "es2017",
-		"types": [
-			"babylonjs",
-			"babylonjs-gui",
-			"babylonjs-materials"
-		]
+    "target": "es2017",
+    "types": [
+      "babylonjs",
+      "babylonjs-gui",
+      "babylonjs-materials"
+    ]
   }
 }

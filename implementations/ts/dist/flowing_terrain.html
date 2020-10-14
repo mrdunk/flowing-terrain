@@ -8,70 +8,49 @@
     <link rel="stylesheet" href="./main.css">
   </head>
   <body>
+    
+    <div id="loader">
+      <div id="loader_content" class="spinner-grow text-success" role="status">
+        <span class="sr-only">Loading...</span>
+      </div>
+    </div>
 
     <div class="" id="main">
 
       <div class="float-panel">
-
-        <div class="collapse-menu" id="info-menu" group="left">
-          <div class="collapse-menu-collapser collapse-menu-button">
-            <button type="button" class="btn btn-primary" aria-label="toggle_menu">
-              <img src="./assets/info-circle.svg" width="30" height="30" title="Wat? What is this all about then?">
-            </button>
-          </div>
-
-          <div class="collapse-menu-collapser collapse-menu-content border shadow rounded show">
-            <div class="transparent card card-body">
-
-              <button type="button" class="close overlay collapse-menu-close" aria-label="toggle_menu">
-                <span aria-hidden="true">&times;</span>
-              </button>
-
-              <div class="border bg-white" id="about">
-                <div>This project is intended to document a simple algorithm for creating 3 dimensional terrain maps and their likely watercourses.</div>
-                <div>An explanation of the algorithm can be found here:
-                  <a href="https://github.com/mrdunk/flowing-terrain">https://github.com/mrdunk/flowing-terrain</a>
-                </div>
-                <div><br>The map you see is randomly generated. For a new map, regenerate one of the sources under the Tool->Geography menu.</div>
-                <div>Cursor keys and mouse to move around.</div>
-                <div><br>This demonstration is made posible by the following projects:</div>
-                <div>
-                  <a href="https://www.typescriptlang.org/">TypeScript</a>. A much saner alternative to vanilla JavaScript in my opinion.
-                </div>
-                <div>The excellent
-                  <a href="https://www.babylonjs.com/">Babylon.js</a> web rendering library.
-                </div>
-                <div>
-                  <a href="https://www.typescriptlang.org/">
-                    <img class="logo" src="./assets/ts-lettermark-white.svg" alt="TypeScript logo">
-                  </a>
-                  <a href="https://www.babylonjs.com/">
-                    <img class="logo" src="./assets/babylonjs_identity_color.svg" alt="Bablyon.js logo">
-                  </a>
-                </div>
-              </div>
-
+        <collapsable-menu label="info" img="./assets/info-circle.svg" id="info" group="left" active="true">
+          <div class="content border">
+            <div>This project is intended to document a simple algorithm for creating 3 dimensional terrain maps and their likely watercourses.</div>
+            <div>An explanation of the algorithm can be found here:
+              <a href="https://github.com/mrdunk/flowing-terrain">https://github.com/mrdunk/flowing-terrain</a>
+            </div>
+            <div><br>The map you see is randomly generated. For a new map, regenerate one of the sources under the Tool->Geography menu.</div>
+            <div>Cursor keys and mouse to move around.</div>
+            <div><br>This demonstration is made posible by the following projects:</div>
+            <div>
+              <a href="https://www.typescriptlang.org/">TypeScript</a>. A much saner alternative to vanilla JavaScript in my opinion.
+            </div>
+            <div>The excellent
+              <a href="https://www.babylonjs.com/">Babylon.js</a> web rendering library.
+            </div>
+            <div>
+              <a href="https://www.typescriptlang.org/">
+                <img class="logo" src="./assets/ts-lettermark-white.svg" alt="TypeScript logo">
+              </a>
+              <a href="https://www.babylonjs.com/">
+                <img class="logo" src="./assets/babylonjs_identity_color.svg" alt="Bablyon.js logo">
+              </a>
             </div>
           </div>
-        </div>
+        </collapsable-menu>
 
-        <div class="collapse-menu" id="config-menu" group="left">
-          <div class="collapse-menu-collapser collapse-menu-button show">
-            <button type="button" class="btn btn-primary" aria-label="toggle_menu">
-              <img src="./assets/wrench.svg" width="30" height="30" title="Configure your world">
-            </button>
-          </div>
-
-          <div class="collapse-menu-collapser collapse-menu-content border shadow rounded">
-            <div class="transparent card card-body">
-
-              <button type="button" class="close overlay collapse-menu-close" aria-label="toggle_menu">
-                <span aria-hidden="true">&times;</span>
-              </button>
+        <collapsable-menu label="config" img="./assets/wrench.svg" id="config" group="left">
+          <div class="content border">
 
               <div class="nav nav-tabs" id="myTab" role="tablist">
                 <a class="nav-link active" id="geography-tab" data-toggle="tab" href="#geography" role="tab" aria-controls="geography" aria-selected="false">Geography</a>
                 <a class="nav-link" id="environment-tab" data-toggle="tab" href="#environment" role="tab" aria-controls="environment" aria-selected="false">Enviroment</a>
+                <a class="nav-link" id="debug-tab" data-toggle="tab" href="#debug" role="tab" aria-controls="debug" aria-selected="false">Debug</a>
               </div>
 
               <div class="tab-content">
@@ -81,27 +60,15 @@
 
                     <div class="col-sm">
                       <div class="border higher-vis">
-                        <div class="form-group range-wrap input-wrap" title="Set the sealevel">
-                          <label for="seaLevel">Sea Level:&nbsp;<output class="bubble"></output></label>
-                          <input type="range" class="form-control-range range input" id="seaLevel" name="geography.sealevel" min="0" max="10" step="0.1" value="1">
-                        </div>
-                      </div>
-                      <div class="border higher-vis">
-                        <div class="form-group range-wrap input-wrap" title="Set the transparency of the sea">
-                          <label for="sea_transparency">Sea Transparency:&nbsp;<output class="bubble"></output></label>
-                          <input type="range" class="form-control-range range input" id="sea_transparency" name="display.sea_transparency" min="0" max="1" step="0.05" value="0.5">
-                        </div>
-                      </div>
-                      <div class="border higher-vis">
-                        <div class="form-group range-wrap input-wrap" title="Set how visible rivers are">
-                          <label for="river_threshold">River Likelihood:&nbsp;<output class="bubble"></output></label>
-                          <input type="range" class="form-control-range range input" id="river_threshold" name="display.river_threshold" min="0" max="20" value="10">
-                        </div>
-                      </div>
-                      <div class="border higher-vis">
-                        <div>
-                          <input type="button" id="inspector" name="inspector" value="Launch Inspector">
-                        </div>
+                        <feedback-slider id="sealevel" title="Set the sealevel" name="geography.sealevel" min="0" max="10" step="0.1" value="1">
+                          Sea Level
+                        </feedback-slider>
+                        <feedback-slider id="sea_transparency" title="Set the transparency of the sea" name="display.sea_transparency" min="0" max="1" step="0.05" value="0.5">
+                          Sea Transparency
+                        </feedback-slider>
+                        <feedback-slider id="river_threshold" title="Set how visible rivers are" name="display.river_threshold" min="0" max="20" value="10">
+                          River Likelihood
+                        </feedback-slider>
                       </div>
                     </div>
 
@@ -128,10 +95,10 @@
                         </div>
                       </div>
                       <div class="border higher-vis">
-                        <div class="form-group show-tooltip range-wrap input-wrap" title="Left=More land less water&#010;Right=More water less land">
-                          <label for="seed_threshold">Threshold: <output class="bubble"></output> </label>
-                          <input type="range" class="form-control-range range input" id="seed_threshold" name="seed_points.threshold" min="0.15" max="0.26" value="0.22" step="0.002">
-                        </div>
+                        <feedback-slider title="Left=More land less water&#010;Right=More water less land" id="seed_threshold"
+                            name="seed_points.threshold" min="0.15" max="0.26" value="0.22" step="0.002">
+                          Threshold
+                        </feedback-slider>
                       </div>
                     </div>
 
@@ -145,36 +112,39 @@
                           </button>
                         </div>
                       </div>
+
                       <div class="border higher-vis">
-                        <div class="form-group range-wrap input-wrap m-0" title="Set number of low frequency (long wavelength) octaves">
-                          <label for="noise_low_octave" class="m-0 p-0">Low octave components: <output class="bubble"></output> </label>
-                          <input type="range" class="form-control-range range input" id="noise_low_octave" name="noise.low_octave" min="0" max="10" value="3">
-                        </div>
-                        <div class="form-group range-wrap input-wrap m-0" title="Weight of low frequency (long wavelength) octaves">
-                          <label for="noise_low_octave_weight" class="m-0 p-0">Weight: <output class="bubble"></output> </label>
-                          <input type="range" class="form-control-range range input" id="noise_low_octave_weight" name="noise.low_octave_weight" min="0" max="4" value="1" step="0.01">
-                        </div>
+                        <feedback-slider title="Set number of low frequency (long wavelength) octaves. Complexity of the big features." id="noise_low_octave"
+                            name="noise.low_octave" min="0" max="10" value="3">
+                          Low octave components
+                        </feedback-slider>
+                        <feedback-slider title="Weight of low frequency (long wavelength) octaves. How pronounced the big features are." id="noise_low_octave_weight"
+                            name="noise.low_octave_weight" min="0" max="4" value="1" step="0.01">
+                          Weight
+                        </feedback-slider>
                       </div>
+                      
                       <div class="border higher-vis">
-                        <div class="form-group range-wrap input-wrap m-0" title="Set number of mid frequency octaves">
-                          <label for="noise_mid_octave" class="m-0 p-0">Mid octave components: <output class="bubble"></output> </label>
-                          <input type="range" class="form-control-range range input" id="noise_mid_octave" name="noise.mid_octave" min="0" max="10" value="3">
-                        </div>
-                        <div class="form-group range-wrap input-wrap m-0" title="Weight of mid frequency (long wavelength) octaves">
-                          <label for="noise_mid_octave_weight" class="m-0 p-0">Weight: <output class="bubble"></output> </label>
-                          <input type="range" class="form-control-range range input" id="noise_mid_octave_weight" name="noise.mid_octave_weight" min="0" max="3" value="1" step="0.01">
-                        </div>
+                        <feedback-slider title="Set number of mid frequency octaves. Complexity of the medeum sized features." id="noise_mid_octave"
+                            name="noise.mid_octave" min="0" max="10" value="3">
+                          Mid octave components
+                        </feedback-slider>
+                        <feedback-slider title="Set number of mid frequency octaves. How pronounced the medeum sized features are." id="noise_mid_octave_weight"
+                            name="noise.mid_octave_weight" min="0" max="3" value="1" step="0.01">
+                          Weight
+                        </feedback-slider>
                       </div>
+                      
                       <div class="border higher-vis">
-                        <div class="form-group range-wrap input-wrap m-0" title="Set number of high frequency (short wavelength) octaves">
-                          <label for="noise_high_octave" class="m-0 p-0">High octave components: <output class="bubble"></output> </label>
-                          <input type="range" class="form-control-range range input" id="noise_high_octave" name="noise.high_octave" min="0" max="20" value="10">
-                        </div>
-                        <div class="form-group range-wrap input-wrap m-0" title="Weight of high frequency (long wavelength) octaves">
-                          <label for="noise_high_octave_weight" class="m-0 p-0">Weight: <output class="bubble"></output> </label>
-                          <input type="range" class="form-control-range range input" id="noise_high_octave_weight" name="noise.high_octave_weight" min="0" max="2" value="1" step="0.01">
-                        </div>
+                        <feedback-slider title="Set number of high frequency (short wavelength) octaves. The fine detail." id="noise_high_octave" name="noise.high_octave" min="0" max="20" value="10">
+                          High octave components
+                        </feedback-slider>
+                        <feedback-slider title="Weight of high frequency (long wavelength) octaves. How pronounced the fine detail is." id="noise_high_octave_weight"
+                            name="noise.high_octave_weight" min="0" max="2" value="1" step="0.01">
+                          Weight
+                        </feedback-slider>
                       </div>
+                      
                       <div class="collapse show border higher-vis" aria-expanded="true">
                         <div style="height: 200px;" class="small overflow-auto mh-10 text-nowrap" id="height_debug">
                         </div>
@@ -187,119 +157,130 @@
                         <p>Output</p>
                       </div>
 
+                      <div class="border higher-vis">
+                        <feedback-slider title="Add a constant value with each step of the algorithm. Turn this up high for a single 'pointy' island." id="terrain_height_constant"
+                            name="terrain.height_constant" min="0.01" max="1" value="0.01" step="0.01">
+                          Constant
+                        </feedback-slider>
+                      </div>
+                      
+                      <div class="border higher-vis">
+                        <feedback-slider title="How big the mountainranges are." id="terrain_noise_height_weight"
+                            name="terrain.noise_height_weight" min="0" max="5" value="1" step="0.1">
+                          Noise value effect
+                        </feedback-slider>
+                        <feedback-slider title="The contrast between mountan ranges and plains." id="terrain_noise_height_polarize"
+                            name="terrain.noise_height_polarize" min="0.1" max="5" value="1" step="0.1">
+                          Noise value polarization
+                        </feedback-slider>
+                      </div>
+                      
+                      <div class="border higher-vis">
+                        <feedback-slider title="How uneven the terrain is." id="terrain_noise_gradient_weight"
+                            name="terrain.noise_gradient_weight" min="0" max="5" value="1" step="0.1">
+                          Noise gradient effect
+                        </feedback-slider>
+                        <feedback-slider title="Contrast between high and low bits." id="terrain_noise_gradient_polarize"
+                            name="terrain.noise_gradient_polarize" min="0.1" max="5" value="1" step="0.1">
+                          Noise gradient polarization
+                        </feedback-slider>
+                      </div>
+
                     </div>
 
                   </div>
                 </div>
+
+                <div class="tab-pane fade" id="debug" role="tabpanel">
+                      <div class="border higher-vis">
+                        <div>
+                          <input type="button" id="inspector" name="inspector" value="Launch Inspector">
+                        </div>
+                      </div>
+                </div>
+
               </div>
-
-            </div>
           </div>
-        </div>
-
+        </collapsable-menu>
       </div>
+
       <div class="float-panel right">
 
-        <div class="collapse-menu-button show">
-          <button id="link" type="button" class="btn btn-primary" aria-label="toggle_menu">
-            <img src="./assets/link-45deg.svg" width="30" height="30" title="Create permanent link to the current map">
-          </button>
-        </div>
-
-        <div class="collapse-menu" id="view-menu">
-          <div class="collapse-menu-collapser collapse-menu-button">
-            <button type="button" class="btn btn-primary" aria-label="toggle_menu">
-              <img src="./assets/globe2.svg" width="30" height="30" title="Adjust view options">
-            </button>
+        <collapsable-menu label="link" img="./assets/link-45deg.svg" id="link" group="right">
+          <div class="content border">
+            <div class="success">
+              Link has been saved to your computer's paste buffer.<br>
+            </div>
+            <div class="fail">
+              Could not save link to your computer's paste buffer.<br>
+            </div>
+            Click <a href="#" id="permalink">here</a> to visit.<br>
+            Click <a href="./flowing_terrain.html" id="clear_link">here</a> to clear an existing permalink and generate a new map.
           </div>
+        </collapsable-menu>
 
-          <div class="collapse-menu-collapser collapse-menu-content border shadow rounded show">
-            <div class="transparent card card-body">
+        <collapsable-menu label="views" img="./assets/globe2.svg" id="views" group="right">
+          <div class="content border">
 
-              <button type="button" class="close overlay collapse-menu-close" aria-label="toggle_menu">
-                <span aria-hidden="true">&times;</span>
-              </button>
-
-              <div id="views">
-                <div>
-                  <div class="my-button">
-                    <button id="arrow-down-right" type="button" class="btn btn-primary">
-                      <img src="./assets/arrow-down-right.svg" width="30" height="30" title="Adjust view">
-                    </button>
-                  </div>
-                  <div class="my-button">
-                    <button id="arrow-down" type="button" class="btn btn-primary">
-                      <img src="./assets/arrow-down.svg" width="30" height="30" title="Adjust view">
-                    </button>
-                  </div>
-                  <div class="my-button">
-                    <button id="arrow-down-left" type="button" class="btn btn-primary">
-                      <img src="./assets/arrow-down-left.svg" width="30" height="30" title="Adjust view">
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <div class="my-button">
-                    <button id="arrow-right" type="button" class="btn btn-primary">
-                      <img src="./assets/arrow-right.svg" width="30" height="30" title="Adjust view">
-                    </button>
-                  </div>
-                  <div class="my-button">
-                    <button id="arrow-overhead" type="button" class="btn btn-primary">
-                      <img src="./assets/square.svg" width="30" height="30" title="Overhead view">
-                    </button>
-                  </div>
-                  <div class="my-button">
-                    <button id="arrow-left" type="button" class="btn btn-primary">
-                      <img src="./assets/arrow-left.svg" width="30" height="30" title="Adjust view">
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <div class="my-button">
-                    <button id="arrow-up-right" type="button" class="btn btn-primary">
-                      <img src="./assets/arrow-up-right.svg" width="30" height="30" title="Adjust view">
-                    </button>
-                  </div>
-                  <div class="my-button">
-                    <button id="arrow-up" type="button" class="btn btn-primary">
-                      <img src="./assets/arrow-up.svg" width="30" height="30" title="Adjust view">
-                    </button>
-                  </div>
-                  <div class="my-button">
-                    <button id="arrow-up-left" type="button" class="btn btn-primary">
-                      <img src="./assets/arrow-up-left.svg" width="30" height="30" title="Adjust view">
-                    </button>
-                  </div>
-                </div>
+            <div>
+              <div class="my-button">
+                <button id="arrow-down-right" type="button" class="btn btn-primary">
+                  <img src="./assets/arrow-down-right.svg" width="30" height="30" title="Adjust view">
+                </button>
               </div>
-
+              <div class="my-button">
+                <button id="arrow-down" type="button" class="btn btn-primary">
+                  <img src="./assets/arrow-down.svg" width="30" height="30" title="Adjust view">
+                </button>
+              </div>
+              <div class="my-button">
+                <button id="arrow-down-left" type="button" class="btn btn-primary">
+                  <img src="./assets/arrow-down-left.svg" width="30" height="30" title="Adjust view">
+                </button>
+              </div>
+            </div>
+            <div>
+              <div class="my-button">
+                <button id="arrow-right" type="button" class="btn btn-primary">
+                  <img src="./assets/arrow-right.svg" width="30" height="30" title="Adjust view">
+                </button>
+              </div>
+              <div class="my-button">
+                <button id="arrow-overhead" type="button" class="btn btn-primary">
+                  <img src="./assets/square.svg" width="30" height="30" title="Overhead view">
+                </button>
+              </div>
+              <div class="my-button">
+                <button id="arrow-left" type="button" class="btn btn-primary">
+                  <img src="./assets/arrow-left.svg" width="30" height="30" title="Adjust view">
+                </button>
+              </div>
+            </div>
+            <div>
+              <div class="my-button">
+                <button id="arrow-up-right" type="button" class="btn btn-primary">
+                  <img src="./assets/arrow-up-right.svg" width="30" height="30" title="Adjust view">
+                </button>
+              </div>
+              <div class="my-button">
+                <button id="arrow-up" type="button" class="btn btn-primary">
+                  <img src="./assets/arrow-up.svg" width="30" height="30" title="Adjust view">
+                </button>
+              </div>
+              <div class="my-button">
+                <button id="arrow-up-left" type="button" class="btn btn-primary">
+                  <img src="./assets/arrow-up-left.svg" width="30" height="30" title="Adjust view">
+                </button>
+              </div>
             </div>
           </div>
-        </div>
 
-      </div>
-
-      <div class="toast hide" data-delay="5000">
-        <div class="toast-header">
-          <strong class="mr-auto">Perma-link saved</strong>
-          <small>Just now</small>
-        </div>
-        <div class="toast-body">
-          Link saved to your computer's paste buffer.<br>
-          Click <a href="#" id="permalink">here</a> to visit.<br>
-          Click <a href="./flowing_terrain.html" id="clear_link">here</a> to clear an existing permalink and generate a new map.
-        </div>
+        </collapsable-menu>
       </div>
 
       <canvas id="renderCanvas" touch-action="none"></canvas>
 
 
-    </div>
-    <div id="loader">
-      <div id="loader_content" class="spinner-grow text-success" role="status">
-        <span class="sr-only">Loading...</span>
-      </div>
     </div>
     <script src="bundle.js"></script>
   </body>

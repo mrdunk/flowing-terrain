@@ -28,6 +28,7 @@
 
 import {SortedSet} from "./ordered_set"
 import {draw_2d} from "./2d_view"
+import {Config} from "./config"
 
 export interface Coordinate {
   x: number;
@@ -67,12 +68,17 @@ export class Tile {
 // Data for a procedurally generated map.
 export class Geography {
   enviroment: Enviroment;
+  config: Config;
   seed_points: Set<string>;
   noise: number[][];
   tiles: Tile[][] = [];
   open_set_sorted: SortedSet = new SortedSet([], this.compare_tiles);
 
-  constructor(enviroment: Enviroment, seed_points: Set<string>, noise: number[][]) {
+  constructor(enviroment: Enviroment,
+              config: Config,
+              seed_points: Set<string>,
+              noise: number[][]) {
+    this.config = config;
     this.terraform(enviroment, seed_points, noise);
   }
 
@@ -133,6 +139,12 @@ export class Geography {
 
   // Populate all tiles with height data. Also set the sealevel.
   heights_algorithm(): void {
+    const height_constant = this.config.get("terrain.height_constant");
+    const noise_height_weight = this.config.get("terrain.noise_height_weight");
+    const noise_height_polarize = this.config.get("terrain.noise_height_polarize");
+    const noise_gradient_weight = this.config.get("terrain.noise_gradient_weight");
+    const noise_gradient_polarize = this.config.get("terrain.noise_gradient_polarize");
+
     while(this.open_set_sorted.length) {
       const tile = this.open_set_sorted.shift();
       this.get_neighbours(tile).forEach((neighbour) => {
@@ -146,15 +158,15 @@ export class Geography {
           // Diagonal neighbours are further away so they should be affected more.
           const orientation_mod = (x !== nx && y !== ny) ? 1.414 : 1;
 
-          const height_diff = Math.max(this.noise[x][y], 0);
-          const unevenness = Math.max((this.noise[x][y] - this.noise[nx][ny]) + 0.03, 0);
-          const jitter = this.noise[x][y] - this.noise[nx][ny] + 0.3;
+          // Basic value of the point on the noise map.
+          const height_diff = noise_height_weight * Math.max(this.noise[x][y], 0);
+          // Gradient of the slope between point and the one the algorithm is flooding out to.
+          const unevenness = ( noise_gradient_weight * 2 *
+            Math.max((this.noise[x][y] - this.noise[nx][ny]) + 0.03, 0));
 
-          neighbour.height = tile.height + 0.01;
-          neighbour.height += orientation_mod * Math.pow(height_diff, 3);
-          neighbour.height += orientation_mod * unevenness;
-          // neighbour.height += orientation_mod * jitter;
-          // neighbour.height += orientation_mod * Math.random() * 0.2;
+          neighbour.height = tile.height + height_constant;
+          neighbour.height += orientation_mod * Math.pow(height_diff, noise_height_polarize);
+          neighbour.height += orientation_mod * Math.pow(unevenness, noise_gradient_polarize);
 
           this.open_set_sorted.push(neighbour);
         }

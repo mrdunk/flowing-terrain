@@ -28,11 +28,16 @@
 import * as $ from "jquery";
 import "bootstrap";
 
-import {Enviroment, Geography, Tile} from "./flowing_terrain"
-import {seed_points, seed_points_to_array, Noise} from "./genesis"
-import {draw_2d} from "./2d_view"
-import {Display3d} from "./3d_view"
-import {Config} from "./config"
+import {Enviroment, Geography, Tile} from "./flowing_terrain";
+import {seed_points, seed_points_to_array, Noise} from "./genesis";
+import {draw_2d} from "./2d_view";
+import {Display3d} from "./3d_view";
+import {Config} from "./config";
+import '@webcomponents/webcomponentsjs/custom-elements-es5-adapter.js';
+import {CollapsibleMenu} from "./custom_html_elements";
+
+// Hack to force ./custom_html_elements to be loaded.
+new CollapsibleMenu();
 
 const stats: Record<string, number> = {};
 
@@ -75,6 +80,17 @@ window.onload = () => {
   config.set_if_null("noise.high_octave_weight", 0.2);
   config.set_callback("noise.high_octave_weight", noise_octaves_callback);
 
+  config.set_if_null("terrain.height_constant", 0.01);
+  config.set_callback("terrain.height_constant", terrain_callback);
+  config.set_if_null("terrain.noise_height_weight", 1.0);
+  config.set_callback("terrain.noise_height_weight", terrain_callback);
+  config.set_if_null("terrain.noise_height_polarize", 1.0);
+  config.set_callback("terrain.noise_height_polarize", terrain_callback);
+  config.set_if_null("terrain.noise_gradient_weight", 1.0);
+  config.set_callback("terrain.noise_gradient_weight", terrain_callback);
+  config.set_if_null("terrain.noise_gradient_polarize", 1.0);
+  config.set_callback("terrain.noise_gradient_polarize", terrain_callback);
+
   config.set_if_null("display.river_threshold", 10);
   config.set_callback("display.river_threshold", (key: string, value: any) => {
     display.set_rivers(value);
@@ -115,7 +131,7 @@ window.onload = () => {
   function generate_terrain() {
     geography = time("geography", () => {
       if(geography === null) {
-        return new Geography(enviroment, seabed, noise.data_combined);
+        return new Geography(enviroment, config, seabed, noise.data_combined);
       } else {
         geography.terraform(enviroment, seabed, noise.data_combined);
         return geography;
@@ -149,108 +165,85 @@ window.onload = () => {
     display.scene.render();
   })
 
-  window.addEventListener("resize", () => {
-    display.engine.resize();
-  });
-
+  display.set_view("up");
 
   // UI components below this point.
 
-  // Slider controls.
-  for(const input_wrap of document.getElementsByClassName("input-wrap")) {
-    const input = input_wrap.getElementsByClassName("input")[0] as HTMLInputElement;
-    const bubble = input_wrap.getElementsByClassName("bubble")[0] as HTMLInputElement;
 
-    const stored_value = config.get(input.name, false);
+  // Resize the window.
+  function onResize() {
+    display.engine.resize();
 
-    // console.log(
-    //  input.name,
-    //  input.type === "checkbox" ? input.checked : input.value,
-    //  stored_value
-    // );
+    const width = window.innerWidth
+      || document.documentElement.clientWidth
+      || document.body.clientWidth;
+    const minimum_width = 1110;
 
-    // Make the HTML element match the stored state.
-    if(stored_value !== null) {
-      if(input.type === "checkbox") {
-        input.checked = stored_value;
-      } else {
-        input.value = stored_value;
+    let menus_open = 0;
+    for(const menu of document.getElementsByTagName("collapsable-menu")) {
+      // Count how many menus are open.
+      if(menu.hasAttribute("active") &&
+          menu.getAttribute("active").toLowerCase() === "true") {
+        menus_open += 1;
       }
+
+      if(width <= minimum_width) {
+        // For narrow display, put all menus in same group so only one will be
+        // open at a time.
+        if(!menu.hasAttribute("original-group")) {
+          menu.setAttribute("original-group", menu.getAttribute("group"));
+        }
+        menu.setAttribute("group", "left");
+      } else {
+        // For wider displays, put menus in separate groups.
+        if(menu.hasAttribute("original-group")) {
+          menu.setAttribute("group", menu.getAttribute("original-group"));
+        }
+      }
+    }
+    if(width <= minimum_width && menus_open > 1) {
+      // Wave more than one menu open when display is too narrow to fit them.
+      // Close all menus.
+      for(const menu of document.getElementsByTagName("collapsable-menu")) {
+        menu.setAttribute("active", "false");
+      }
+    }
+  }
+  window.addEventListener("resize", onResize);
+  onResize();
+
+
+  // Initialise Slider controls.
+  for(const node of document.getElementsByTagName("feedback-slider")) {
+    const slider = node as HTMLInputElement;
+    const name = slider.getAttribute("name");
+    console.assert(name !== null && name !== undefined);
+    const stored_value = config.get(name, false);
+
+    // Make the HTML element match the stored state at startup.
+    if(stored_value !== null) {
+      slider.setAttribute("value", stored_value);
     } else {
       console.warn(
-        `Range element does not have coresponding entry in config: ${input.name}`);
-    }
-    if(bubble) {
-      bubble.innerHTML = input.value;
+        `Range element does not have coresponding entry in config: ${name}`);
     }
 
-    // Set up HTML element callback.
-    input.addEventListener("input", () => {
-      const value = input.type === "checkbox" ? input.checked : input.value
-      if(bubble) {
-        bubble.innerHTML = `${value}`;
+    // Set up callback when slider moves.
+    slider.addEventListener("change", () => {
+      if(config.get(name, false) !== null) {
+        // Callback to update map happens as part of the config.set(...).
+        console.assert(typeof slider.value === "string");
+        config.set(name, parseFloat(slider.value));
       }
-      if(config.get(input.name, false) !== null) {
-        // Callback happens as part of the config.set(...).
-        if(typeof value === "string") {
-          config.set(input.name, parseFloat(value));
-        } else {
-          config.set(input.name, value);
-        }
+    });
+    slider.addEventListener("input", () => {
+      if(config.get(name, false) !== null) {
+        // Callback to update map happens as part of the config.set(...).
+        console.assert(typeof slider.value === "string");
+        config.set(name, parseFloat(slider.value));
       }
     });
   }
-
-
-  // Menu controls
-  for(const menu of document.getElementsByClassName("collapse-menu")) {
-    const button = menu.getElementsByClassName("collapse-menu-button")[0] as HTMLInputElement;
-    const content = menu.getElementsByClassName("collapse-menu-content")[0] as HTMLInputElement;
-    const closer = menu.getElementsByClassName("collapse-menu-close")[0] as HTMLInputElement;
-    const buddies: Element[] = [];
-
-
-    // Show the current menu.
-    const show = (button_: HTMLInputElement, content_: HTMLElement) => {
-      if(!content_.classList.contains("show")) {
-        button_.classList.remove("show");
-        content_.classList.add("show");
-      }
-    };
-
-    // Hide the current menu.
-    const hide = (button_: HTMLInputElement, content_: HTMLElement) => {
-      if(content_.classList.contains("show")) {
-        content_.classList.remove("show");
-        button_.classList.add("show");
-      }
-    };
-
-    // Get list of menus with the same "group" attribute set.
-    for(const other_menu of document.getElementsByClassName("collapse-menu")) {
-      if(menu.id !== other_menu.id &&
-          menu.getAttribute("group") &&
-          menu.getAttribute("group") === other_menu.getAttribute("group")) {
-        buddies.push(other_menu);
-      }
-    }
-
-    button.addEventListener("click", (event) => {
-      show(button, content);
-      // Close other menus in same group.
-      buddies.forEach((buddy) => {
-        const buddy_but = buddy.getElementsByClassName(
-          "collapse-menu-button")[0] as HTMLInputElement;
-        const buddy_cont = buddy.getElementsByClassName(
-          "collapse-menu-content")[0] as HTMLInputElement;
-        hide(buddy_but, buddy_cont);
-      });
-    });
-
-    closer.addEventListener("click", (event) => {
-      hide(button, content);
-    });
-  };
 
 
   // Button to regenerate the seed_point map.
@@ -262,25 +255,18 @@ window.onload = () => {
   });
 
 
-  // Callabck for adjusting detail of the seed_point map.
-  let seed_threshold_timer_fast: ReturnType<typeof setTimeout> = 0;
-  let seed_threshold_timer_slow: ReturnType<typeof setTimeout> = 0;
+  // Callback for adjusting detail of the seed_point map.
+  let timer_fast: ReturnType<typeof setTimeout> = 0;
   function seed_threshold_callback(keys: string, value: any) {
     // Only change the minimap every 200ms, even if more updates are sent.
-    if(seed_threshold_timer_fast === 0) {
-      seed_threshold_timer_fast = setTimeout(() => {
+    if(timer_fast === 0) {
+      timer_fast = setTimeout(() => {
         config.set("seed_points.random_seed", `${(new Date()).getTime()}`);
         generate_seed_points();
-        seed_threshold_timer_fast = 0;
+        timer_fast = 0;
       }, 200);
     }
-    // Only change the 3d display every 2 seconds.
-    if(seed_threshold_timer_slow === 0) {
-      seed_threshold_timer_slow = setTimeout(() => {
-        generate_terrain();
-        seed_threshold_timer_slow = 0;
-      }, 2000);
-    }
+    terrain_callback(keys, value);
   }
 
 
@@ -294,24 +280,29 @@ window.onload = () => {
 
   // Callback to set noise octaves.
   // This single callback will work for all octaves.
-  let noise_timer_fast: ReturnType<typeof setTimeout> = 0;
-  let noise_timer_slow: ReturnType<typeof setTimeout> = 0;
   function noise_octaves_callback(keys: string, value: any) {
     // Only do this every 200ms, even if more updates are sent.
-    if(noise_timer_fast === 0) {
-      noise_timer_fast = setTimeout(() => {
+    if(timer_fast === 0) {
+      timer_fast = setTimeout(() => {
         generate_noise();
-        noise_timer_fast = 0;
+        timer_fast = 0;
       }, 200);
     }
+    terrain_callback(keys, value);
+  }
+
+  // Callback to regenerate terrain after settings change.
+  let timer_slow: ReturnType<typeof setTimeout> = 0;
+  function terrain_callback(keys: string, value: any) {
     // Only change the 3d display every 2 seconds.
-    if(noise_timer_slow === 0) {
-      noise_timer_slow = setTimeout(() => {
+    if(timer_slow === 0) {
+      timer_slow = setTimeout(() => {
         generate_terrain();
-        noise_timer_slow = 0;
+        timer_slow = 0;
       }, 2000);
     }
   }
+
 
   // Move camera to selected view.
   const views = document.getElementById("views").querySelectorAll(".btn");
@@ -327,6 +318,7 @@ window.onload = () => {
     });
   });
 
+
   // Launch Babylon.js debug panel.
   function menu_inspector_handler(event: Event) {
     display.scene.debugLayer.show({embedMode:true});
@@ -336,27 +328,33 @@ window.onload = () => {
 
 
   // Create a permanent link to the current map.
+  const menu_link = document.getElementById("link");
+  const button = menu_link.shadowRoot.querySelector("button");
+
   function menu_link_button_handler(event: Event) {
-    navigator.clipboard.writeText(config.url.toString()).then(() => {
-      /* clipboard successfully set */
-      $('.toast').toast('show');
-    }, () => {
-      /* clipboard write failed */
+    if(navigator.clipboard !== undefined) {
+      navigator.clipboard.writeText(config.url.toString()).then(() => {
+        // clipboard write success.
+        menu_link.querySelector(".success").classList.add("show");
+      }, () => {
+        // clipboard write failed
+        menu_link.querySelector(".fail").classList.add("show");
+        console.log(`Failed to copy ${config.url.toString()} to paste buffer.`);
+      });
+    } else {
       console.log(`Failed to copy ${config.url.toString()} to paste buffer.`);
-    });
+    }
+
     // window.open(config.url.toString());
     const hyperlink: HTMLAnchorElement = document.getElementById("permalink") as HTMLAnchorElement;
     hyperlink.href = config.url.toString();
   }
-  const menu_link_button = document.getElementById("link") as HTMLInputElement;
-  menu_link_button.addEventListener("click", menu_link_button_handler);
+  button.addEventListener("click", menu_link_button_handler, false);
 
 
-  canvas.onblur = (envent) => {
-    canvas.focus();
-  };
-
-  document.onclick = (envent) => {
-    canvas.focus();
-  };
+  // Return focus to canvas after any menu is clicked so keyboard controls
+  // work.
+  window.addEventListener("mouseup", (event) => {
+    window.setTimeout(() => canvas.focus(), 0);
+  });
 }
