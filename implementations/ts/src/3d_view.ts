@@ -27,8 +27,9 @@
 
 import * as BABYLON from 'babylonjs';
 import {WaterMaterial} from 'babylonjs-materials';
-import {Geography, Tile, DisplayBase, Coordinate} from "./flowing_terrain"
-import {Config} from "./config"
+import {Geography, Tile, DisplayBase, Coordinate} from "./flowing_terrain";
+import {Config} from "./config";
+import {FreeCameraPointersInput} from './freeCameraPointersInput';
 
 
 export class Display3d extends DisplayBase {
@@ -65,7 +66,20 @@ export class Display3d extends DisplayBase {
       "UniversalCamera",
       new BABYLON.Vector3(0, 0, 0),
       this.scene);
+    
     this.camera.inputs.addMouseWheel();
+    (this.camera.inputs.attached['mousewheel'] as BABYLON.FreeCameraMouseWheelInput).
+      wheelYMoveScene = BABYLON.Coordinate.Y;
+    (this.camera.inputs.attached['mousewheel'] as BABYLON.FreeCameraMouseWheelInput).
+      wheelPrecisionY = -1;
+
+    this.camera.inputs.removeMouse();
+    //this.camera.inputs.addPointers();
+    let pointerInput = new FreeCameraPointersInput();
+    pointerInput.panSensitivity = new BABYLON.Vector3(0.02, -0.02, 0.02);
+    pointerInput.angularSensitivity = new BABYLON.Vector3(0.001, 0.001, 0.001);
+    this.camera.inputs.add(pointerInput);
+
     this.camera.position = new BABYLON.Vector3(-mapsize / 4, mapsize / 4, -mapsize / 4);
     this.camera.checkCollisions = true;
     this.camera.ellipsoid = new BABYLON.Vector3(0.5, 0.5, 0.5);

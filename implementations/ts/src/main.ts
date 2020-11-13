@@ -86,7 +86,7 @@ window.onload = () => {
   config.set_callback("terrain.noise_height_weight", terrain_callback);
   config.set_if_null("terrain.noise_height_polarize", 1.0);
   config.set_callback("terrain.noise_height_polarize", terrain_callback);
-  config.set_if_null("terrain.noise_gradient_weight", 1.0);
+  config.set_if_null("terrain.noise_gradient_weight", 0.6);
   config.set_callback("terrain.noise_gradient_weight", terrain_callback);
   config.set_if_null("terrain.noise_gradient_polarize", 1.0);
   config.set_callback("terrain.noise_gradient_polarize", terrain_callback);
