@@ -25,7 +25,8 @@ enum _PointerInputTypes {
     ButtonUp,
     DoubleTap,
     Touch,
-    MultiTouch
+    MultiTouch,
+    Pinch
 }
 
 enum _Modifiers {
@@ -65,15 +66,16 @@ export class FreeCameraPointersInput extends BaseCameraPointersInput {
      */
     constructor() {
         super();
+        // Mouse moves camera over scene.
         this._mapPointerToCamera(_PointerInputTypes.Touch,
             _Modifiers.XAxis | _Modifiers.ShiftUp | _Modifiers.MouseButton2Up,
             _CameraProperty.MoveOverScene,
-            //_CameraProperty.RotateRelative,
             BABYLON.Coordinate.X);
         this._mapPointerToCamera(_PointerInputTypes.Touch,
             _Modifiers.YAxis | _Modifiers.ShiftUp | _Modifiers.MouseButton2Up,
             _CameraProperty.MoveOverScene,
             BABYLON.Coordinate.Z);
+        // Mouse with shift down changes camera orientation.
         this._mapPointerToCamera(_PointerInputTypes.Touch,
             _Modifiers.XAxis | _Modifiers.ShiftDown | _Modifiers.MouseButton2Up,
             _CameraProperty.RotateRelative,
@@ -82,6 +84,7 @@ export class FreeCameraPointersInput extends BaseCameraPointersInput {
             _Modifiers.YAxis | _Modifiers.ShiftDown | _Modifiers.MouseButton2Up,
             _CameraProperty.RotateRelative,
             BABYLON.Coordinate.X);
+        // 2nd mouse button changes camera orientation.
         this._mapPointerToCamera(_PointerInputTypes.Touch,
             _Modifiers.XAxis | _Modifiers.MouseButton2Down,
             _CameraProperty.RotateRelative,
@@ -90,6 +93,21 @@ export class FreeCameraPointersInput extends BaseCameraPointersInput {
             _Modifiers.YAxis | _Modifiers.MouseButton2Down,
             _CameraProperty.RotateRelative,
             BABYLON.Coordinate.X);
+
+        // MultiTouch drag affects camera orientation.
+        this._mapPointerToCamera(_PointerInputTypes.MultiTouch,
+            _Modifiers.XAxis,
+            _CameraProperty.RotateRelative,
+            BABYLON.Coordinate.Y);
+        this._mapPointerToCamera(_PointerInputTypes.MultiTouch,
+            _Modifiers.YAxis,
+            _CameraProperty.RotateRelative,
+            BABYLON.Coordinate.X);
+        // MultiTouch pinch affects camera height.
+        this._mapPointerToCamera(_PointerInputTypes.Pinch,
+            _Modifiers.YAxis,
+            _CameraProperty.MoveScene,
+            BABYLON.Coordinate.Y);
     }
 
     /**
@@ -181,9 +199,48 @@ export class FreeCameraPointersInput extends BaseCameraPointersInput {
         if (! this._pointerToCamera.has(_PointerInputTypes.Touch)) {
             return;
         }
+        if (Math.abs(deltaX) > 1000 || Math.abs(deltaY) > 1000) {
+            // Cursor dragged off page.
+            return;
+        }
         this._deltaX = deltaX;
         this._deltaY = deltaY;
-        const touchInputs = this._pointerToCamera.get(_PointerInputTypes.Touch);
+        this._applyEvents(_PointerInputTypes.Touch);
+    }
+
+    /**
+     * Called on pointer POINTERMOVE event if multiple touches are active.
+     */
+    protected onMultiTouch(pointA: BABYLON.Nullable<BABYLON.PointerTouch>,
+                           pointB: BABYLON.Nullable<BABYLON.PointerTouch>,
+                           previousPinchSquaredDistance: number,
+                           pinchSquaredDistance: number,
+                           previousMultiTouchPanPosition: BABYLON.Nullable<BABYLON.PointerTouch>,
+                           multiTouchPanPosition: BABYLON.Nullable<BABYLON.PointerTouch>): void {
+        // Apply multi-touch pinch events.
+        if (this._pointerToCamera.has(_PointerInputTypes.Pinch)) {
+            if (previousPinchSquaredDistance && pinchSquaredDistance) {
+                this._deltaY = this._deltaX =
+                    Math.sqrt(pinchSquaredDistance) - Math.sqrt(previousPinchSquaredDistance);
+                this._applyEvents(_PointerInputTypes.Pinch);
+            }
+        }
+
+        // Apply multi-touch drag events.
+        if (this._pointerToCamera.has(_PointerInputTypes.MultiTouch)) {
+            if(previousMultiTouchPanPosition !== null && multiTouchPanPosition !== null) {
+                this._deltaX = previousMultiTouchPanPosition.x - multiTouchPanPosition.x;
+                this._deltaY = previousMultiTouchPanPosition.y - multiTouchPanPosition.y;
+                this._applyEvents(_PointerInputTypes.MultiTouch);
+            } else {
+                this._deltaX = 0;
+                this._deltaY = 0;
+            }
+        }
+    }
+
+    private _applyEvents(inputType: _PointerInputTypes): void {
+        const touchInputs = this._pointerToCamera.get(inputType);
         touchInputs.forEach(this._updateCameraPropertyWrapper.bind(this));
     }
 
@@ -288,6 +345,7 @@ export class FreeCameraPointersInput extends BaseCameraPointersInput {
     private _moveOverScene = BABYLON.Vector3.Zero();
     private _deltaX = 0;
     private _deltaY = 0;
+    private _deltaPinch = 0;
 
     private _mapPointerToCamera(pointerInputType: _PointerInputTypes,
                                 pointerModifiers: number,

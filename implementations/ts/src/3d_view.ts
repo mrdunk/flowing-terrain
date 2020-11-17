@@ -60,7 +60,7 @@ export class Display3d extends DisplayBase {
     this.canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
     this.engine = new BABYLON.Engine(this.canvas, true);
     this.scene = new BABYLON.Scene(this.engine);
-    const mapsize = this.tile_size * this.geography.enviroment.tile_count;
+    const mapsize = this.tile_size * config.get("enviroment.tile_count");
 
     this.camera = new BABYLON.UniversalCamera(
       "UniversalCamera",
@@ -74,9 +74,10 @@ export class Display3d extends DisplayBase {
       wheelPrecisionY = -1;
 
     this.camera.inputs.removeMouse();
+    this.camera.inputs.remove(this.camera.inputs.attached.touch);
     //this.camera.inputs.addPointers();
     let pointerInput = new FreeCameraPointersInput();
-    pointerInput.panSensitivity = new BABYLON.Vector3(0.02, -0.02, 0.02);
+    pointerInput.panSensitivity = new BABYLON.Vector3(-0.02, -0.02, 0.02);
     pointerInput.angularSensitivity = new BABYLON.Vector3(0.001, 0.001, 0.001);
     this.camera.inputs.add(pointerInput);
 
@@ -132,7 +133,7 @@ export class Display3d extends DisplayBase {
 
   // Move camera to selected view.
   set_view(direction: string): void {
-    const mapsize = this.tile_size * this.enviroment.tile_count;
+    const mapsize = this.tile_size * this.config.get("enviroment.tile_count");
     const map_center = new BABYLON.Vector3(mapsize / 2, 0, mapsize / 2);
     const view_pos = 1.5 * mapsize
     const view_pos_diag =  mapsize + mapsize / 2.8
@@ -208,7 +209,7 @@ export class Display3d extends DisplayBase {
   }
 
   coordinate_to_index(coordinate: Coordinate): number {
-    return (coordinate.y * this.enviroment.tile_count + coordinate.x);
+    return (coordinate.y * this.config.get("enviroment.tile_count") + coordinate.x);
   }
 
   // Called before iteration through map's points.
@@ -223,8 +224,8 @@ export class Display3d extends DisplayBase {
     this.indices = [];
     this.rivers = [];
 
-    for(let y = 0; y < this.enviroment.tile_count; y++) {
-      for(let x = 0; x < this.enviroment.tile_count; x++) {
+    for(let y = 0; y < this.config.get("enviroment.tile_count"); y++) {
+      for(let x = 0; x < this.config.get("enviroment.tile_count"); x++) {
         // TODO: Some of these positions are not actually used.
         // Tiles at the height of the seabed are not drawn.
         // Not populating these at this time would make calculating indexes into
@@ -241,8 +242,8 @@ export class Display3d extends DisplayBase {
   draw_tile(tile: Tile): void {
     const x = tile.pos.x;
     const y = tile.pos.y;
-    if( x < 0 || x >= this.enviroment.tile_count -1||
-        y < 0 || y >= this.enviroment.tile_count -1) {
+    if( x < 0 || x >= this.config.get("enviroment.tile_count") -1||
+        y < 0 || y >= this.config.get("enviroment.tile_count") -1) {
       return;
     }
 
@@ -387,7 +388,7 @@ export class Display3d extends DisplayBase {
     this.schedule_update_rivers();
 
     // Generate seabed.
-    const mapsize = this.tile_size * this.enviroment.tile_count;
+    const mapsize = this.tile_size * this.config.get("enviroment.tile_count");
     const seabed = BABYLON.MeshBuilder.CreateGround(
       "seabed", {width: mapsize * 2, height: mapsize * 2});
     seabed.position = new BABYLON.Vector3(
@@ -405,7 +406,7 @@ export class Display3d extends DisplayBase {
 
   // Move the height of the sea mesh on the Z axis.
   set_sealevel(sealevel: number): void {
-    const mapsize = this.tile_size * this.enviroment.tile_count;
+    const mapsize = this.tile_size * this.config.get("enviroment.tile_count");
     this.sea_mesh.position = new BABYLON.Vector3(
       mapsize / 2, (sealevel + 0.02) * this.tile_size, mapsize / 2);
 
@@ -442,8 +443,8 @@ export class Display3d extends DisplayBase {
       this.rivers_mesh.dispose();
     }
 
-    for(let y = 0; y < this.enviroment.tile_count; y++) {
-      for(let x = 0; x < this.enviroment.tile_count; x++) {
+    for(let y = 0; y < this.config.get("enviroment.tile_count"); y++) {
+      for(let x = 0; x < this.config.get("enviroment.tile_count"); x++) {
         const tile = this.geography.get_tile({x, y});
         this.draw_river(tile, tile.lowest_neighbour);
       }

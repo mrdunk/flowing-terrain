@@ -108,10 +108,10 @@ window.onload = () => {
 
   function generate_seed_points() {
     seabed = time("seed_points", () => {
-      return seed_points(config, enviroment.tile_count);
+      return seed_points(config, config.get("enviroment.tile_count"));
     });
     time("2d_seed_map", () => {
-      draw_2d("2d_seed_map", seed_points_to_array(enviroment.tile_count, seabed));
+      draw_2d("2d_seed_map", seed_points_to_array(config.get("enviroment.tile_count"), seabed));
     });
   }
 

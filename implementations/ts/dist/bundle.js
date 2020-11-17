@@ -19029,15 +19029,16 @@ var Display3d = function (_flowing_terrain_1$Di) {
         _this.canvas = document.getElementById("renderCanvas");
         _this.engine = new BABYLON.Engine(_this.canvas, true);
         _this.scene = new BABYLON.Scene(_this.engine);
-        var mapsize = _this.tile_size * _this.geography.enviroment.tile_count;
+        var mapsize = _this.tile_size * config.get("enviroment.tile_count");
         _this.camera = new BABYLON.UniversalCamera("UniversalCamera", new BABYLON.Vector3(0, 0, 0), _this.scene);
         _this.camera.inputs.addMouseWheel();
         _this.camera.inputs.attached['mousewheel'].wheelYMoveScene = BABYLON.Coordinate.Y;
         _this.camera.inputs.attached['mousewheel'].wheelPrecisionY = -1;
         _this.camera.inputs.removeMouse();
+        _this.camera.inputs.remove(_this.camera.inputs.attached.touch);
         //this.camera.inputs.addPointers();
         var pointerInput = new freeCameraPointersInput_1.FreeCameraPointersInput();
-        pointerInput.panSensitivity = new BABYLON.Vector3(0.02, -0.02, 0.02);
+        pointerInput.panSensitivity = new BABYLON.Vector3(-0.02, -0.02, 0.02);
         pointerInput.angularSensitivity = new BABYLON.Vector3(0.001, 0.001, 0.001);
         _this.camera.inputs.add(pointerInput);
         _this.camera.position = new BABYLON.Vector3(-mapsize / 4, mapsize / 4, -mapsize / 4);
@@ -19080,7 +19081,7 @@ var Display3d = function (_flowing_terrain_1$Di) {
     _createClass(Display3d, [{
         key: "set_view",
         value: function set_view(direction) {
-            var mapsize = this.tile_size * this.enviroment.tile_count;
+            var mapsize = this.tile_size * this.config.get("enviroment.tile_count");
             var map_center = new BABYLON.Vector3(mapsize / 2, 0, mapsize / 2);
             var view_pos = 1.5 * mapsize;
             var view_pos_diag = mapsize + mapsize / 2.8;
@@ -19143,7 +19144,7 @@ var Display3d = function (_flowing_terrain_1$Di) {
     }, {
         key: "coordinate_to_index",
         value: function coordinate_to_index(coordinate) {
-            return coordinate.y * this.enviroment.tile_count + coordinate.x;
+            return coordinate.y * this.config.get("enviroment.tile_count") + coordinate.x;
         }
         // Called before iteration through map's points.
 
@@ -19158,8 +19159,8 @@ var Display3d = function (_flowing_terrain_1$Di) {
             this.positions = [];
             this.indices = [];
             this.rivers = [];
-            for (var y = 0; y < this.enviroment.tile_count; y++) {
-                for (var x = 0; x < this.enviroment.tile_count; x++) {
+            for (var y = 0; y < this.config.get("enviroment.tile_count"); y++) {
+                for (var x = 0; x < this.config.get("enviroment.tile_count"); x++) {
                     // TODO: Some of these positions are not actually used.
                     // Tiles at the height of the seabed are not drawn.
                     // Not populating these at this time would make calculating indexes into
@@ -19178,7 +19179,7 @@ var Display3d = function (_flowing_terrain_1$Di) {
         value: function draw_tile(tile) {
             var x = tile.pos.x;
             var y = tile.pos.y;
-            if (x < 0 || x >= this.enviroment.tile_count - 1 || y < 0 || y >= this.enviroment.tile_count - 1) {
+            if (x < 0 || x >= this.config.get("enviroment.tile_count") - 1 || y < 0 || y >= this.config.get("enviroment.tile_count") - 1) {
                 return;
             }
             // All vertex position information has already been entered into
@@ -19302,7 +19303,7 @@ var Display3d = function (_flowing_terrain_1$Di) {
             // Rivers
             this.schedule_update_rivers();
             // Generate seabed.
-            var mapsize = this.tile_size * this.enviroment.tile_count;
+            var mapsize = this.tile_size * this.config.get("enviroment.tile_count");
             var seabed = BABYLON.MeshBuilder.CreateGround("seabed", { width: mapsize * 2, height: mapsize * 2 });
             seabed.position = new BABYLON.Vector3(mapsize / 2, -0.01, mapsize / 2);
             seabed.material = this.seabed_material;
@@ -19318,7 +19319,7 @@ var Display3d = function (_flowing_terrain_1$Di) {
     }, {
         key: "set_sealevel",
         value: function set_sealevel(sealevel) {
-            var mapsize = this.tile_size * this.enviroment.tile_count;
+            var mapsize = this.tile_size * this.config.get("enviroment.tile_count");
             this.sea_mesh.position = new BABYLON.Vector3(mapsize / 2, (sealevel + 0.02) * this.tile_size, mapsize / 2);
             // Now recalculate the rivers as they now meet the sea at a different height
             // so length will be different.
@@ -19360,8 +19361,8 @@ var Display3d = function (_flowing_terrain_1$Di) {
             if (this.rivers_mesh !== undefined) {
                 this.rivers_mesh.dispose();
             }
-            for (var y = 0; y < this.enviroment.tile_count; y++) {
-                for (var x = 0; x < this.enviroment.tile_count; x++) {
+            for (var y = 0; y < this.config.get("enviroment.tile_count"); y++) {
+                for (var x = 0; x < this.config.get("enviroment.tile_count"); x++) {
                     var tile = this.geography.get_tile({ x: x, y: y });
                     this.draw_river(tile, tile.lowest_neighbour);
                 }
@@ -20269,7 +20270,6 @@ var Enviroment = function Enviroment() {
     this.highest_point = 0;
     this.sealevel = 1;
     this.dampest = 0;
-    this.tile_count = 100;
 };
 
 exports.Enviroment = Enviroment;
@@ -20328,9 +20328,9 @@ var Geography = function () {
             // Clear existing geography.
             this.tiles = [];
             // Populate tile array with un-configured Tile elements.
-            for (var x = 0; x < this.enviroment.tile_count; x++) {
+            for (var x = 0; x < this.config.get("enviroment.tile_count"); x++) {
                 var row = [];
-                for (var y = 0; y < this.enviroment.tile_count; y++) {
+                for (var y = 0; y < this.config.get("enviroment.tile_count"); y++) {
                     var tile = new Tile({ x: x, y: y }, this.enviroment);
                     row.push(tile);
                 }
@@ -20398,6 +20398,13 @@ var Geography = function () {
             }
         }
         // Populate all tiles with height data. Also set the sealevel.
+        // While with the right implementation of an ordered set it wold be possible
+        // to achieve O(n log n) here, my simple SortedSet is actually O(n) for
+        // inserts. This makes this method is theoretically O(n^2) time complexity.
+        // In practice though this makes little difference as the SortedSet is getting
+        // drained as it is being populated so we typically never see anything like
+        // "n" entries in it. Also many attempted inserts into SortedSet are
+        // duplicates and are dealt with in o(log n) time.
 
     }, {
         key: "heights_algorithm",
@@ -20448,8 +20455,8 @@ var Geography = function () {
             var _this2 = this;
 
             this.open_set_sorted.clear();
-            for (var y = 0; y < this.enviroment.tile_count; y++) {
-                for (var x = 0; x < this.enviroment.tile_count; x++) {
+            for (var y = 0; y < this.config.get("enviroment.tile_count"); y++) {
+                for (var x = 0; x < this.config.get("enviroment.tile_count"); x++) {
                     var _tile = this.get_tile({ x: x, y: y });
                     this.open_set_sorted.push(_tile);
                 }
@@ -20492,7 +20499,7 @@ var Geography = function () {
     }, {
         key: "get_tile",
         value: function get_tile(coordinate) {
-            if (coordinate.x < 0 || coordinate.y < 0 || coordinate.x >= this.enviroment.tile_count || coordinate.y >= this.enviroment.tile_count) {
+            if (coordinate.x < 0 || coordinate.y < 0 || coordinate.x >= this.config.get("enviroment.tile_count") || coordinate.y >= this.config.get("enviroment.tile_count")) {
                 return null;
             }
             return this.tiles[coordinate.x][coordinate.y];
@@ -20518,7 +20525,7 @@ var DisplayBase = function () {
         _classCallCheck(this, DisplayBase);
 
         this.geography = geography;
-        this.enviroment = this.geography.enviroment;
+        this.config = this.geography.config;
     }
     // Access all points in Geography and call `draw_tile(...)` method on each.
 
@@ -20527,8 +20534,8 @@ var DisplayBase = function () {
         key: "draw",
         value: function draw() {
             this.draw_start();
-            for (var y = 0; y < this.enviroment.tile_count; y += 1) {
-                for (var x = 0; x < this.enviroment.tile_count; x += 1) {
+            for (var y = 0; y < this.config.get("enviroment.tile_count"); y += 1) {
+                for (var x = 0; x < this.config.get("enviroment.tile_count"); x += 1) {
                     var _tile2 = this.geography.get_tile({ x: x, y: y });
                     this.draw_tile(_tile2);
                 }
@@ -20605,6 +20612,7 @@ var _PointerInputTypes;
     _PointerInputTypes[_PointerInputTypes["DoubleTap"] = 2] = "DoubleTap";
     _PointerInputTypes[_PointerInputTypes["Touch"] = 3] = "Touch";
     _PointerInputTypes[_PointerInputTypes["MultiTouch"] = 4] = "MultiTouch";
+    _PointerInputTypes[_PointerInputTypes["Pinch"] = 5] = "Pinch";
 })(_PointerInputTypes || (_PointerInputTypes = {}));
 var _Modifiers;
 (function (_Modifiers) {
@@ -20672,14 +20680,21 @@ var FreeCameraPointersInput = function (_BaseCameraPointersIn) {
         _this._moveOverScene = BABYLON.Vector3.Zero();
         _this._deltaX = 0;
         _this._deltaY = 0;
-        _this._mapPointerToCamera(_PointerInputTypes.Touch, _Modifiers.XAxis | _Modifiers.ShiftUp | _Modifiers.MouseButton2Up, _CameraProperty.MoveOverScene,
-        //_CameraProperty.RotateRelative,
-        BABYLON.Coordinate.X);
+        _this._deltaPinch = 0;
+        // Mouse moves camera over scene.
+        _this._mapPointerToCamera(_PointerInputTypes.Touch, _Modifiers.XAxis | _Modifiers.ShiftUp | _Modifiers.MouseButton2Up, _CameraProperty.MoveOverScene, BABYLON.Coordinate.X);
         _this._mapPointerToCamera(_PointerInputTypes.Touch, _Modifiers.YAxis | _Modifiers.ShiftUp | _Modifiers.MouseButton2Up, _CameraProperty.MoveOverScene, BABYLON.Coordinate.Z);
+        // Mouse with shift down changes camera orientation.
         _this._mapPointerToCamera(_PointerInputTypes.Touch, _Modifiers.XAxis | _Modifiers.ShiftDown | _Modifiers.MouseButton2Up, _CameraProperty.RotateRelative, BABYLON.Coordinate.Y);
         _this._mapPointerToCamera(_PointerInputTypes.Touch, _Modifiers.YAxis | _Modifiers.ShiftDown | _Modifiers.MouseButton2Up, _CameraProperty.RotateRelative, BABYLON.Coordinate.X);
+        // 2nd mouse button changes camera orientation.
         _this._mapPointerToCamera(_PointerInputTypes.Touch, _Modifiers.XAxis | _Modifiers.MouseButton2Down, _CameraProperty.RotateRelative, BABYLON.Coordinate.Y);
         _this._mapPointerToCamera(_PointerInputTypes.Touch, _Modifiers.YAxis | _Modifiers.MouseButton2Down, _CameraProperty.RotateRelative, BABYLON.Coordinate.X);
+        // MultiTouch drag affects camera orientation.
+        _this._mapPointerToCamera(_PointerInputTypes.MultiTouch, _Modifiers.XAxis, _CameraProperty.RotateRelative, BABYLON.Coordinate.Y);
+        _this._mapPointerToCamera(_PointerInputTypes.MultiTouch, _Modifiers.YAxis, _CameraProperty.RotateRelative, BABYLON.Coordinate.X);
+        // MultiTouch pinch affects camera height.
+        _this._mapPointerToCamera(_PointerInputTypes.Pinch, _Modifiers.YAxis, _CameraProperty.MoveScene, BABYLON.Coordinate.Y);
         return _this;
     }
     /**
@@ -20738,9 +20753,45 @@ var FreeCameraPointersInput = function (_BaseCameraPointersIn) {
             if (!this._pointerToCamera.has(_PointerInputTypes.Touch)) {
                 return;
             }
+            if (Math.abs(deltaX) > 1000 || Math.abs(deltaY) > 1000) {
+                // Cursor dragged off page.
+                console.log("!!");
+                return;
+            }
             this._deltaX = deltaX;
             this._deltaY = deltaY;
-            var touchInputs = this._pointerToCamera.get(_PointerInputTypes.Touch);
+            this._applyEvents(_PointerInputTypes.Touch);
+        }
+        /**
+         * Called on pointer POINTERMOVE event if multiple touches are active.
+         */
+
+    }, {
+        key: "onMultiTouch",
+        value: function onMultiTouch(pointA, pointB, previousPinchSquaredDistance, pinchSquaredDistance, previousMultiTouchPanPosition, multiTouchPanPosition) {
+            // Apply multi-touch pinch events.
+            if (this._pointerToCamera.has(_PointerInputTypes.Pinch)) {
+                if (previousPinchSquaredDistance && pinchSquaredDistance) {
+                    this._deltaY = this._deltaX = Math.sqrt(pinchSquaredDistance) - Math.sqrt(previousPinchSquaredDistance);
+                    this._applyEvents(_PointerInputTypes.Pinch);
+                }
+            }
+            // Apply multi-touch drag events.
+            if (this._pointerToCamera.has(_PointerInputTypes.MultiTouch)) {
+                if (previousMultiTouchPanPosition !== null && multiTouchPanPosition !== null) {
+                    this._deltaX = previousMultiTouchPanPosition.x - multiTouchPanPosition.x;
+                    this._deltaY = previousMultiTouchPanPosition.y - multiTouchPanPosition.y;
+                    this._applyEvents(_PointerInputTypes.MultiTouch);
+                } else {
+                    this._deltaX = 0;
+                    this._deltaY = 0;
+                }
+            }
+        }
+    }, {
+        key: "_applyEvents",
+        value: function _applyEvents(inputType) {
+            var touchInputs = this._pointerToCamera.get(inputType);
             touchInputs.forEach(this._updateCameraPropertyWrapper.bind(this));
         }
     }, {
@@ -21245,10 +21296,10 @@ window.onload = function () {
     });
     function generate_seed_points() {
         seabed = time("seed_points", function () {
-            return genesis_1.seed_points(config, enviroment.tile_count);
+            return genesis_1.seed_points(config, config.get("enviroment.tile_count"));
         });
         time("2d_seed_map", function () {
-            _2d_view_1.draw_2d("2d_seed_map", genesis_1.seed_points_to_array(enviroment.tile_count, seabed));
+            _2d_view_1.draw_2d("2d_seed_map", genesis_1.seed_points_to_array(config.get("enviroment.tile_count"), seabed));
         });
     }
     function generate_noise() {
@@ -21561,7 +21612,9 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SortedSet = void 0;
 /* A Set implementation that allows highest and lowest values to be retrieved.
- * Adding to and querying the Set takes O(log n) time.
+ * Adding to the Set takes O(n) time.
+ * Querying the Set takes O(log n) time.
+ * Retrieving an element from either end takes O(1) time.
  * Retrieving the highest or lowest value takes constant time.
  * A comparison function must be provided to determine whether 2 stored values
  * are greater, equal or less than each other.
@@ -21583,7 +21636,7 @@ var SortedSet = function () {
     _createClass(SortedSet, [{
         key: "push",
         value: function push(value) {
-            // O(log n) time.
+            // O(n) time.
             var left = 0;
             var right = this.length;
             while (right > left) {
@@ -21599,6 +21652,7 @@ var SortedSet = function () {
                     right = mid;
                 }
             }
+            // This splice takes O(n) time.
             this.values.splice(left, 0, value);
             this.length = this.values.length;
         }
