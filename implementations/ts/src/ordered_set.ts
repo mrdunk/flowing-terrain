@@ -24,7 +24,9 @@
 
 
 /* A Set implementation that allows highest and lowest values to be retrieved.
- * Adding to and querying the Set takes O(log n) time.
+ * Adding to the Set takes O(n) time.
+ * Querying the Set takes O(log n) time.
+ * Retrieving an element from either end takes O(1) time.
  * Retrieving the highest or lowest value takes constant time.
  * A comparison function must be provided to determine whether 2 stored values
  * are greater, equal or less than each other.
@@ -40,7 +42,7 @@ export class SortedSet {
   }
 
   push(value: any) {
-    // O(log n) time.
+    // O(n) time.
     let left = 0;
     let right = this.length;
     while(right > left) {
@@ -56,6 +58,7 @@ export class SortedSet {
         right = mid;
       }
     }
+    // This splice takes O(n) time.
     this.values.splice(left, 0, value);
     this.length = this.values.length;
   }

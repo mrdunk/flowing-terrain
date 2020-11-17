@@ -40,7 +40,6 @@ export class Enviroment {
   highest_point: number = 0;
   sealevel: number = 1;
   dampest: number = 0;
-  tile_count: number = 100;
 }
 
 // A single point on the map.
@@ -95,9 +94,9 @@ export class Geography {
     this.tiles = [];
 
     // Populate tile array with un-configured Tile elements.
-    for(let x = 0; x < this.enviroment.tile_count; x++) {
+    for(let x = 0; x < this.config.get("enviroment.tile_count"); x++) {
       const row: Tile[] = [];
-      for(let y = 0; y < this.enviroment.tile_count; y++) {
+      for(let y = 0; y < this.config.get("enviroment.tile_count"); y++) {
         const tile: Tile = new Tile({x, y}, this.enviroment);
         row.push(tile);
       }
@@ -138,6 +137,13 @@ export class Geography {
   }
 
   // Populate all tiles with height data. Also set the sealevel.
+  // While with the right implementation of an ordered set it wold be possible
+  // to achieve O(n log n) here, my simple SortedSet is actually O(n) for
+  // inserts. This makes this method is theoretically O(n^2) time complexity.
+  // In practice though this makes little difference as the SortedSet is getting
+  // drained as it is being populated so we typically never see anything like
+  // "n" entries in it. Also many attempted inserts into SortedSet are
+  // duplicates and are dealt with in o(log n) time.
   heights_algorithm(): void {
     const height_constant = this.config.get("terrain.height_constant");
     const noise_height_weight = this.config.get("terrain.noise_height_weight");
@@ -182,8 +188,8 @@ export class Geography {
   // map. High tile.dampness values indicate a river runs through that tile.
   drainage_algorithm(): void {
     this.open_set_sorted.clear();
-    for(let y = 0; y < this.enviroment.tile_count; y++) {
-      for(let x = 0; x < this.enviroment.tile_count; x++) {
+    for(let y = 0; y < this.config.get("enviroment.tile_count"); y++) {
+      for(let x = 0; x < this.config.get("enviroment.tile_count"); x++) {
         const tile = this.get_tile({x, y});
         this.open_set_sorted.push(tile);
       }
@@ -224,8 +230,8 @@ export class Geography {
   get_tile(coordinate: Coordinate): Tile {
     if(coordinate.x < 0 ||
        coordinate.y < 0 ||
-       coordinate.x >= this.enviroment.tile_count ||
-       coordinate.y >= this.enviroment.tile_count) {
+       coordinate.x >= this.config.get("enviroment.tile_count") ||
+       coordinate.y >= this.config.get("enviroment.tile_count")) {
       return null;
     }
     return this.tiles[coordinate.x][coordinate.y];
@@ -250,18 +256,18 @@ export class Geography {
 // Example to iterate over a Geography object.
 export class DisplayBase {
   geography: Geography;
-  enviroment: Enviroment;
+  config: Config;
 
   constructor(geography: Geography) {
     this.geography = geography;
-    this.enviroment = this.geography.enviroment;
+    this.config = this.geography.config;
   }
 
   // Access all points in Geography and call `draw_tile(...)` method on each.
   draw(): void {
     this.draw_start();
-    for(let y = 0; y < this.enviroment.tile_count; y += 1) {
-      for(let x = 0; x < this.enviroment.tile_count; x += 1) {
+    for(let y = 0; y < this.config.get("enviroment.tile_count"); y += 1) {
+      for(let x = 0; x < this.config.get("enviroment.tile_count"); x += 1) {
         const tile = this.geography.get_tile({x, y});
         this.draw_tile(tile);
       }
