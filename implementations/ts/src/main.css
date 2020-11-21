@@ -10,6 +10,19 @@ img.logo{
   height: 100%;
 }
 
+#fps {
+  position: absolute;
+  background-color: black;
+  border: 2px solid white;
+  text-align: center;
+  font-size: 1em;
+  color: white;
+  bottom: 15px;
+  right: 10px;
+  width: 60px;
+  height: fit-content;
+}
+
 #renderCanvas {
   width: 100%;
   height: 100%;

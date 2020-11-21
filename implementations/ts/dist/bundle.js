@@ -19023,13 +19023,16 @@ var Display3d = function (_flowing_terrain_1$Di) {
         _this.positions = [];
         _this.indices = [];
         _this.normals = [];
+        _this.tileIterator = 0;
         _this.rivers = [];
         _this.update_rivers_timer = 0;
         _this.config = config;
         _this.canvas = document.getElementById("renderCanvas");
+        _this.fpsMeter = document.getElementById("fps");
         _this.engine = new BABYLON.Engine(_this.canvas, true);
         _this.scene = new BABYLON.Scene(_this.engine);
         var mapsize = _this.tile_size * config.get("enviroment.tile_count");
+        _this.scene.registerBeforeRender(_this.updateFps.bind(_this));
         _this.camera = new BABYLON.UniversalCamera("UniversalCamera", new BABYLON.Vector3(0, 0, 0), _this.scene);
         _this.camera.inputs.addMouseWheel();
         _this.camera.inputs.attached['mousewheel'].wheelYMoveScene = BABYLON.Coordinate.Y;
@@ -19070,15 +19073,21 @@ var Display3d = function (_flowing_terrain_1$Di) {
         _this.sea_material.alpha = config.get("display.sea_transparency");
         _this.sea_material.backFaceCulling = false;
         _this.draw();
+        _this.planting();
         _this.camera.setTarget(new BABYLON.Vector3(mapsize / 2, 0, mapsize / 2));
         // Hide the HTML loader.
         document.getElementById("loader").style.display = "none";
         return _this;
     }
-    // Move camera to selected view.
-
 
     _createClass(Display3d, [{
+        key: "updateFps",
+        value: function updateFps() {
+            this.fpsMeter.innerHTML = this.engine.getFps().toFixed() + " fps";
+        }
+        // Move camera to selected view.
+
+    }, {
         key: "set_view",
         value: function set_view(direction) {
             var mapsize = this.tile_size * this.config.get("enviroment.tile_count");
@@ -19371,12 +19380,123 @@ var Display3d = function (_flowing_terrain_1$Di) {
                 this.rivers_mesh = BABYLON.MeshBuilder.CreateLineSystem("rivers", { lines: this.rivers }, this.scene);
             }
         }
+    }, {
+        key: "getTile",
+        value: function getTile(corners) {
+            var sealevel = this.config.get("geography.sealevel");
+            do {
+                var offset0 = this.indices[this.tileIterator * 3];
+                var offset1 = this.indices[this.tileIterator * 3 + 1];
+                var offset2 = this.indices[this.tileIterator * 3 + 2];
+                corners[0].fromArray(this.positions, offset0 * 3);
+                corners[1].fromArray(this.positions, offset1 * 3);
+                corners[2].fromArray(this.positions, offset2 * 3);
+                this.tileIterator++;
+            } while ((corners[0].y < sealevel * this.tile_size || corners[1].y < sealevel * this.tile_size || corners[2].y < sealevel * this.tile_size) && this.tileIterator < this.positions.length * 3);
+        }
+        //Random point on the triangle.
+
+    }, {
+        key: "randomPoint",
+        value: function randomPoint(corners) {
+            // point.x = s * corners[0].x + (t-s) * corners[1].x + (1-t) * corners[2].x;
+            var s = Math.random();
+            var t = Math.random();
+            if (s > t) {
+                var tmp = s;
+                s = t;
+                t = tmp;
+            }
+            var point = new BABYLON.Vector3();
+            point.x = s * corners[0].x + (t - s) * corners[1].x + (1 - t) * corners[2].x;
+            point.y = s * corners[0].y + (t - s) * corners[1].y + (1 - t) * corners[2].y;
+            point.z = s * corners[0].z + (t - s) * corners[1].z + (1 - t) * corners[2].z;
+            return point;
+        }
+    }, {
+        key: "planting",
+        value: function planting() {
+            var treesPerTile = 1;
+            var tree = new Tree(this.scene);
+            var points = [new BABYLON.Vector3(), new BABYLON.Vector3(), new BABYLON.Vector3()];
+            var maxTreeCount = 100000;
+            var treeCount = 0;
+            this.tileIterator = 0;
+            while (this.tileIterator < this.positions.length * 3 && treeCount < maxTreeCount) {
+                this.getTile(points);
+                treeCount++;
+            }
+            console.log(treeCount);
+            var bufferMatrices = new Float32Array(16 * treeCount * treesPerTile);
+            treeCount = 0;
+            this.tileIterator = 0;
+            while (this.tileIterator < this.positions.length * 3 && treeCount < maxTreeCount) {
+                if (treeCount % 100 == 0) {
+                    console.log(treeCount);
+                }
+                this.getTile(points);
+                for (var i = 0; i < treesPerTile; i++) {
+                    var size = Math.random() * 0.1 + 0.1;
+                    var matrix = BABYLON.Matrix.Compose(new BABYLON.Vector3(size, size, size),
+                    //BABYLON.Vector3.One(),
+                    BABYLON.Quaternion.Zero(), this.randomPoint(points)
+                    //new BABYLON.Vector3(1, 2, 3)
+                    );
+                    //const leaves = tree.leaves.thinInstanceAdd(matrix, true);
+                    //const trunk = tree.trunk.thinInstanceAdd(matrix, true);
+                    console.assert(treeCount * 16 < bufferMatrices.length);
+                    matrix.copyToArray(bufferMatrices, (treeCount + i) * 16);
+                }
+                treeCount++;
+            }
+            tree.leaves.thinInstanceSetBuffer("matrix", bufferMatrices, 16, true);
+            tree.trunk.thinInstanceSetBuffer("matrix", bufferMatrices, 16, true);
+        }
     }]);
 
     return Display3d;
 }(flowing_terrain_1.DisplayBase);
 
 exports.Display3d = Display3d;
+
+var Tree = function Tree(scene) {
+    _classCallCheck(this, Tree);
+
+    this.tessellation = 3;
+    this.trunkHeight = 5;
+    this.leavesHeight = 10;
+    this.leavesDiamiter = 10;
+    this.trunkMaterial = new BABYLON.StandardMaterial("trunkMaterial", scene);
+    this.trunkMaterial.diffuseColor = new BABYLON.Color3(0.5, 0.3, 0.3);
+    this.trunkMaterial.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
+    this.leafMaterial = new BABYLON.StandardMaterial("leafMaterial", scene);
+    this.leafMaterial.diffuseColor = new BABYLON.Color3(0.4, 0.7, 0.4);
+    this.leafMaterial.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
+    this.root = BABYLON.Mesh.CreateBox("pineTree", 1, scene);
+    this.root.isVisible = false;
+    this.trunk = BABYLON.MeshBuilder.CreateCylinder("trunk", {
+        height: this.trunkHeight,
+        tessellation: this.tessellation,
+        cap: BABYLON.Mesh.NO_CAP,
+        diameterTop: 1,
+        diameterBottom: 1.2
+    });
+    this.trunk.position.y = this.trunkHeight / 2;
+    this.trunk.material = this.trunkMaterial;
+    this.trunk.bakeCurrentTransformIntoVertices();
+    this.leaves = BABYLON.MeshBuilder.CreateCylinder("leaves", {
+        height: this.leavesHeight,
+        tessellation: this.tessellation,
+        cap: BABYLON.Mesh.NO_CAP,
+        diameterTop: 0.1,
+        diameterBottom: this.leavesDiamiter
+    });
+    this.leaves.position.y = this.leavesHeight / 2 + this.trunkHeight;
+    this.leaves.material = this.leafMaterial;
+    this.leaves.bakeCurrentTransformIntoVertices();
+    this.leaves.parent = this.root;
+    this.trunk.parent = this.root;
+};
 
 },{"./flowing_terrain":20,"./freeCameraPointersInput":21,"babylonjs":2}],17:[function(require,module,exports){
 "use strict";
@@ -20755,7 +20875,6 @@ var FreeCameraPointersInput = function (_BaseCameraPointersIn) {
             }
             if (Math.abs(deltaX) > 1000 || Math.abs(deltaY) > 1000) {
                 // Cursor dragged off page.
-                console.log("!!");
                 return;
             }
             this._deltaX = deltaX;
