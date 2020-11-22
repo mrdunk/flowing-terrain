@@ -55,6 +55,7 @@ window.onload = () => {
   const config: Config = new Config();
   let seabed: Set<string> = null;
   let noise: Noise = null;
+  let vegetation: Noise = null;
   let geography: Geography = null;
   let display: Display3d = null;
 
@@ -63,6 +64,9 @@ window.onload = () => {
   config.set_if_null("noise.random_seed_low", `low ${(new Date()).getTime()}`);
   config.set_if_null("noise.random_seed_mid", `mid ${(new Date()).getTime()}`);
   config.set_if_null("noise.random_seed_high", `high ${(new Date()).getTime()}`);
+  config.set_if_null("vegetation.random_seed_low", `v low ${(new Date()).getTime()}`);
+  config.set_if_null("vegetation.random_seed_mid", `v mid ${(new Date()).getTime()}`);
+  config.set_if_null("vegetation.random_seed_high", `v high ${(new Date()).getTime()}`);
 
   config.set_if_null("seed_points.threshold", 0.18);
   config.set_callback("seed_points.threshold", seed_threshold_callback);
@@ -79,6 +83,19 @@ window.onload = () => {
   config.set_callback("noise.mid_octave_weight", noise_octaves_callback);
   config.set_if_null("noise.high_octave_weight", 0.2);
   config.set_callback("noise.high_octave_weight", noise_octaves_callback);
+
+  config.set_if_null("vegetation.low_octave", 3);
+  //config.set_callback("vegetation.low_octave", vegetation_octaves_callback);
+  config.set_if_null("vegetation.mid_octave", 5);
+  //config.set_callback("vegetation.mid_octave", vegetation_octaves_callback);
+  config.set_if_null("vegetation.high_octave", 10);
+  //config.set_callback("vegetation.high_octave", vegetation_octaves_callback);
+  config.set_if_null("vegetation.low_octave_weight", 0.2);
+  //config.set_callback("vegetation.low_octave_weight", vegetation_octaves_callback);
+  config.set_if_null("vegetation.mid_octave_weight", 0.5);
+  //config.set_callback("vegetation.mid_octave_weight", vegetation_octaves_callback);
+  config.set_if_null("vegetation.high_octave_weight", 0.2);
+  //config.set_callback("vegetation.high_octave_weight", vegetation_octaves_callback);
 
   config.set_if_null("terrain.height_constant", 0.01);
   config.set_callback("terrain.height_constant", terrain_callback);
@@ -118,13 +135,26 @@ window.onload = () => {
   function generate_noise(regenerate: boolean = false) {
     time("noise", () => {
       if(noise === null) {
-        noise = new Noise(config);
+        noise = new Noise("noise", config);
       }
       noise.generate(regenerate);
     });
     time("2d_noise_map", () => {
       draw_2d("2d_noise_map", noise.data_combined);
       noise.text(document.getElementById("height_debug"));
+    });
+  }
+
+  function generate_vegetation(regenerate: boolean = false) {
+    time("vegetation", () => {
+      if(vegetation === null) {
+        vegetation = new Noise("vegetation", config);
+      }
+      vegetation.generate(regenerate);
+    });
+    time("vegetation_map", () => {
+      draw_2d("vegetation_map", vegetation.data_combined);
+      //vegetation.text(document.getElementById("vegetation_debug"));
     });
   }
 
@@ -146,7 +176,7 @@ window.onload = () => {
 
     display = time("3d_display", () => {
       if(display === null) {
-        return new Display3d(geography, config);
+        return new Display3d(geography, vegetation, config);
       } else {
         display.draw();
         return display;
@@ -156,6 +186,7 @@ window.onload = () => {
 
   generate_seed_points();
   generate_noise();
+  generate_vegetation();
   generate_terrain();
 
   console.table(stats);
@@ -302,6 +333,13 @@ window.onload = () => {
       }, 2000);
     }
   }
+
+
+  // Button to regenerate all aspects of the vegetation map.
+  const menu_vegetation = document.getElementById("vegetation") as HTMLInputElement;
+  menu_vegetation.addEventListener("click", (event) => {
+    generate_vegetation(true);
+  });
 
 
   // Move camera to selected view.

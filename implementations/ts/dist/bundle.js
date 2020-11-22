@@ -19013,7 +19013,7 @@ var freeCameraPointersInput_1 = require("./freeCameraPointersInput");
 var Display3d = function (_flowing_terrain_1$Di) {
     _inherits(Display3d, _flowing_terrain_1$Di);
 
-    function Display3d(geography, config) {
+    function Display3d(geography, vegetation, config) {
         _classCallCheck(this, Display3d);
 
         var _this = _possibleConstructorReturn(this, (Display3d.__proto__ || Object.getPrototypeOf(Display3d)).call(this, geography));
@@ -19026,6 +19026,7 @@ var Display3d = function (_flowing_terrain_1$Di) {
         _this.tileIterator = 0;
         _this.rivers = [];
         _this.update_rivers_timer = 0;
+        _this.vegetation = vegetation;
         _this.config = config;
         _this.canvas = document.getElementById("renderCanvas");
         _this.fpsMeter = document.getElementById("fps");
@@ -19052,28 +19053,34 @@ var Display3d = function (_flowing_terrain_1$Di) {
         _this.camera.touchMoveSensibility = 200;
         _this.camera.touchAngularSensibility = 60000;
         _this.camera.attachControl(_this.canvas, true);
-        var light_1 = new BABYLON.HemisphericLight("light_1", new BABYLON.Vector3(1, 0.5, 0), _this.scene);
-        light_1.diffuse = new BABYLON.Color3(1, 0, 1);
+        var light_1 = new BABYLON.DirectionalLight("light_1", new BABYLON.Vector3(-10, -10, 0), _this.scene);
+        light_1.position = new BABYLON.Vector3(100, 100, 100);
+        light_1.diffuse = new BABYLON.Color3(1, 1, 1);
         light_1.specular = new BABYLON.Color3(0, 0, 0);
-        var light_2 = new BABYLON.HemisphericLight("light_2", new BABYLON.Vector3(0, 0.5, 1), _this.scene);
-        light_2.diffuse = new BABYLON.Color3(0, 1, 1);
+        light_1.intensity = 0.5;
+        var light_2 = new BABYLON.DirectionalLight("light_2", new BABYLON.Vector3(0, -10, 0), _this.scene);
+        light_2.diffuse = new BABYLON.Color3(1, 1, 1);
         light_2.specular = new BABYLON.Color3(0.3, 0.3, 0.3);
+        light_2.intensity = 0.5;
         _this.scene.ambientColor = new BABYLON.Color3(0.2, 0.2, 0.3);
         _this.land_material = new BABYLON.StandardMaterial("land_material", _this.scene);
-        _this.land_material.diffuseColor = new BABYLON.Color3(0.3, 0.7, 0.2);
+        _this.land_material.diffuseColor = new BABYLON.Color3(0.4, 0.6, 0.2);
         _this.land_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
         // this.land_material.backFaceCulling = false;
         _this.seabed_material = new BABYLON.StandardMaterial("seabed_material", _this.scene);
-        _this.seabed_material.diffuseColor = new BABYLON.Color3(0.3, 0.7, 0.2);
+        _this.seabed_material.diffuseColor = new BABYLON.Color3(0.4, 0.6, 0.2);
         _this.seabed_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
         // this.seabed_material.backFaceCulling = false;
         _this.sea_material = new BABYLON.StandardMaterial("sea_material", _this.scene);
-        _this.sea_material.diffuseColor = new BABYLON.Color3(0.2, 0.4, 0.7);
+        _this.sea_material.diffuseColor = new BABYLON.Color3(0.1, 0.2, 1.0);
         _this.sea_material.specularColor = new BABYLON.Color3(0.5, 0.5, 0.5);
         _this.sea_material.alpha = config.get("display.sea_transparency");
         _this.sea_material.backFaceCulling = false;
         _this.draw();
         _this.planting();
+        var shadowGenerator = new BABYLON.ShadowGenerator(2048, light_1);
+        shadowGenerator.addShadowCaster(_this.trees.leaves, true);
+        _this.land_mesh.receiveShadows = true;
         _this.camera.setTarget(new BABYLON.Vector3(mapsize / 2, 0, mapsize / 2));
         // Hide the HTML loader.
         document.getElementById("loader").style.display = "none";
@@ -19304,11 +19311,12 @@ var Display3d = function (_flowing_terrain_1$Di) {
             vertexData.positions = this.positions;
             vertexData.indices = this.indices;
             vertexData.normals = this.normals;
-            var land = new BABYLON.Mesh("land");
-            land.material = this.land_material;
-            vertexData.applyToMesh(land, true);
-            land.checkCollisions = true;
-            // land.convertToFlatShadedMesh();
+            this.land_mesh = new BABYLON.Mesh("land");
+            this.land_mesh.material = this.land_material;
+            vertexData.applyToMesh(this.land_mesh, true);
+            this.land_mesh.isPickable = false;
+            this.land_mesh.checkCollisions = false;
+            // this.land_mesh.convertToFlatShadedMesh();
             // Rivers
             this.schedule_update_rivers();
             // Generate seabed.
@@ -19377,7 +19385,11 @@ var Display3d = function (_flowing_terrain_1$Di) {
                 }
             }
             if (this.rivers.length > 0) {
-                this.rivers_mesh = BABYLON.MeshBuilder.CreateLineSystem("rivers", { lines: this.rivers }, this.scene);
+                this.rivers_mesh = BABYLON.MeshBuilder.CreateLineSystem("rivers", {
+                    lines: this.rivers,
+                    useVertexAlpha: false
+                }, this.scene);
+                this.rivers_mesh.color = new BABYLON.Color3(0.3, 0.3, 1);
             }
         }
     }, {
@@ -19392,7 +19404,11 @@ var Display3d = function (_flowing_terrain_1$Di) {
                 corners[1].fromArray(this.positions, offset1 * 3);
                 corners[2].fromArray(this.positions, offset2 * 3);
                 this.tileIterator++;
-            } while ((corners[0].y < sealevel * this.tile_size || corners[1].y < sealevel * this.tile_size || corners[2].y < sealevel * this.tile_size) && this.tileIterator < this.positions.length * 3);
+                if (this.tileIterator * 3 >= this.indices.length) {
+                    return false;
+                }
+            } while (corners[0].y < sealevel * this.tile_size || corners[1].y < sealevel * this.tile_size || corners[2].y < sealevel * this.tile_size);
+            return true;
         }
         //Random point on the triangle.
 
@@ -19416,26 +19432,30 @@ var Display3d = function (_flowing_terrain_1$Di) {
     }, {
         key: "planting",
         value: function planting() {
-            var treesPerTile = 1;
-            var tree = new Tree(this.scene);
+            this.trees = new Tree(this.scene);
             var points = [new BABYLON.Vector3(), new BABYLON.Vector3(), new BABYLON.Vector3()];
-            var maxTreeCount = 100000;
+            var maxTreeCount = 10000;
             var treeCount = 0;
             this.tileIterator = 0;
-            while (this.tileIterator < this.positions.length * 3 && treeCount < maxTreeCount) {
-                this.getTile(points);
-                treeCount++;
+            console.log(this.vegetation.data_combined.length, this.vegetation.data_combined[0].length);
+            while (this.getTile(points) && treeCount < maxTreeCount) {
+                var x = points[0].x / this.tile_size;
+                var z = points[0].z / this.tile_size;
+                if (this.vegetation.data_combined[x][z] > 0.05) {
+                    treeCount++;
+                }
             }
             console.log(treeCount);
-            var bufferMatrices = new Float32Array(16 * treeCount * treesPerTile);
+            var bufferMatrices = new Float32Array(16 * treeCount);
             treeCount = 0;
             this.tileIterator = 0;
-            while (this.tileIterator < this.positions.length * 3 && treeCount < maxTreeCount) {
-                if (treeCount % 100 == 0) {
-                    console.log(treeCount);
-                }
-                this.getTile(points);
-                for (var i = 0; i < treesPerTile; i++) {
+            while (this.getTile(points) && treeCount < maxTreeCount) {
+                var _x = points[0].x / this.tile_size;
+                var _z = points[0].z / this.tile_size;
+                if (this.vegetation.data_combined[_x][_z] > 0.05) {
+                    if (treeCount % 100 == 0) {
+                        console.log(treeCount);
+                    }
                     var size = Math.random() * 0.1 + 0.1;
                     var matrix = BABYLON.Matrix.Compose(new BABYLON.Vector3(size, size, size),
                     //BABYLON.Vector3.One(),
@@ -19445,12 +19465,12 @@ var Display3d = function (_flowing_terrain_1$Di) {
                     //const leaves = tree.leaves.thinInstanceAdd(matrix, true);
                     //const trunk = tree.trunk.thinInstanceAdd(matrix, true);
                     console.assert(treeCount * 16 < bufferMatrices.length);
-                    matrix.copyToArray(bufferMatrices, (treeCount + i) * 16);
+                    matrix.copyToArray(bufferMatrices, treeCount * 16);
+                    treeCount++;
                 }
-                treeCount++;
             }
-            tree.leaves.thinInstanceSetBuffer("matrix", bufferMatrices, 16, true);
-            tree.trunk.thinInstanceSetBuffer("matrix", bufferMatrices, 16, true);
+            this.trees.leaves.thinInstanceSetBuffer("matrix", bufferMatrices, 16, true);
+            this.trees.trunk.thinInstanceSetBuffer("matrix", bufferMatrices, 16, true);
         }
     }]);
 
@@ -19468,10 +19488,10 @@ var Tree = function Tree(scene) {
     this.leavesDiamiter = 10;
     this.trunkMaterial = new BABYLON.StandardMaterial("trunkMaterial", scene);
     this.trunkMaterial.diffuseColor = new BABYLON.Color3(0.5, 0.3, 0.3);
-    this.trunkMaterial.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
+    this.trunkMaterial.specularColor = new BABYLON.Color3(0.04, 0.04, 0.03);
     this.leafMaterial = new BABYLON.StandardMaterial("leafMaterial", scene);
-    this.leafMaterial.diffuseColor = new BABYLON.Color3(0.4, 0.7, 0.4);
-    this.leafMaterial.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
+    this.leafMaterial.diffuseColor = new BABYLON.Color3(0.2, 0.5, 0.1);
+    this.leafMaterial.specularColor = new BABYLON.Color3(0.03, 0.03, 0.03);
     this.root = BABYLON.Mesh.CreateBox("pineTree", 1, scene);
     this.root.isVisible = false;
     this.trunk = BABYLON.MeshBuilder.CreateCylinder("trunk", {
@@ -21126,9 +21146,10 @@ function seed_points(config, tile_count) {
 exports.seed_points = seed_points;
 
 var Noise = function () {
-    function Noise(config) {
+    function Noise(label, config) {
         _classCallCheck(this, Noise);
 
+        this.label = label;
         this.config = config;
     }
 
@@ -21146,25 +21167,25 @@ var Noise = function () {
                     scale = 20 / tile_count;
                     this.coefficients_low = [];
                     coefficients = this.coefficients_low;
-                    random = seedrandom(this.config.get("noise.random_seed_low"));
+                    random = seedrandom(this.config.get(this.label + ".random_seed_low"));
                     break;
                 case "mid":
                     scale = 100 / tile_count;
                     this.coefficients_mid = [];
                     coefficients = this.coefficients_mid;
-                    random = seedrandom(this.config.get("noise.random_seed_mid"));
+                    random = seedrandom(this.config.get(this.label + ".random_seed_mid"));
                     break;
                 case "high":
                     scale = 10;
                     this.coefficients_high = [];
                     coefficients = this.coefficients_high;
-                    random = seedrandom(this.config.get("noise.random_seed_high"));
+                    random = seedrandom(this.config.get(this.label + ".random_seed_high"));
                     break;
                 default:
                     console.trace();
             }
             // Get ranges of octaves to use from config.
-            var octave_count = this.config.get("noise." + octave + "_octave");
+            var octave_count = this.config.get(this.label + "." + octave + "_octave");
             for (var i = 0; i < octave_count; i++) {
                 coefficients.push([random() * scale - scale / 2, random() * scale - scale / 2]);
             }
@@ -21180,19 +21201,19 @@ var Noise = function () {
             var data = null;
             switch (octave) {
                 case "low":
-                    weight = this.config.get("noise.low_octave_weight");
+                    weight = this.config.get(this.label + ".low_octave_weight");
                     coefficients = this.coefficients_low;
                     this.data_low = [];
                     data = this.data_low;
                     break;
                 case "mid":
-                    weight = this.config.get("noise.mid_octave_weight");
+                    weight = this.config.get(this.label + ".mid_octave_weight");
                     coefficients = this.coefficients_mid;
                     this.data_mid = [];
                     data = this.data_mid;
                     break;
                 case "high":
-                    weight = this.config.get("noise.high_octave_weight");
+                    weight = this.config.get(this.label + ".high_octave_weight");
                     coefficients = this.coefficients_high;
                     this.data_high = [];
                     data = this.data_high;
@@ -21250,9 +21271,9 @@ var Noise = function () {
 
             if (regenerate) {
                 // Do not use same values again.
-                this.config.set("noise.random_seed_low", "low " + new Date().getTime());
-                this.config.set("noise.random_seed_mid", "mid " + new Date().getTime());
-                this.config.set("noise.random_seed_high", "high " + new Date().getTime());
+                this.config.set(this.label + ".random_seed_low", "low " + new Date().getTime());
+                this.config.set(this.label + ".random_seed_mid", "mid " + new Date().getTime());
+                this.config.set(this.label + ".random_seed_high", "high " + new Date().getTime());
             }
             // TODO: Calculate what needs updating and do only that.
             var octave = "all";
@@ -21289,21 +21310,21 @@ var Noise = function () {
             var coefficients_y = null;
             var text = "<code class='text-dark'>height =</code><br>";
             var weight = 0;
-            weight = this.config.get("noise.low_octave_weight");
+            weight = this.config.get(this.label + ".low_octave_weight");
             if (weight > 0) {
                 text += "<code class='text-info'>// low frequency</code><br>";
                 this.coefficients_low.forEach(function (both) {
                     text += line(weight, both[0], both[1]);
                 });
             }
-            weight = this.config.get("noise.mid_octave_weight");
+            weight = this.config.get(this.label + ".mid_octave_weight");
             if (weight > 0) {
                 text += "<code class='text-info'>// mid frequency</code><br>";
                 this.coefficients_mid.forEach(function (both) {
                     text += line(weight, both[0], both[1]);
                 });
             }
-            weight = this.config.get("noise.high_octave_weight");
+            weight = this.config.get(this.label + ".high_octave_weight");
             if (weight > 0) {
                 text += "<code class='text-info'>// high frequency</code><br>";
                 this.coefficients_high.forEach(function (both) {
@@ -21370,6 +21391,7 @@ window.onload = function () {
     var config = new config_1.Config();
     var seabed = null;
     var noise = null;
+    var vegetation = null;
     var geography = null;
     var display = null;
     config.set_if_null("enviroment.tile_count", 100);
@@ -21377,6 +21399,9 @@ window.onload = function () {
     config.set_if_null("noise.random_seed_low", "low " + new Date().getTime());
     config.set_if_null("noise.random_seed_mid", "mid " + new Date().getTime());
     config.set_if_null("noise.random_seed_high", "high " + new Date().getTime());
+    config.set_if_null("vegetation.random_seed_low", "v low " + new Date().getTime());
+    config.set_if_null("vegetation.random_seed_mid", "v mid " + new Date().getTime());
+    config.set_if_null("vegetation.random_seed_high", "v high " + new Date().getTime());
     config.set_if_null("seed_points.threshold", 0.18);
     config.set_callback("seed_points.threshold", seed_threshold_callback);
     config.set_if_null("noise.low_octave", 3);
@@ -21391,6 +21416,18 @@ window.onload = function () {
     config.set_callback("noise.mid_octave_weight", noise_octaves_callback);
     config.set_if_null("noise.high_octave_weight", 0.2);
     config.set_callback("noise.high_octave_weight", noise_octaves_callback);
+    config.set_if_null("vegetation.low_octave", 3);
+    //config.set_callback("vegetation.low_octave", vegetation_octaves_callback);
+    config.set_if_null("vegetation.mid_octave", 5);
+    //config.set_callback("vegetation.mid_octave", vegetation_octaves_callback);
+    config.set_if_null("vegetation.high_octave", 10);
+    //config.set_callback("vegetation.high_octave", vegetation_octaves_callback);
+    config.set_if_null("vegetation.low_octave_weight", 0.2);
+    //config.set_callback("vegetation.low_octave_weight", vegetation_octaves_callback);
+    config.set_if_null("vegetation.mid_octave_weight", 0.5);
+    //config.set_callback("vegetation.mid_octave_weight", vegetation_octaves_callback);
+    config.set_if_null("vegetation.high_octave_weight", 0.2);
+    //config.set_callback("vegetation.high_octave_weight", vegetation_octaves_callback);
     config.set_if_null("terrain.height_constant", 0.01);
     config.set_callback("terrain.height_constant", terrain_callback);
     config.set_if_null("terrain.noise_height_weight", 1.0);
@@ -21426,13 +21463,27 @@ window.onload = function () {
 
         time("noise", function () {
             if (noise === null) {
-                noise = new genesis_1.Noise(config);
+                noise = new genesis_1.Noise("noise", config);
             }
             noise.generate(regenerate);
         });
         time("2d_noise_map", function () {
             _2d_view_1.draw_2d("2d_noise_map", noise.data_combined);
             noise.text(document.getElementById("height_debug"));
+        });
+    }
+    function generate_vegetation() {
+        var regenerate = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : false;
+
+        time("vegetation", function () {
+            if (vegetation === null) {
+                vegetation = new genesis_1.Noise("vegetation", config);
+            }
+            vegetation.generate(regenerate);
+        });
+        time("vegetation_map", function () {
+            _2d_view_1.draw_2d("vegetation_map", vegetation.data_combined);
+            //vegetation.text(document.getElementById("vegetation_debug"));
         });
     }
     function generate_terrain() {
@@ -21451,7 +21502,7 @@ window.onload = function () {
         });
         display = time("3d_display", function () {
             if (display === null) {
-                return new _3d_view_1.Display3d(geography, config);
+                return new _3d_view_1.Display3d(geography, vegetation, config);
             } else {
                 display.draw();
                 return display;
@@ -21460,6 +21511,7 @@ window.onload = function () {
     }
     generate_seed_points();
     generate_noise();
+    generate_vegetation();
     generate_terrain();
     console.table(stats);
     // Start drawing the 3d view.
@@ -21649,6 +21701,11 @@ window.onload = function () {
             }, 2000);
         }
     }
+    // Button to regenerate all aspects of the vegetation map.
+    var menu_vegetation = document.getElementById("vegetation");
+    menu_vegetation.addEventListener("click", function (event) {
+        generate_vegetation(true);
+    });
     // Move camera to selected view.
     var views = document.getElementById("views").querySelectorAll(".btn");
     views.forEach(function (view) {

@@ -26,12 +26,13 @@
  * https://github.com/mrdunk/flowing-terrain */
 
 import * as BABYLON from 'babylonjs';
-import {WaterMaterial} from 'babylonjs-materials';
 import {Geography, Tile, DisplayBase, Coordinate} from "./flowing_terrain";
+import {Noise} from "./genesis";
 import {Config} from "./config";
 import {FreeCameraPointersInput} from './freeCameraPointersInput';
 
 export class Display3d extends DisplayBase {
+  vegetation: Noise;
   config: Config = null;
   tile_size: number = 2;
   positions: number[] = [];
@@ -39,6 +40,8 @@ export class Display3d extends DisplayBase {
   normals: number[] = [];
   tileIterator: number = 0;
   rivers: BABYLON.Vector3[][] = [];
+  land_mesh: BABYLON.Mesh;
+  trees: Tree;
   sea_mesh: BABYLON.Mesh;
   rivers_mesh: BABYLON.Mesh;
   update_rivers_timer: ReturnType<typeof setTimeout> = 0;
@@ -53,9 +56,10 @@ export class Display3d extends DisplayBase {
   sea_material: BABYLON.StandardMaterial;
   seabed_material: BABYLON.StandardMaterial;
 
-  constructor(geography: Geography, config: Config) {
+  constructor(geography: Geography, vegetation: Noise, config: Config) {
     super(geography);
 
+    this.vegetation = vegetation;
     this.config = config;
 
     this.canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
@@ -95,34 +99,37 @@ export class Display3d extends DisplayBase {
     this.camera.touchAngularSensibility = 60000;
 
     this.camera.attachControl(this.canvas, true);
-    const light_1 = new BABYLON.HemisphericLight(
+    const light_1 = new BABYLON.DirectionalLight(
       "light_1",
-      new BABYLON.Vector3(1, 0.5, 0),
+      new BABYLON.Vector3(-10, -10, 0),
       this.scene);
-    light_1.diffuse = new BABYLON.Color3(1, 0, 1);
+    light_1.position = new BABYLON.Vector3(100, 100, 100);
+    light_1.diffuse = new BABYLON.Color3(1, 1, 1);
     light_1.specular = new BABYLON.Color3(0, 0, 0);
+    light_1.intensity = 0.5;
 
-    const light_2 = new BABYLON.HemisphericLight(
+    const light_2 = new BABYLON.DirectionalLight(
       "light_2",
-      new BABYLON.Vector3(0, 0.5, 1),
+      new BABYLON.Vector3(0, -10, 0),
       this.scene);
-    light_2.diffuse = new BABYLON.Color3(0, 1, 1);
+    light_2.diffuse = new BABYLON.Color3(1, 1, 1);
     light_2.specular = new BABYLON.Color3(0.3, 0.3, 0.3);
+    light_2.intensity = 0.5;
 
     this.scene.ambientColor = new BABYLON.Color3(0.2, 0.2, 0.3);
 
     this.land_material = new BABYLON.StandardMaterial("land_material", this.scene);
-    this.land_material.diffuseColor = new BABYLON.Color3(0.3, 0.7, 0.2);
+    this.land_material.diffuseColor = new BABYLON.Color3(0.4, 0.6, 0.2);
     this.land_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
     // this.land_material.backFaceCulling = false;
 
     this.seabed_material = new BABYLON.StandardMaterial("seabed_material", this.scene);
-    this.seabed_material.diffuseColor = new BABYLON.Color3(0.3, 0.7, 0.2);
+    this.seabed_material.diffuseColor = new BABYLON.Color3(0.4, 0.6, 0.2);
     this.seabed_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
     // this.seabed_material.backFaceCulling = false;
 
     this.sea_material = new BABYLON.StandardMaterial("sea_material", this.scene);
-    this.sea_material.diffuseColor = new BABYLON.Color3(0.2, 0.4, 0.7);
+    this.sea_material.diffuseColor = new BABYLON.Color3(0.1, 0.2, 1.0);
     this.sea_material.specularColor = new BABYLON.Color3(0.5, 0.5, 0.5);
     this.sea_material.alpha = config.get("display.sea_transparency");
     this.sea_material.backFaceCulling = false;
@@ -130,6 +137,10 @@ export class Display3d extends DisplayBase {
     this.draw();
 
     this.planting();
+
+    const shadowGenerator = new BABYLON.ShadowGenerator(2048, light_1);
+    shadowGenerator.addShadowCaster(this.trees.leaves, true);
+    this.land_mesh.receiveShadows = true
 
     this.camera.setTarget(new BABYLON.Vector3(mapsize / 2, 0, mapsize / 2));
 
@@ -388,11 +399,12 @@ export class Display3d extends DisplayBase {
     vertexData.indices = this.indices;
     vertexData.normals = this.normals;
 
-    const land = new BABYLON.Mesh("land");
-    land.material = this.land_material;
-    vertexData.applyToMesh(land, true);
-    land.checkCollisions = true;
-    // land.convertToFlatShadedMesh();
+    this.land_mesh = new BABYLON.Mesh("land");
+    this.land_mesh.material = this.land_material;
+    vertexData.applyToMesh(this.land_mesh, true);
+    this.land_mesh.isPickable = false;
+    this.land_mesh.checkCollisions = false;
+    // this.land_mesh.convertToFlatShadedMesh();
 
     // Rivers
     this.schedule_update_rivers();
@@ -461,11 +473,17 @@ export class Display3d extends DisplayBase {
     }
     if(this.rivers.length > 0) {
       this.rivers_mesh = BABYLON.MeshBuilder.CreateLineSystem(
-        "rivers", {lines: this.rivers}, this.scene);
+        "rivers",
+        {
+          lines: this.rivers,
+          useVertexAlpha: false
+        },
+        this.scene);
+      (<any>this.rivers_mesh).color = new BABYLON.Color3(0.3, 0.3, 1);
     }
   }
 
-  getTile(corners: BABYLON.Vector3[]): void {
+  getTile(corners: BABYLON.Vector3[]): boolean {
     const sealevel = this.config.get("geography.sealevel");
     do {
       const offset0 = this.indices[this.tileIterator * 3];
@@ -477,10 +495,13 @@ export class Display3d extends DisplayBase {
       corners[2].fromArray(this.positions, offset2 * 3);
 
       this.tileIterator++;
-    } while((corners[0].y < sealevel * this.tile_size ||
-             corners[1].y < sealevel * this.tile_size ||
-             corners[2].y < sealevel * this.tile_size) &&
-            this.tileIterator < this.positions.length * 3);
+      if(this.tileIterator * 3 >= this.indices.length) {
+        return false;
+      }
+    } while(corners[0].y < sealevel * this.tile_size ||
+            corners[1].y < sealevel * this.tile_size ||
+            corners[2].y < sealevel * this.tile_size);
+    return true;
   }
 
   //Random point on the triangle.
@@ -502,32 +523,35 @@ export class Display3d extends DisplayBase {
   }
 
   planting(): void {
-    const treesPerTile = 1;
-    const tree = new Tree(this.scene);
+    this.trees = new Tree(this.scene);
 
     const points = [new BABYLON.Vector3(), new BABYLON.Vector3(), new BABYLON.Vector3()];
 
-    const maxTreeCount = 100000;
+    const maxTreeCount = 10000;
     let treeCount = 0;
     this.tileIterator = 0;
-    while(this.tileIterator < this.positions.length * 3 && treeCount < maxTreeCount) {
-      this.getTile(points);
-      treeCount++;
+    console.log(this.vegetation.data_combined.length, this.vegetation.data_combined[0].length);
+    while(this.getTile(points) && treeCount < maxTreeCount) {
+      const x = points[0].x / this.tile_size;
+      const z = points[0].z / this.tile_size;
+      if(this.vegetation.data_combined[x][z] > 0.05) {
+        treeCount++;
+      }
     }
     console.log(treeCount);
 
-    let bufferMatrices = new Float32Array(16 * treeCount * treesPerTile);
+    let bufferMatrices = new Float32Array(16 * treeCount);
 
     treeCount = 0;
     this.tileIterator = 0;
-    while(this.tileIterator < this.positions.length * 3 && treeCount < maxTreeCount) {
-      if(treeCount % 100 == 0) {
-        console.log(treeCount);
-      }
+    while(this.getTile(points) && treeCount < maxTreeCount) {
+      const x = points[0].x / this.tile_size;
+      const z = points[0].z / this.tile_size;
+      if(this.vegetation.data_combined[x][z] > 0.05) {
+        if(treeCount % 100 == 0) {
+          console.log(treeCount);
+        }
 
-      this.getTile(points);
-
-      for(let i = 0; i < treesPerTile; i++) {
         const size = Math.random() * 0.1 + 0.1;
         const matrix = BABYLON.Matrix.Compose(
           new BABYLON.Vector3(size, size, size),
@@ -541,13 +565,13 @@ export class Display3d extends DisplayBase {
         //const trunk = tree.trunk.thinInstanceAdd(matrix, true);
 
         console.assert(treeCount * 16 < bufferMatrices.length);
-        matrix.copyToArray(bufferMatrices, (treeCount + i) * 16);
-      }
+        matrix.copyToArray(bufferMatrices, (treeCount) * 16);
 
-      treeCount++;
+        treeCount++;
+      }
     }
-    tree.leaves.thinInstanceSetBuffer("matrix", bufferMatrices, 16, true);
-    tree.trunk.thinInstanceSetBuffer("matrix", bufferMatrices, 16, true);
+    this.trees.leaves.thinInstanceSetBuffer("matrix", bufferMatrices, 16, true);
+    this.trees.trunk.thinInstanceSetBuffer("matrix", bufferMatrices, 16, true);
   }
 }
 
@@ -565,11 +589,11 @@ class Tree {
   constructor(scene: BABYLON.Scene) {
     this.trunkMaterial = new BABYLON.StandardMaterial("trunkMaterial", scene);
     this.trunkMaterial.diffuseColor = new BABYLON.Color3(0.5, 0.3, 0.3);
-    this.trunkMaterial.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
+    this.trunkMaterial.specularColor = new BABYLON.Color3(0.04, 0.04, 0.03);
 
     this.leafMaterial = new BABYLON.StandardMaterial("leafMaterial", scene);
-    this.leafMaterial.diffuseColor = new BABYLON.Color3(0.4, 0.7, 0.4);
-    this.leafMaterial.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
+    this.leafMaterial.diffuseColor = new BABYLON.Color3(0.2, 0.5, 0.1);
+    this.leafMaterial.specularColor = new BABYLON.Color3(0.03, 0.03, 0.03);
 
     this.root = BABYLON.Mesh.CreateBox("pineTree", 1, scene);
     this.root.isVisible = false;

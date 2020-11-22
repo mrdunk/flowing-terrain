@@ -25,7 +25,7 @@
 export function draw_2d(id: string,
                         data: any[][],
                         accessor: any = (item: any) => {return item;},
-                        size:number=2): void {
+                        size: number = 2): void {
   const canvas = document.getElementById(id) as HTMLCanvasElement;
   console.assert(canvas !== undefined, `Can't find canvas element: ${id}`);
   const ctx = canvas.getContext('2d');
