@@ -30,6 +30,7 @@ import {Geography, Tile, DisplayBase, Coordinate} from "./flowing_terrain";
 import {Noise} from "./genesis";
 import {Config} from "./config";
 import {FreeCameraPointersInput} from './freeCameraPointersInput';
+import {Planting, PlantType} from './Planting';
 
 export class Display3d extends DisplayBase {
   vegetation: Noise;
@@ -41,7 +42,8 @@ export class Display3d extends DisplayBase {
   tileIterator: number = 0;
   rivers: BABYLON.Vector3[][] = [];
   land_mesh: BABYLON.Mesh;
-  trees: Tree;
+  treesPine: TreePine;
+  treesDeciduous: TreeDeciduous;
   sea_mesh: BABYLON.Mesh;
   rivers_mesh: BABYLON.Mesh;
   update_rivers_timer: ReturnType<typeof setTimeout> = 0;
@@ -74,7 +76,7 @@ export class Display3d extends DisplayBase {
       "UniversalCamera",
       new BABYLON.Vector3(0, 0, 0),
       this.scene);
-    
+
     this.camera.inputs.addMouseWheel();
     (this.camera.inputs.attached['mousewheel'] as BABYLON.FreeCameraMouseWheelInput).
       wheelYMoveScene = BABYLON.Coordinate.Y;
@@ -91,7 +93,7 @@ export class Display3d extends DisplayBase {
 
     this.camera.position = new BABYLON.Vector3(-mapsize / 4, mapsize / 4, -mapsize / 4);
     this.camera.checkCollisions = true;
-    this.camera.ellipsoid = new BABYLON.Vector3(0.5, 0.5, 0.5);
+    this.camera.ellipsoid = new BABYLON.Vector3(1.0, 0.5, 1.0);
     this.camera.updateUpVectorFromRotation = true;
 
     // Higher the less sensitive.
@@ -107,6 +109,7 @@ export class Display3d extends DisplayBase {
     light_1.diffuse = new BABYLON.Color3(1, 1, 1);
     light_1.specular = new BABYLON.Color3(0, 0, 0);
     light_1.intensity = 0.5;
+    light_1.autoCalcShadowZBounds = true;
 
     const light_2 = new BABYLON.DirectionalLight(
       "light_2",
@@ -138,14 +141,21 @@ export class Display3d extends DisplayBase {
 
     this.planting();
 
-    const shadowGenerator = new BABYLON.ShadowGenerator(2048, light_1);
-    shadowGenerator.addShadowCaster(this.trees.leaves, true);
+    const shadowGenerator = new BABYLON.ShadowGenerator(4096, light_1);
+    //shadowGenerator.usePoissonSampling = true;
+    shadowGenerator.useExponentialShadowMap = false;
+    shadowGenerator.addShadowCaster(this.treesPine.trunk, true);
+    shadowGenerator.addShadowCaster(this.treesPine.leaves, true);
+    shadowGenerator.addShadowCaster(this.treesDeciduous.trunk, true);
+    shadowGenerator.addShadowCaster(this.treesDeciduous.leaves, true);
     this.land_mesh.receiveShadows = true
 
     this.camera.setTarget(new BABYLON.Vector3(mapsize / 2, 0, mapsize / 2));
 
     // Hide the HTML loader.
     document.getElementById("loader").style.display = "none";
+
+    console.log(this.indices.length, this.positions.length);
   }
 
   updateFps(): void {
@@ -247,10 +257,10 @@ export class Display3d extends DisplayBase {
 
     for(let y = 0; y < this.config.get("enviroment.tile_count"); y++) {
       for(let x = 0; x < this.config.get("enviroment.tile_count"); x++) {
-        // TODO: Some of these positions are not actually used.
-        // Tiles at the height of the seabed are not drawn.
-        // Not populating these at this time would make calculating indexes into
-        // the this.positions array much more challenging though.
+        // These are the points at the corners of the grid.
+        // We actually form these into triangles later in draw_tile(...) where
+        // we populate the this.indices[] collection with indexes of
+        // this.positions entries.
         const tile = this.geography.get_tile({x, y});
         this.positions.push(tile.pos.x * this.tile_size);
         this.positions.push(tile.height * this.tile_size);
@@ -283,11 +293,11 @@ export class Display3d extends DisplayBase {
     const height01 = this.positions[offset01 * 3 + 1];
     const height11 = this.positions[offset11 * 3 + 1];
 
-    if(height00 === 0 && height10 === 0 && height01 === 0 && height11 === 0) {
+    // if(height00 === 0 && height10 === 0 && height01 === 0 && height11 === 0) {
       // The tile we are considering drawing is at the same height as the seabed.
       // More efficient to just draw a single "seabed" tile under the whole map.
       // return;
-    }
+    // }
 
     const height_lowest = Math.min(Math.min(Math.min(height00, height10), height01), height11);
 
@@ -311,34 +321,24 @@ export class Display3d extends DisplayBase {
     // This will obscure any river drawn directly between "A" and "D".
     // Instead we should tile with triangles "ADC" and "ACB" so the edge of both
     // triangles is the same vertex as the river.
-    if(height00 === height_lowest) {
+    if(height00 === height_lowest || height11 === height_lowest) {
+      // First triangle.
       this.indices.push(offset00);
       this.indices.push(offset11);
       this.indices.push(offset01);
+      // Second triangle.
+      this.indices.push(offset11);
       this.indices.push(offset00);
       this.indices.push(offset10);
-      this.indices.push(offset11);
-    } else if(height10 === height_lowest) {
-      this.indices.push(offset10);
-      this.indices.push(offset01);
-      this.indices.push(offset00);
-      this.indices.push(offset10);
-      this.indices.push(offset11);
-      this.indices.push(offset01);
-    } else if(height01 === height_lowest) {
-      this.indices.push(offset01);
-      this.indices.push(offset00);
-      this.indices.push(offset10);
-      this.indices.push(offset01);
-      this.indices.push(offset10);
-      this.indices.push(offset11);
     } else {
-      this.indices.push(offset11);
-      this.indices.push(offset00);
+      // First triangle.
       this.indices.push(offset10);
-      this.indices.push(offset11);
       this.indices.push(offset01);
       this.indices.push(offset00);
+      // Second triangle.
+      this.indices.push(offset01);
+      this.indices.push(offset10);
+      this.indices.push(offset11);
     }
   }
 
@@ -403,8 +403,13 @@ export class Display3d extends DisplayBase {
     this.land_mesh.material = this.land_material;
     vertexData.applyToMesh(this.land_mesh, true);
     this.land_mesh.isPickable = false;
-    this.land_mesh.checkCollisions = false;
+    // Required to keep camera above ground.
+    this.land_mesh.checkCollisions = true;
     // this.land_mesh.convertToFlatShadedMesh();
+
+    //this.land_mesh.enableEdgesRendering(.9999999999);
+    //this.land_mesh.edgesWidth = 5.0;
+    //this.land_mesh.edgesColor = new BABYLON.Color4(1, 1, 1, 1);
 
     // Rivers
     this.schedule_update_rivers();
@@ -483,99 +488,200 @@ export class Display3d extends DisplayBase {
     }
   }
 
-  getTile(corners: BABYLON.Vector3[]): boolean {
-    const sealevel = this.config.get("geography.sealevel");
-    do {
-      const offset0 = this.indices[this.tileIterator * 3];
-      const offset1 = this.indices[this.tileIterator * 3 + 1];
-      const offset2 = this.indices[this.tileIterator * 3 + 2];
+  setPositionOnSurface(point: BABYLON.Vector3): void {
 
-      corners[0].fromArray(this.positions, offset0 * 3);
-      corners[1].fromArray(this.positions, offset1 * 3);
-      corners[2].fromArray(this.positions, offset2 * 3);
+    // Get the 2 triangles that tile this square.
+    const indiceStartIndex = (
+      (Math.floor(point.z / 2) * (this.config.get("enviroment.tile_count") - 1) +
+        Math.floor(point.x / 2)) * 6);
+    const triangle1Corners: BABYLON.Vector3[] = [
+      BABYLON.Vector3.FromArray(this.positions, this.indices[indiceStartIndex + 0] * 3),
+      BABYLON.Vector3.FromArray(this.positions, this.indices[indiceStartIndex + 1] * 3),
+      BABYLON.Vector3.FromArray(this.positions, this.indices[indiceStartIndex + 2] * 3)
+    ];
+    const triangle2Corners: BABYLON.Vector3[] = [
+      BABYLON.Vector3.FromArray(this.positions, this.indices[indiceStartIndex + 3] * 3),
+      BABYLON.Vector3.FromArray(this.positions, this.indices[indiceStartIndex + 4] * 3),
+      BABYLON.Vector3.FromArray(this.positions, this.indices[indiceStartIndex + 5] * 3)
+    ];
 
-      this.tileIterator++;
-      if(this.tileIterator * 3 >= this.indices.length) {
-        return false;
+    // Calculate which triangle point is in.
+    const pointOrientation = (point.x - triangle1Corners[0].x) /
+                             (point.z - triangle1Corners[0].z);
+    const dx = point.x / 2 - Math.floor(point.x / 2);
+    const dz = point.z / 2 - Math.floor(point.z / 2);
+
+    if(triangle1Corners[1].x === triangle1Corners[2].x &&
+      triangle1Corners[0].z === triangle1Corners[2].z) {
+      if(Math.abs(pointOrientation) >= 1) {
+        // 1
+        // 2 0
+        console.assert(triangle1Corners[2].x / 2 === Math.floor(point.x / 2));
+        console.assert(triangle1Corners[2].z / 2 === Math.floor(point.z / 2));
+        console.assert(triangle1Corners[1].x === triangle1Corners[2].x);
+        console.assert(triangle1Corners[0].z === triangle1Corners[2].z);
+
+        const dxy = triangle1Corners[2].y - triangle1Corners[0].y;
+        const dzy = triangle1Corners[2].y - triangle1Corners[1].y;
+
+        point.y = triangle1Corners[2].y - (dzy * dz) - (dxy * dx);
+        //point.y = -1000;
+      } else {
+        // 0 2
+        //   1
+        console.assert(triangle2Corners[0].x / 2 === Math.floor(point.x / 2));
+        console.assert(triangle2Corners[1].z / 2 === Math.floor(point.z / 2));
+        console.assert(triangle2Corners[1].x === triangle2Corners[2].x);
+        console.assert(triangle2Corners[1].z === triangle2Corners[2].z - 2);
+        console.assert(triangle2Corners[0].x === triangle2Corners[2].x - 2);
+        console.assert(triangle2Corners[0].z === triangle2Corners[2].z);
+
+        const dxy = triangle2Corners[2].y - triangle2Corners[0].y;
+        const dzy = triangle2Corners[2].y - triangle2Corners[1].y;
+
+        point.y = triangle2Corners[2].y - (dzy * (1 - dz)) - (dxy * (1 - dx));
+        //point.y = -1000;
       }
-    } while(corners[0].y < sealevel * this.tile_size ||
-            corners[1].y < sealevel * this.tile_size ||
-            corners[2].y < sealevel * this.tile_size);
-    return true;
-  }
+    } else if(triangle1Corners[2].x === triangle1Corners[0].x &&
+      triangle1Corners[1].z === triangle1Corners[2].z ) {
+      if(Math.abs(pointOrientation) <= 1) {
+        // 2 1
+        // 0
+        console.assert(triangle1Corners[0].x / 2 === Math.floor(point.x / 2));
+        console.assert(triangle1Corners[0].z / 2 === Math.floor(point.z / 2));
+        console.assert(triangle1Corners[2].x === triangle1Corners[0].x);
+        console.assert(triangle1Corners[2].z === triangle1Corners[0].z + 2);
+        console.assert(triangle1Corners[1].x === triangle1Corners[2].x + 2);
+        console.assert(triangle1Corners[1].z === triangle1Corners[2].z);
 
-  //Random point on the triangle.
-  randomPoint(corners: BABYLON.Vector3[]): BABYLON.Vector3 {
-    // point.x = s * corners[0].x + (t-s) * corners[1].x + (1-t) * corners[2].x;
-    let s = Math.random();
-    let t = Math.random();
-    if (s > t) {
-      const tmp = s;
-      s = t;
-      t = tmp;
+        const dxy = triangle1Corners[2].y - triangle1Corners[1].y;
+        const dzy = triangle1Corners[2].y - triangle1Corners[0].y;
+
+        point.y = triangle1Corners[2].y - (dzy * (1 - dz)) - (dxy * dx);
+        //point.y = -1000;
+      } else {
+        //   0
+        // 1 2
+        console.assert(triangle2Corners[1].x / 2 === Math.floor(point.x / 2));
+        console.assert(triangle2Corners[1].z / 2 === Math.floor(point.z / 2));
+        console.assert(triangle2Corners[0].x === triangle2Corners[2].x);
+        console.assert(triangle2Corners[0].z === triangle2Corners[2].z + 2);
+        console.assert(triangle2Corners[2].x === triangle2Corners[1].x + 2);
+        console.assert(triangle2Corners[2].z === triangle2Corners[1].z);
+
+        const dxy = triangle2Corners[2].y - triangle2Corners[1].y;
+        const dzy = triangle2Corners[2].y - triangle2Corners[0].y;
+
+        point.y = triangle2Corners[2].y - (dzy * dz) - (dxy * (1 - dx));
+        //point.y = -1000;
+      }
     }
-    let point = new BABYLON.Vector3;
-    point.x = s * corners[0].x + (t-s) * corners[1].x + (1-t) * corners[2].x;
-    point.y = s * corners[0].y + (t-s) * corners[1].y + (1-t) * corners[2].y;
-    point.z = s * corners[0].z + (t-s) * corners[1].z + (1-t) * corners[2].z;
-
-    return point;
   }
 
   planting(): void {
-    this.trees = new Tree(this.scene);
+    const p = new Planting(this.geography, this.config, this.vegetation.data_combined);
 
-    const points = [new BABYLON.Vector3(), new BABYLON.Vector3(), new BABYLON.Vector3()];
+    this.treesPine = new TreePine(this.scene);
+    this.treesDeciduous = new TreeDeciduous(this.scene);
+    let pineCount = 0;
+    let deciduousCount = 0;
 
-    const maxTreeCount = 10000;
-    let treeCount = 0;
-    this.tileIterator = 0;
-    console.log(this.vegetation.data_combined.length, this.vegetation.data_combined[0].length);
-    while(this.getTile(points) && treeCount < maxTreeCount) {
-      const x = points[0].x / this.tile_size;
-      const z = points[0].z / this.tile_size;
-      if(this.vegetation.data_combined[x][z] > 0.05) {
-        treeCount++;
-      }
-    }
-    console.log(treeCount);
+    let bufferMatricesPine =
+      new Float32Array(16 * p.countByType[PlantType.Pine]);
+    let bufferMatricesDeciduous =
+      new Float32Array(16 * p.countByType[PlantType.Deciduous]);
 
-    let bufferMatrices = new Float32Array(16 * treeCount);
+    for(let [keyX, row] of p.locations.entries()) {
+      for(let [keyY, Plant] of row.entries()) {
+        for(let plant of p.get(keyX, keyY)) {
+          //const position = plant.position.clone() as BABYLON.Vector3;
+          const position = new BABYLON.Vector3(
+            plant.position.x * this.tile_size, 0, plant.position.z * this.tile_size);
+          this.setPositionOnSurface(position);
 
-    treeCount = 0;
-    this.tileIterator = 0;
-    while(this.getTile(points) && treeCount < maxTreeCount) {
-      const x = points[0].x / this.tile_size;
-      const z = points[0].z / this.tile_size;
-      if(this.vegetation.data_combined[x][z] > 0.05) {
-        if(treeCount % 100 == 0) {
-          console.log(treeCount);
+          const matrix = BABYLON.Matrix.Compose(
+            new BABYLON.Vector3(plant.height, plant.height, plant.height),
+            BABYLON.Quaternion.Zero(),
+            position
+          );
+
+          switch(plant.type_){
+            case PlantType.Pine:
+              matrix.copyToArray(bufferMatricesPine, pineCount * 16);
+              pineCount++;
+              break;
+            case PlantType.Deciduous:
+              matrix.copyToArray(bufferMatricesDeciduous, deciduousCount * 16);
+              deciduousCount++;
+              break;
+          }
         }
-
-        const size = Math.random() * 0.1 + 0.1;
-        const matrix = BABYLON.Matrix.Compose(
-          new BABYLON.Vector3(size, size, size),
-          //BABYLON.Vector3.One(),
-          BABYLON.Quaternion.Zero(),
-          this.randomPoint(points)
-          //new BABYLON.Vector3(1, 2, 3)
-        );
-
-        //const leaves = tree.leaves.thinInstanceAdd(matrix, true);
-        //const trunk = tree.trunk.thinInstanceAdd(matrix, true);
-
-        console.assert(treeCount * 16 < bufferMatrices.length);
-        matrix.copyToArray(bufferMatrices, (treeCount) * 16);
-
-        treeCount++;
       }
     }
-    this.trees.leaves.thinInstanceSetBuffer("matrix", bufferMatrices, 16, true);
-    this.trees.trunk.thinInstanceSetBuffer("matrix", bufferMatrices, 16, true);
+
+    this.treesDeciduous.leaves.thinInstanceSetBuffer("matrix", bufferMatricesDeciduous, 16, true);
+    this.treesDeciduous.trunk.thinInstanceSetBuffer("matrix", bufferMatricesDeciduous, 16, true);
+    this.treesPine.leaves.thinInstanceSetBuffer("matrix", bufferMatricesPine, 16, true);
+    this.treesPine.trunk.thinInstanceSetBuffer("matrix", bufferMatricesPine, 16, true);
   }
 }
 
-class Tree {
+class TreeDeciduous {
+  readonly tessellation: number = 3;
+  readonly trunkHeight: number = 5;
+  readonly leavesDiamiter: number = 10;
+  root: BABYLON.Mesh;
+  trunk: BABYLON.Mesh;
+  leaves: BABYLON.Mesh;
+  trunkMaterial: BABYLON.StandardMaterial;
+  leafMaterial: BABYLON.StandardMaterial;
+
+  constructor(scene: BABYLON.Scene) {
+    this.trunkMaterial = new BABYLON.StandardMaterial("trunkMaterial", scene);
+    this.trunkMaterial.diffuseColor = new BABYLON.Color3(0.5, 0.3, 0.3);
+    this.trunkMaterial.specularColor = new BABYLON.Color3(0.04, 0.04, 0.03);
+
+    this.leafMaterial = new BABYLON.StandardMaterial("leafMaterial", scene);
+    this.leafMaterial.diffuseColor = new BABYLON.Color3(0.2, 0.7, 0.3);
+    this.leafMaterial.specularColor = new BABYLON.Color3(0.03, 0.03, 0.03);
+
+    this.root = BABYLON.Mesh.CreateBox("pineTree", 1, scene);
+    this.root.isVisible = false;
+
+    this.trunk = BABYLON.MeshBuilder.CreateCylinder(
+      "trunk",
+      {
+        height: this.trunkHeight + this.leavesDiamiter / 2,
+        tessellation: this.tessellation,
+        cap: BABYLON.Mesh.NO_CAP,
+        diameterTop: 1,
+        diameterBottom: 1.2,
+      }
+    );
+    this.trunk.position.y = this.trunkHeight / 2;
+    this.trunk.material = this.trunkMaterial;
+    this.trunk.bakeCurrentTransformIntoVertices();
+
+    // const debug = BABYLON.MeshBuilder.CreateBox("debug", {size: 2, height: 0.02}, scene);
+    // this.trunk = BABYLON.Mesh.MergeMeshes([this.trunk, debug]);
+
+    this.leaves = BABYLON.MeshBuilder.CreateSphere(
+      "leaves",
+      {
+        segments: 1,
+        diameter: this.leavesDiamiter
+      }
+    );
+    this.leaves.position.y = this.leavesDiamiter / 2 + this.trunkHeight;
+    this.leaves.material = this.leafMaterial;
+    this.leaves.bakeCurrentTransformIntoVertices();
+
+    this.leaves.parent = this.root;
+    this.trunk.parent = this.root;
+  }
+}
+
+class TreePine {
   readonly tessellation: number = 3;
   readonly trunkHeight: number = 5;
   readonly leavesHeight: number = 10;
@@ -597,7 +703,7 @@ class Tree {
 
     this.root = BABYLON.Mesh.CreateBox("pineTree", 1, scene);
     this.root.isVisible = false;
-    
+
     this.trunk = BABYLON.MeshBuilder.CreateCylinder(
       "trunk",
       {
@@ -611,6 +717,9 @@ class Tree {
     this.trunk.position.y = this.trunkHeight / 2;
     this.trunk.material = this.trunkMaterial;
     this.trunk.bakeCurrentTransformIntoVertices();
+
+    // const debug = BABYLON.MeshBuilder.CreateBox("debug", {size: 2, height: 0.02}, scene);
+    // this.trunk = BABYLON.Mesh.MergeMeshes([this.trunk, debug]);
 
     this.leaves = BABYLON.MeshBuilder.CreateCylinder(
       "leaves",
@@ -627,6 +736,6 @@ class Tree {
     this.leaves.bakeCurrentTransformIntoVertices();
 
     this.leaves.parent = this.root;
-    this.trunk.parent = this.root; 
+    this.trunk.parent = this.root;
   }
 }

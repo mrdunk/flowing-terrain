@@ -18994,6 +18994,8 @@ exports.draw_2d = draw_2d;
  * SOFTWARE.
  */
 
+var _slicedToArray = function () { function sliceIterator(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"]) _i["return"](); } finally { if (_d) throw _e; } } return _arr; } return function (arr, i) { if (Array.isArray(arr)) { return arr; } else if (Symbol.iterator in Object(arr)) { return sliceIterator(arr, i); } else { throw new TypeError("Invalid attempt to destructure non-iterable instance"); } }; }();
+
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
@@ -19009,6 +19011,7 @@ exports.Display3d = void 0;
 var BABYLON = require("babylonjs");
 var flowing_terrain_1 = require("./flowing_terrain");
 var freeCameraPointersInput_1 = require("./freeCameraPointersInput");
+var Planting_1 = require("./Planting");
 
 var Display3d = function (_flowing_terrain_1$Di) {
     _inherits(Display3d, _flowing_terrain_1$Di);
@@ -19047,7 +19050,7 @@ var Display3d = function (_flowing_terrain_1$Di) {
         _this.camera.inputs.add(pointerInput);
         _this.camera.position = new BABYLON.Vector3(-mapsize / 4, mapsize / 4, -mapsize / 4);
         _this.camera.checkCollisions = true;
-        _this.camera.ellipsoid = new BABYLON.Vector3(0.5, 0.5, 0.5);
+        _this.camera.ellipsoid = new BABYLON.Vector3(1.0, 0.5, 1.0);
         _this.camera.updateUpVectorFromRotation = true;
         // Higher the less sensitive.
         _this.camera.touchMoveSensibility = 200;
@@ -19058,6 +19061,7 @@ var Display3d = function (_flowing_terrain_1$Di) {
         light_1.diffuse = new BABYLON.Color3(1, 1, 1);
         light_1.specular = new BABYLON.Color3(0, 0, 0);
         light_1.intensity = 0.5;
+        light_1.autoCalcShadowZBounds = true;
         var light_2 = new BABYLON.DirectionalLight("light_2", new BABYLON.Vector3(0, -10, 0), _this.scene);
         light_2.diffuse = new BABYLON.Color3(1, 1, 1);
         light_2.specular = new BABYLON.Color3(0.3, 0.3, 0.3);
@@ -19078,12 +19082,18 @@ var Display3d = function (_flowing_terrain_1$Di) {
         _this.sea_material.backFaceCulling = false;
         _this.draw();
         _this.planting();
-        var shadowGenerator = new BABYLON.ShadowGenerator(2048, light_1);
-        shadowGenerator.addShadowCaster(_this.trees.leaves, true);
+        var shadowGenerator = new BABYLON.ShadowGenerator(4096, light_1);
+        //shadowGenerator.usePoissonSampling = true;
+        shadowGenerator.useExponentialShadowMap = false;
+        shadowGenerator.addShadowCaster(_this.treesPine.trunk, true);
+        shadowGenerator.addShadowCaster(_this.treesPine.leaves, true);
+        shadowGenerator.addShadowCaster(_this.treesDeciduous.trunk, true);
+        shadowGenerator.addShadowCaster(_this.treesDeciduous.leaves, true);
         _this.land_mesh.receiveShadows = true;
         _this.camera.setTarget(new BABYLON.Vector3(mapsize / 2, 0, mapsize / 2));
         // Hide the HTML loader.
         document.getElementById("loader").style.display = "none";
+        console.log(_this.indices.length, _this.positions.length);
         return _this;
     }
 
@@ -19177,10 +19187,10 @@ var Display3d = function (_flowing_terrain_1$Di) {
             this.rivers = [];
             for (var y = 0; y < this.config.get("enviroment.tile_count"); y++) {
                 for (var x = 0; x < this.config.get("enviroment.tile_count"); x++) {
-                    // TODO: Some of these positions are not actually used.
-                    // Tiles at the height of the seabed are not drawn.
-                    // Not populating these at this time would make calculating indexes into
-                    // the this.positions array much more challenging though.
+                    // These are the points at the corners of the grid.
+                    // We actually form these into triangles later in draw_tile(...) where
+                    // we populate the this.indices[] collection with indexes of
+                    // this.positions entries.
                     var tile = this.geography.get_tile({ x: x, y: y });
                     this.positions.push(tile.pos.x * this.tile_size);
                     this.positions.push(tile.height * this.tile_size);
@@ -19210,11 +19220,11 @@ var Display3d = function (_flowing_terrain_1$Di) {
             var height10 = this.positions[offset10 * 3 + 1];
             var height01 = this.positions[offset01 * 3 + 1];
             var height11 = this.positions[offset11 * 3 + 1];
-            if (height00 === 0 && height10 === 0 && height01 === 0 && height11 === 0) {
-                // The tile we are considering drawing is at the same height as the seabed.
-                // More efficient to just draw a single "seabed" tile under the whole map.
-                // return;
-            }
+            // if(height00 === 0 && height10 === 0 && height01 === 0 && height11 === 0) {
+            // The tile we are considering drawing is at the same height as the seabed.
+            // More efficient to just draw a single "seabed" tile under the whole map.
+            // return;
+            // }
             var height_lowest = Math.min(Math.min(Math.min(height00, height10), height01), height11);
             // Each square on the map is tiled with 2 triangles. It is important to
             // orientate these triangles with any river we may draw.
@@ -19236,34 +19246,24 @@ var Display3d = function (_flowing_terrain_1$Di) {
             // This will obscure any river drawn directly between "A" and "D".
             // Instead we should tile with triangles "ADC" and "ACB" so the edge of both
             // triangles is the same vertex as the river.
-            if (height00 === height_lowest) {
+            if (height00 === height_lowest || height11 === height_lowest) {
+                // First triangle.
                 this.indices.push(offset00);
                 this.indices.push(offset11);
                 this.indices.push(offset01);
+                // Second triangle.
+                this.indices.push(offset11);
                 this.indices.push(offset00);
                 this.indices.push(offset10);
-                this.indices.push(offset11);
-            } else if (height10 === height_lowest) {
-                this.indices.push(offset10);
-                this.indices.push(offset01);
-                this.indices.push(offset00);
-                this.indices.push(offset10);
-                this.indices.push(offset11);
-                this.indices.push(offset01);
-            } else if (height01 === height_lowest) {
-                this.indices.push(offset01);
-                this.indices.push(offset00);
-                this.indices.push(offset10);
-                this.indices.push(offset01);
-                this.indices.push(offset10);
-                this.indices.push(offset11);
             } else {
-                this.indices.push(offset11);
-                this.indices.push(offset00);
+                // First triangle.
                 this.indices.push(offset10);
-                this.indices.push(offset11);
                 this.indices.push(offset01);
                 this.indices.push(offset00);
+                // Second triangle.
+                this.indices.push(offset01);
+                this.indices.push(offset10);
+                this.indices.push(offset11);
             }
         }
         // Draw river between 2 points.
@@ -19315,8 +19315,12 @@ var Display3d = function (_flowing_terrain_1$Di) {
             this.land_mesh.material = this.land_material;
             vertexData.applyToMesh(this.land_mesh, true);
             this.land_mesh.isPickable = false;
-            this.land_mesh.checkCollisions = false;
+            // Required to keep camera above ground.
+            this.land_mesh.checkCollisions = true;
             // this.land_mesh.convertToFlatShadedMesh();
+            //this.land_mesh.enableEdgesRendering(.9999999999);
+            //this.land_mesh.edgesWidth = 5.0;
+            //this.land_mesh.edgesColor = new BABYLON.Color4(1, 1, 1, 1);
             // Rivers
             this.schedule_update_rivers();
             // Generate seabed.
@@ -19393,84 +19397,174 @@ var Display3d = function (_flowing_terrain_1$Di) {
             }
         }
     }, {
-        key: "getTile",
-        value: function getTile(corners) {
-            var sealevel = this.config.get("geography.sealevel");
-            do {
-                var offset0 = this.indices[this.tileIterator * 3];
-                var offset1 = this.indices[this.tileIterator * 3 + 1];
-                var offset2 = this.indices[this.tileIterator * 3 + 2];
-                corners[0].fromArray(this.positions, offset0 * 3);
-                corners[1].fromArray(this.positions, offset1 * 3);
-                corners[2].fromArray(this.positions, offset2 * 3);
-                this.tileIterator++;
-                if (this.tileIterator * 3 >= this.indices.length) {
-                    return false;
+        key: "setPositionOnSurface",
+        value: function setPositionOnSurface(point) {
+            // Get the 2 triangles that tile this square.
+            var indiceStartIndex = (Math.floor(point.z / 2) * (this.config.get("enviroment.tile_count") - 1) + Math.floor(point.x / 2)) * 6;
+            var triangle1Corners = [BABYLON.Vector3.FromArray(this.positions, this.indices[indiceStartIndex + 0] * 3), BABYLON.Vector3.FromArray(this.positions, this.indices[indiceStartIndex + 1] * 3), BABYLON.Vector3.FromArray(this.positions, this.indices[indiceStartIndex + 2] * 3)];
+            var triangle2Corners = [BABYLON.Vector3.FromArray(this.positions, this.indices[indiceStartIndex + 3] * 3), BABYLON.Vector3.FromArray(this.positions, this.indices[indiceStartIndex + 4] * 3), BABYLON.Vector3.FromArray(this.positions, this.indices[indiceStartIndex + 5] * 3)];
+            // Calculate which triangle point is in.
+            var pointOrientation = (point.x - triangle1Corners[0].x) / (point.z - triangle1Corners[0].z);
+            var dx = point.x / 2 - Math.floor(point.x / 2);
+            var dz = point.z / 2 - Math.floor(point.z / 2);
+            if (triangle1Corners[1].x === triangle1Corners[2].x && triangle1Corners[0].z === triangle1Corners[2].z) {
+                if (Math.abs(pointOrientation) >= 1) {
+                    // 1
+                    // 2 0
+                    console.assert(triangle1Corners[2].x / 2 === Math.floor(point.x / 2));
+                    console.assert(triangle1Corners[2].z / 2 === Math.floor(point.z / 2));
+                    console.assert(triangle1Corners[1].x === triangle1Corners[2].x);
+                    console.assert(triangle1Corners[0].z === triangle1Corners[2].z);
+                    var dxy = triangle1Corners[2].y - triangle1Corners[0].y;
+                    var dzy = triangle1Corners[2].y - triangle1Corners[1].y;
+                    point.y = triangle1Corners[2].y - dzy * dz - dxy * dx;
+                    //point.y = -1000;
+                } else {
+                    // 0 2
+                    //   1
+                    console.assert(triangle2Corners[0].x / 2 === Math.floor(point.x / 2));
+                    console.assert(triangle2Corners[1].z / 2 === Math.floor(point.z / 2));
+                    console.assert(triangle2Corners[1].x === triangle2Corners[2].x);
+                    console.assert(triangle2Corners[1].z === triangle2Corners[2].z - 2);
+                    console.assert(triangle2Corners[0].x === triangle2Corners[2].x - 2);
+                    console.assert(triangle2Corners[0].z === triangle2Corners[2].z);
+                    var _dxy = triangle2Corners[2].y - triangle2Corners[0].y;
+                    var _dzy = triangle2Corners[2].y - triangle2Corners[1].y;
+                    point.y = triangle2Corners[2].y - _dzy * (1 - dz) - _dxy * (1 - dx);
+                    //point.y = -1000;
                 }
-            } while (corners[0].y < sealevel * this.tile_size || corners[1].y < sealevel * this.tile_size || corners[2].y < sealevel * this.tile_size);
-            return true;
-        }
-        //Random point on the triangle.
-
-    }, {
-        key: "randomPoint",
-        value: function randomPoint(corners) {
-            // point.x = s * corners[0].x + (t-s) * corners[1].x + (1-t) * corners[2].x;
-            var s = Math.random();
-            var t = Math.random();
-            if (s > t) {
-                var tmp = s;
-                s = t;
-                t = tmp;
+            } else if (triangle1Corners[2].x === triangle1Corners[0].x && triangle1Corners[1].z === triangle1Corners[2].z) {
+                if (Math.abs(pointOrientation) <= 1) {
+                    // 2 1
+                    // 0
+                    console.assert(triangle1Corners[0].x / 2 === Math.floor(point.x / 2));
+                    console.assert(triangle1Corners[0].z / 2 === Math.floor(point.z / 2));
+                    console.assert(triangle1Corners[2].x === triangle1Corners[0].x);
+                    console.assert(triangle1Corners[2].z === triangle1Corners[0].z + 2);
+                    console.assert(triangle1Corners[1].x === triangle1Corners[2].x + 2);
+                    console.assert(triangle1Corners[1].z === triangle1Corners[2].z);
+                    var _dxy2 = triangle1Corners[2].y - triangle1Corners[1].y;
+                    var _dzy2 = triangle1Corners[2].y - triangle1Corners[0].y;
+                    point.y = triangle1Corners[2].y - _dzy2 * (1 - dz) - _dxy2 * dx;
+                    //point.y = -1000;
+                } else {
+                    //   0
+                    // 1 2
+                    console.assert(triangle2Corners[1].x / 2 === Math.floor(point.x / 2));
+                    console.assert(triangle2Corners[1].z / 2 === Math.floor(point.z / 2));
+                    console.assert(triangle2Corners[0].x === triangle2Corners[2].x);
+                    console.assert(triangle2Corners[0].z === triangle2Corners[2].z + 2);
+                    console.assert(triangle2Corners[2].x === triangle2Corners[1].x + 2);
+                    console.assert(triangle2Corners[2].z === triangle2Corners[1].z);
+                    var _dxy3 = triangle2Corners[2].y - triangle2Corners[1].y;
+                    var _dzy3 = triangle2Corners[2].y - triangle2Corners[0].y;
+                    point.y = triangle2Corners[2].y - _dzy3 * dz - _dxy3 * (1 - dx);
+                    //point.y = -1000;
+                }
             }
-            var point = new BABYLON.Vector3();
-            point.x = s * corners[0].x + (t - s) * corners[1].x + (1 - t) * corners[2].x;
-            point.y = s * corners[0].y + (t - s) * corners[1].y + (1 - t) * corners[2].y;
-            point.z = s * corners[0].z + (t - s) * corners[1].z + (1 - t) * corners[2].z;
-            return point;
         }
     }, {
         key: "planting",
         value: function planting() {
-            this.trees = new Tree(this.scene);
-            var points = [new BABYLON.Vector3(), new BABYLON.Vector3(), new BABYLON.Vector3()];
-            var maxTreeCount = 10000;
-            var treeCount = 0;
-            this.tileIterator = 0;
-            console.log(this.vegetation.data_combined.length, this.vegetation.data_combined[0].length);
-            while (this.getTile(points) && treeCount < maxTreeCount) {
-                var x = points[0].x / this.tile_size;
-                var z = points[0].z / this.tile_size;
-                if (this.vegetation.data_combined[x][z] > 0.05) {
-                    treeCount++;
-                }
-            }
-            console.log(treeCount);
-            var bufferMatrices = new Float32Array(16 * treeCount);
-            treeCount = 0;
-            this.tileIterator = 0;
-            while (this.getTile(points) && treeCount < maxTreeCount) {
-                var _x = points[0].x / this.tile_size;
-                var _z = points[0].z / this.tile_size;
-                if (this.vegetation.data_combined[_x][_z] > 0.05) {
-                    if (treeCount % 100 == 0) {
-                        console.log(treeCount);
+            var p = new Planting_1.Planting(this.geography, this.config, this.vegetation.data_combined);
+            this.treesPine = new TreePine(this.scene);
+            this.treesDeciduous = new TreeDeciduous(this.scene);
+            var pineCount = 0;
+            var deciduousCount = 0;
+            var bufferMatricesPine = new Float32Array(16 * p.countByType[0 /* Pine */]);
+            var bufferMatricesDeciduous = new Float32Array(16 * p.countByType[1 /* Deciduous */]);
+            var _iteratorNormalCompletion = true;
+            var _didIteratorError = false;
+            var _iteratorError = undefined;
+
+            try {
+                for (var _iterator = p.locations.entries()[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+                    var _step$value = _slicedToArray(_step.value, 2),
+                        keyX = _step$value[0],
+                        row = _step$value[1];
+
+                    var _iteratorNormalCompletion2 = true;
+                    var _didIteratorError2 = false;
+                    var _iteratorError2 = undefined;
+
+                    try {
+                        for (var _iterator2 = row.entries()[Symbol.iterator](), _step2; !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {
+                            var _step2$value = _slicedToArray(_step2.value, 2),
+                                keyY = _step2$value[0],
+                                Plant = _step2$value[1];
+
+                            var _iteratorNormalCompletion3 = true;
+                            var _didIteratorError3 = false;
+                            var _iteratorError3 = undefined;
+
+                            try {
+                                for (var _iterator3 = p.get(keyX, keyY)[Symbol.iterator](), _step3; !(_iteratorNormalCompletion3 = (_step3 = _iterator3.next()).done); _iteratorNormalCompletion3 = true) {
+                                    var plant = _step3.value;
+
+                                    //const position = plant.position.clone() as BABYLON.Vector3;
+                                    var position = new BABYLON.Vector3(plant.position.x * this.tile_size, 0, plant.position.z * this.tile_size);
+                                    this.setPositionOnSurface(position);
+                                    var matrix = BABYLON.Matrix.Compose(new BABYLON.Vector3(plant.height, plant.height, plant.height), BABYLON.Quaternion.Zero(), position);
+                                    switch (plant.type_) {
+                                        case 0 /* Pine */:
+                                            matrix.copyToArray(bufferMatricesPine, pineCount * 16);
+                                            pineCount++;
+                                            break;
+                                        case 1 /* Deciduous */:
+                                            matrix.copyToArray(bufferMatricesDeciduous, deciduousCount * 16);
+                                            deciduousCount++;
+                                            break;
+                                    }
+                                }
+                            } catch (err) {
+                                _didIteratorError3 = true;
+                                _iteratorError3 = err;
+                            } finally {
+                                try {
+                                    if (!_iteratorNormalCompletion3 && _iterator3.return) {
+                                        _iterator3.return();
+                                    }
+                                } finally {
+                                    if (_didIteratorError3) {
+                                        throw _iteratorError3;
+                                    }
+                                }
+                            }
+                        }
+                    } catch (err) {
+                        _didIteratorError2 = true;
+                        _iteratorError2 = err;
+                    } finally {
+                        try {
+                            if (!_iteratorNormalCompletion2 && _iterator2.return) {
+                                _iterator2.return();
+                            }
+                        } finally {
+                            if (_didIteratorError2) {
+                                throw _iteratorError2;
+                            }
+                        }
                     }
-                    var size = Math.random() * 0.1 + 0.1;
-                    var matrix = BABYLON.Matrix.Compose(new BABYLON.Vector3(size, size, size),
-                    //BABYLON.Vector3.One(),
-                    BABYLON.Quaternion.Zero(), this.randomPoint(points)
-                    //new BABYLON.Vector3(1, 2, 3)
-                    );
-                    //const leaves = tree.leaves.thinInstanceAdd(matrix, true);
-                    //const trunk = tree.trunk.thinInstanceAdd(matrix, true);
-                    console.assert(treeCount * 16 < bufferMatrices.length);
-                    matrix.copyToArray(bufferMatrices, treeCount * 16);
-                    treeCount++;
+                }
+            } catch (err) {
+                _didIteratorError = true;
+                _iteratorError = err;
+            } finally {
+                try {
+                    if (!_iteratorNormalCompletion && _iterator.return) {
+                        _iterator.return();
+                    }
+                } finally {
+                    if (_didIteratorError) {
+                        throw _iteratorError;
+                    }
                 }
             }
-            this.trees.leaves.thinInstanceSetBuffer("matrix", bufferMatrices, 16, true);
-            this.trees.trunk.thinInstanceSetBuffer("matrix", bufferMatrices, 16, true);
+
+            this.treesDeciduous.leaves.thinInstanceSetBuffer("matrix", bufferMatricesDeciduous, 16, true);
+            this.treesDeciduous.trunk.thinInstanceSetBuffer("matrix", bufferMatricesDeciduous, 16, true);
+            this.treesPine.leaves.thinInstanceSetBuffer("matrix", bufferMatricesPine, 16, true);
+            this.treesPine.trunk.thinInstanceSetBuffer("matrix", bufferMatricesPine, 16, true);
         }
     }]);
 
@@ -19479,8 +19573,45 @@ var Display3d = function (_flowing_terrain_1$Di) {
 
 exports.Display3d = Display3d;
 
-var Tree = function Tree(scene) {
-    _classCallCheck(this, Tree);
+var TreeDeciduous = function TreeDeciduous(scene) {
+    _classCallCheck(this, TreeDeciduous);
+
+    this.tessellation = 3;
+    this.trunkHeight = 5;
+    this.leavesDiamiter = 10;
+    this.trunkMaterial = new BABYLON.StandardMaterial("trunkMaterial", scene);
+    this.trunkMaterial.diffuseColor = new BABYLON.Color3(0.5, 0.3, 0.3);
+    this.trunkMaterial.specularColor = new BABYLON.Color3(0.04, 0.04, 0.03);
+    this.leafMaterial = new BABYLON.StandardMaterial("leafMaterial", scene);
+    this.leafMaterial.diffuseColor = new BABYLON.Color3(0.2, 0.7, 0.3);
+    this.leafMaterial.specularColor = new BABYLON.Color3(0.03, 0.03, 0.03);
+    this.root = BABYLON.Mesh.CreateBox("pineTree", 1, scene);
+    this.root.isVisible = false;
+    this.trunk = BABYLON.MeshBuilder.CreateCylinder("trunk", {
+        height: this.trunkHeight + this.leavesDiamiter / 2,
+        tessellation: this.tessellation,
+        cap: BABYLON.Mesh.NO_CAP,
+        diameterTop: 1,
+        diameterBottom: 1.2
+    });
+    this.trunk.position.y = this.trunkHeight / 2;
+    this.trunk.material = this.trunkMaterial;
+    this.trunk.bakeCurrentTransformIntoVertices();
+    // const debug = BABYLON.MeshBuilder.CreateBox("debug", {size: 2, height: 0.02}, scene);
+    // this.trunk = BABYLON.Mesh.MergeMeshes([this.trunk, debug]);
+    this.leaves = BABYLON.MeshBuilder.CreateSphere("leaves", {
+        segments: 1,
+        diameter: this.leavesDiamiter
+    });
+    this.leaves.position.y = this.leavesDiamiter / 2 + this.trunkHeight;
+    this.leaves.material = this.leafMaterial;
+    this.leaves.bakeCurrentTransformIntoVertices();
+    this.leaves.parent = this.root;
+    this.trunk.parent = this.root;
+};
+
+var TreePine = function TreePine(scene) {
+    _classCallCheck(this, TreePine);
 
     this.tessellation = 3;
     this.trunkHeight = 5;
@@ -19504,6 +19635,8 @@ var Tree = function Tree(scene) {
     this.trunk.position.y = this.trunkHeight / 2;
     this.trunk.material = this.trunkMaterial;
     this.trunk.bakeCurrentTransformIntoVertices();
+    // const debug = BABYLON.MeshBuilder.CreateBox("debug", {size: 2, height: 0.02}, scene);
+    // this.trunk = BABYLON.Mesh.MergeMeshes([this.trunk, debug]);
     this.leaves = BABYLON.MeshBuilder.CreateCylinder("leaves", {
         height: this.leavesHeight,
         tessellation: this.tessellation,
@@ -19518,7 +19651,7 @@ var Tree = function Tree(scene) {
     this.trunk.parent = this.root;
 };
 
-},{"./flowing_terrain":20,"./freeCameraPointersInput":21,"babylonjs":2}],17:[function(require,module,exports){
+},{"./Planting":18,"./flowing_terrain":21,"./freeCameraPointersInput":22,"babylonjs":2}],17:[function(require,module,exports){
 "use strict";
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
@@ -19839,6 +19972,152 @@ exports.BaseCameraPointersInput = BaseCameraPointersInput;
  * SOFTWARE.
  */
 
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.Planting = exports.Plant = void 0;
+var seedrandom = require("seedrandom");
+
+var Plant = function Plant(position, random) {
+    _classCallCheck(this, Plant);
+
+    this.positionBase = position;
+    this.height = random() * 0.1 + 0.05;
+    if (random() < 0.2) {
+        this.type_ = 0 /* Pine */;
+    } else {
+        this.type_ = 1 /* Deciduous */;
+    }
+    this.position = new BABYLON.Vector3(random() + this.positionBase.x, 0, random() + this.positionBase.z);
+};
+
+exports.Plant = Plant;
+
+var Planting = function () {
+    function Planting(geography, config, noise) {
+        _classCallCheck(this, Planting);
+
+        this.treesPerTile = 5;
+        this.geography = geography;
+        this.config = config;
+        this.noise = noise;
+        this.countByType = [0, 0, 0, 0];
+        this.locations = new Map();
+        this.populate();
+    }
+
+    _createClass(Planting, [{
+        key: "populate",
+        value: function populate() {
+            this.countByType = [0, 0, 0, 0];
+            this.count = 0;
+            for (var x = 0; x < this.noise.length; x++) {
+                var row = this.noise[x];
+                for (var y = 0; y < row.length; y++) {
+                    for (var i = 0; i < this.treesPerTile; i++) {
+                        this.set(x, y, this.createPlant(x, y));
+                    }
+                }
+            }
+        }
+    }, {
+        key: "set",
+        value: function set(keyX, keyY, value) {
+            var row = void 0;
+            if (this.locations.has(keyX)) {
+                row = this.locations.get(keyX);
+            } else if (value !== null) {
+                row = new Map();
+                this.locations.set(keyX, row);
+            } else {
+                return;
+            }
+            if (value === null) {
+                row.delete(keyY);
+            } else {
+                var plants = [];
+                if (row.has(keyY)) {
+                    plants = row.get(keyY);
+                } else {
+                    row.set(keyY, plants);
+                }
+                if (value !== null) {
+                    plants.push(value);
+                }
+            }
+        }
+    }, {
+        key: "get",
+        value: function get(keyX, keyY) {
+            if (!this.locations.has(keyX)) {
+                return [];
+            }
+            var row = this.locations.get(keyX);
+            if (!row.has(keyY)) {
+                return [];
+            }
+            return row.get(keyY);
+        }
+    }, {
+        key: "createPlant",
+        value: function createPlant(keyX, keyY) {
+            var sealevel = this.config.get("geography.sealevel");
+            var tileCount = this.config.get("enviroment.tile_count");
+            if (keyX >= tileCount - 1 || keyY >= tileCount - 1) {
+                return null;
+            }
+            var tile00 = this.geography.tiles[keyX][keyY];
+            var tile10 = this.geography.tiles[keyX + 1][keyY];
+            var tile01 = this.geography.tiles[keyX][keyY + 1];
+            var tile11 = this.geography.tiles[keyX + 1][keyY + 1];
+            if (tile00.height < sealevel || tile10.height < sealevel || tile01.height < sealevel || tile11.height < sealevel) {
+                return null;
+            }
+            var noiseVal = this.noise[keyX][keyY];
+            if (noiseVal < 0.05) {
+                return null;
+            }
+            var random = seedrandom(noiseVal + " " + this.count);
+            var plant = new Plant(new BABYLON.Vector3(keyX, tile00.height, keyY), random);
+            this.countByType[plant.type_]++;
+            this.count++;
+            return plant;
+        }
+    }]);
+
+    return Planting;
+}();
+
+exports.Planting = Planting;
+
+},{"seedrandom":7}],19:[function(require,module,exports){
+"use strict";
+/*
+ * MIT License
+ *
+ * Copyright (c) 2020 duncan law
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 var _slicedToArray = function () { function sliceIterator(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"]) _i["return"](); } finally { if (_d) throw _e; } } return _arr; } return function (arr, i) { if (Array.isArray(arr)) { return arr; } else if (Symbol.iterator in Object(arr)) { return sliceIterator(arr, i); } else { throw new TypeError("Invalid attempt to destructure non-iterable instance"); } }; }();
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
@@ -20083,7 +20362,7 @@ var Config = function () {
 
 exports.Config = Config;
 
-},{}],19:[function(require,module,exports){
+},{}],20:[function(require,module,exports){
 "use strict";
 /*
  * MIT License
@@ -20364,7 +20643,7 @@ var FeedbackSlider = function (_HTMLElement2) {
 exports.FeedbackSlider = FeedbackSlider;
 customElements.define("feedback-slider", FeedbackSlider);
 
-},{}],20:[function(require,module,exports){
+},{}],21:[function(require,module,exports){
 "use strict";
 /*
  * MIT License
@@ -20711,7 +20990,7 @@ var DisplayBase = function () {
 
 exports.DisplayBase = DisplayBase;
 
-},{"./ordered_set":24}],21:[function(require,module,exports){
+},{"./ordered_set":25}],22:[function(require,module,exports){
 "use strict";
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
@@ -21015,7 +21294,7 @@ var FreeCameraPointersInput = function (_BaseCameraPointersIn) {
 exports.FreeCameraPointersInput = FreeCameraPointersInput;
 BABYLON.CameraInputTypes["FreeCameraPointersInput"] = FreeCameraPointersInput;
 
-},{"./BaseCameraPointersInput":17,"babylonjs":2}],22:[function(require,module,exports){
+},{"./BaseCameraPointersInput":17,"babylonjs":2}],23:[function(require,module,exports){
 "use strict";
 /*
  * MIT License
@@ -21340,7 +21619,7 @@ var Noise = function () {
 
 exports.Noise = Noise;
 
-},{"./ordered_set":24,"seedrandom":7}],23:[function(require,module,exports){
+},{"./ordered_set":25,"seedrandom":7}],24:[function(require,module,exports){
 "use strict";
 /*
  * MIT License
@@ -21755,7 +22034,7 @@ window.onload = function () {
     });
 };
 
-},{"./2d_view":15,"./3d_view":16,"./config":18,"./custom_html_elements":19,"./flowing_terrain":20,"./genesis":22,"@webcomponents/webcomponentsjs/custom-elements-es5-adapter.js":1,"bootstrap":3}],24:[function(require,module,exports){
+},{"./2d_view":15,"./3d_view":16,"./config":19,"./custom_html_elements":20,"./flowing_terrain":21,"./genesis":23,"@webcomponents/webcomponentsjs/custom-elements-es5-adapter.js":1,"bootstrap":3}],25:[function(require,module,exports){
 "use strict";
 /*
 # MIT License
@@ -21889,6 +22168,6 @@ var SortedSet = function () {
 
 exports.SortedSet = SortedSet;
 
-},{}]},{},[23])
+},{}]},{},[24])
 
 //# sourceMappingURL=bundle.js.map
