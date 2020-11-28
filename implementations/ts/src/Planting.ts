@@ -55,7 +55,7 @@ export class Plant {
 }
 
 export class Planting {
-  readonly treesPerTile: number = 5;
+  readonly treesPerTile: number = 10;
   geography: Geography;
   config: Config;
   noise: number[][];
@@ -150,7 +150,7 @@ export class Planting {
       return null;
     }
     const noiseVal = this.noise[keyX][keyY];
-    if(noiseVal < 0.05) {
+    if(noiseVal < 0.01) {
       return null;
     }
 
