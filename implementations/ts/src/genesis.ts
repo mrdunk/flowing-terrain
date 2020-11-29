@@ -141,6 +141,7 @@ export function seed_points(config: Config, tile_count: number): Set<string> {
 }
 
 export class Noise {
+  label: string;
   config: Config;
 
   coefficients_low: number[][];
@@ -152,7 +153,8 @@ export class Noise {
   data_high: number[][];
   data_combined: number[][];
 
-  constructor(config: Config) {
+  constructor(label: string, config: Config) {
+    this.label = label;
     this.config = config;
   }
 
@@ -169,26 +171,26 @@ export class Noise {
         scale = 20 / tile_count;
         this.coefficients_low = [];
         coefficients = this.coefficients_low;
-        random = seedrandom(this.config.get("noise.random_seed_low"));
+        random = seedrandom(this.config.get(`${this.label}.random_seed_low`));
         break;
       case "mid":
         scale = 100 / tile_count;
         this.coefficients_mid = [];
         coefficients = this.coefficients_mid;
-        random = seedrandom(this.config.get("noise.random_seed_mid"));
+        random = seedrandom(this.config.get(`${this.label}.random_seed_mid`));
         break;
       case "high":
         scale = 10;
         this.coefficients_high = [];
         coefficients = this.coefficients_high;
-        random = seedrandom(this.config.get("noise.random_seed_high"));
+        random = seedrandom(this.config.get(`${this.label}.random_seed_high`));
         break;
       default:
         console.trace();
     }
 
     // Get ranges of octaves to use from config.
-    const octave_count = this.config.get(`noise.${octave}_octave`);
+    const octave_count = this.config.get(`${this.label}.${octave}_octave`);
 
     for(let i = 0; i < octave_count; i++) {
       coefficients.push([random() * scale - scale / 2,
@@ -207,19 +209,19 @@ export class Noise {
 
     switch (octave) {
       case "low":
-        weight = this.config.get("noise.low_octave_weight");
+        weight = this.config.get(`${this.label}.low_octave_weight`);
         coefficients = this.coefficients_low;
         this.data_low = [];
         data = this.data_low;
         break;
       case "mid":
-        weight = this.config.get("noise.mid_octave_weight");
+        weight = this.config.get(`${this.label}.mid_octave_weight`);
         coefficients = this.coefficients_mid;
         this.data_mid = [];
         data = this.data_mid;
         break;
       case "high":
-        weight = this.config.get("noise.high_octave_weight");
+        weight = this.config.get(`${this.label}.high_octave_weight`);
         coefficients = this.coefficients_high;
         this.data_high = [];
         data = this.data_high;
@@ -265,9 +267,9 @@ export class Noise {
   generate(regenerate: boolean = false) {
     if(regenerate) {
       // Do not use same values again.
-      this.config.set("noise.random_seed_low", `low ${(new Date()).getTime()}`);
-      this.config.set("noise.random_seed_mid", `mid ${(new Date()).getTime()}`);
-      this.config.set("noise.random_seed_high", `high ${(new Date()).getTime()}`);
+      this.config.set(`${this.label}.random_seed_low`, `low ${(new Date()).getTime()}`);
+      this.config.set(`${this.label}.random_seed_mid`, `mid ${(new Date()).getTime()}`);
+      this.config.set(`${this.label}.random_seed_high`, `high ${(new Date()).getTime()}`);
     }
 
     // TODO: Calculate what needs updating and do only that.
@@ -307,7 +309,7 @@ export class Noise {
     let text: string = "<code class='text-dark'>height =</code><br>";
     let weight: number = 0;
 
-    weight = this.config.get("noise.low_octave_weight");
+    weight = this.config.get(`${this.label}.low_octave_weight`);
     if(weight > 0) {
       text += "<code class='text-info'>// low frequency</code><br>";
       this.coefficients_low.forEach((both) => {
@@ -315,7 +317,7 @@ export class Noise {
       });
     }
 
-    weight = this.config.get("noise.mid_octave_weight");
+    weight = this.config.get(`${this.label}.mid_octave_weight`);
     if(weight > 0) {
       text += "<code class='text-info'>// mid frequency</code><br>";
       this.coefficients_mid.forEach((both) => {
@@ -323,7 +325,7 @@ export class Noise {
       });
     }
 
-    weight = this.config.get("noise.high_octave_weight");
+    weight = this.config.get(`${this.label}.high_octave_weight`);
     if(weight > 0) {
       text += "<code class='text-info'>// high frequency</code><br>";
       this.coefficients_high.forEach((both) => {

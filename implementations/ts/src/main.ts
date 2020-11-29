@@ -55,6 +55,7 @@ window.onload = () => {
   const config: Config = new Config();
   let seabed: Set<string> = null;
   let noise: Noise = null;
+  let vegetation: Noise = null;
   let geography: Geography = null;
   let display: Display3d = null;
 
@@ -63,6 +64,9 @@ window.onload = () => {
   config.set_if_null("noise.random_seed_low", `low ${(new Date()).getTime()}`);
   config.set_if_null("noise.random_seed_mid", `mid ${(new Date()).getTime()}`);
   config.set_if_null("noise.random_seed_high", `high ${(new Date()).getTime()}`);
+  config.set_if_null("vegetation.random_seed_low", `v low ${(new Date()).getTime()}`);
+  config.set_if_null("vegetation.random_seed_mid", `v mid ${(new Date()).getTime()}`);
+  config.set_if_null("vegetation.random_seed_high", `v high ${(new Date()).getTime()}`);
 
   config.set_if_null("seed_points.threshold", 0.18);
   config.set_callback("seed_points.threshold", seed_threshold_callback);
@@ -79,6 +83,21 @@ window.onload = () => {
   config.set_callback("noise.mid_octave_weight", noise_octaves_callback);
   config.set_if_null("noise.high_octave_weight", 0.2);
   config.set_callback("noise.high_octave_weight", noise_octaves_callback);
+
+  config.set_if_null("vegetation.enabled", 1);
+  config.set_callback("vegetation.enabled", vegetation_enabled);
+  config.set_if_null("vegetation.low_octave", 3);
+  config.set_callback("vegetation.low_octave", vegetation_octaves_callback);
+  config.set_if_null("vegetation.mid_octave", 5);
+  config.set_callback("vegetation.mid_octave", vegetation_octaves_callback);
+  config.set_if_null("vegetation.high_octave", 10);
+  config.set_callback("vegetation.high_octave", vegetation_octaves_callback);
+  config.set_if_null("vegetation.low_octave_weight", 0.2);
+  config.set_callback("vegetation.low_octave_weight", vegetation_octaves_callback);
+  config.set_if_null("vegetation.mid_octave_weight", 0.5);
+  config.set_callback("vegetation.mid_octave_weight", vegetation_octaves_callback);
+  config.set_if_null("vegetation.high_octave_weight", 0.2);
+  config.set_callback("vegetation.high_octave_weight", vegetation_octaves_callback);
 
   config.set_if_null("terrain.height_constant", 0.01);
   config.set_callback("terrain.height_constant", terrain_callback);
@@ -118,7 +137,7 @@ window.onload = () => {
   function generate_noise(regenerate: boolean = false) {
     time("noise", () => {
       if(noise === null) {
-        noise = new Noise(config);
+        noise = new Noise("noise", config);
       }
       noise.generate(regenerate);
     });
@@ -146,7 +165,7 @@ window.onload = () => {
 
     display = time("3d_display", () => {
       if(display === null) {
-        return new Display3d(geography, config);
+        return new Display3d(geography, vegetation, config);
       } else {
         display.draw();
         return display;
@@ -154,8 +173,31 @@ window.onload = () => {
     });
   }
 
+  function generate_vegetation(regenerate: boolean = false) {
+    time("vegetation", () => {
+      if(vegetation === null) {
+        vegetation = new Noise("vegetation", config);
+      }
+      vegetation.generate(regenerate);
+    });
+    time("vegetation_map", () => {
+      draw_2d("vegetation_map", vegetation.data_combined);
+      vegetation.text(document.getElementById("vegetation_debug"));
+    });
+  }
+
+  function draw_vegetation() {
+    time("vegetation_draw", () => {
+      if(display !== null) {
+        display.planting();
+      }
+    });
+  }
+
   generate_seed_points();
   generate_noise();
+  generate_vegetation();
+  draw_vegetation();
   generate_terrain();
 
   console.table(stats);
@@ -245,6 +287,19 @@ window.onload = () => {
     });
   }
 
+  // Initialise checkbox controls.
+  for(const node of document.getElementsByTagName("input")) {
+    if(node.type === "checkbox") {
+      node.checked = config.get("vegetation.enabled");
+      node.addEventListener("change", () => {
+        console.info(`Checkbox ${node.name} changed to ${node.checked}`);
+        if(config.get(node.name, false) !== null) {
+          // Callback to update map happens as part of the config.set(...).
+          config.set(node.name, node.checked ? 1 : 0);
+        }
+      });
+    }
+  }
 
   // Button to regenerate the seed_point map.
   const menu_seed_points = document.getElementById("seed_points") as HTMLInputElement;
@@ -291,6 +346,7 @@ window.onload = () => {
     terrain_callback(keys, value);
   }
 
+
   // Callback to regenerate terrain after settings change.
   let timer_slow: ReturnType<typeof setTimeout> = 0;
   function terrain_callback(keys: string, value: any) {
@@ -298,6 +354,39 @@ window.onload = () => {
     if(timer_slow === 0) {
       timer_slow = setTimeout(() => {
         generate_terrain();
+        timer_slow = 0;
+      }, 2000);
+    }
+  }
+
+
+  // Button to regenerate all aspects of the vegetation map.
+  const menu_vegetation = document.getElementById("vegetation") as HTMLInputElement;
+  menu_vegetation.addEventListener("click", (event) => {
+    generate_vegetation(true);
+    draw_vegetation();
+  });
+
+  // Callback to set whether trees should be displayed or not.
+  function vegetation_enabled(keys: string, value: any) {
+    draw_vegetation();
+  }
+
+  // Callback to set vegetation noise octaves.
+  // This single callback will work for all octaves.
+  function vegetation_octaves_callback(keys: string, value: any) {
+    // Only do this every 200ms, even if more updates are sent.
+
+    // TODO: Timers should not be shared between actions.
+    if(timer_fast === 0) {
+      timer_fast = setTimeout(() => {
+        generate_vegetation();
+        timer_fast = 0;
+      }, 200);
+    }
+    if(timer_slow === 0) {
+      timer_slow = setTimeout(() => {
+        draw_vegetation();
         timer_slow = 0;
       }, 2000);
     }

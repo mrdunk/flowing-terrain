@@ -18994,6 +18994,8 @@ exports.draw_2d = draw_2d;
  * SOFTWARE.
  */
 
+var _slicedToArray = function () { function sliceIterator(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"]) _i["return"](); } finally { if (_d) throw _e; } } return _arr; } return function (arr, i) { if (Array.isArray(arr)) { return arr; } else if (Symbol.iterator in Object(arr)) { return sliceIterator(arr, i); } else { throw new TypeError("Invalid attempt to destructure non-iterable instance"); } }; }();
+
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
@@ -19009,11 +19011,12 @@ exports.Display3d = void 0;
 var BABYLON = require("babylonjs");
 var flowing_terrain_1 = require("./flowing_terrain");
 var freeCameraPointersInput_1 = require("./freeCameraPointersInput");
+var Planting_1 = require("./Planting");
 
 var Display3d = function (_flowing_terrain_1$Di) {
     _inherits(Display3d, _flowing_terrain_1$Di);
 
-    function Display3d(geography, config) {
+    function Display3d(geography, vegetation, config) {
         _classCallCheck(this, Display3d);
 
         var _this = _possibleConstructorReturn(this, (Display3d.__proto__ || Object.getPrototypeOf(Display3d)).call(this, geography));
@@ -19025,6 +19028,7 @@ var Display3d = function (_flowing_terrain_1$Di) {
         _this.normals = [];
         _this.rivers = [];
         _this.update_rivers_timer = 0;
+        _this.vegetation = vegetation;
         _this.config = config;
         _this.canvas = document.getElementById("renderCanvas");
         _this.engine = new BABYLON.Engine(_this.canvas, true);
@@ -19043,29 +19047,33 @@ var Display3d = function (_flowing_terrain_1$Di) {
         _this.camera.inputs.add(pointerInput);
         _this.camera.position = new BABYLON.Vector3(-mapsize / 4, mapsize / 4, -mapsize / 4);
         _this.camera.checkCollisions = true;
-        _this.camera.ellipsoid = new BABYLON.Vector3(0.5, 0.5, 0.5);
+        _this.camera.ellipsoid = new BABYLON.Vector3(1.0, 0.5, 1.0);
         _this.camera.updateUpVectorFromRotation = true;
         // Higher the less sensitive.
         _this.camera.touchMoveSensibility = 200;
         _this.camera.touchAngularSensibility = 60000;
         _this.camera.attachControl(_this.canvas, true);
-        var light_1 = new BABYLON.HemisphericLight("light_1", new BABYLON.Vector3(1, 0.5, 0), _this.scene);
-        light_1.diffuse = new BABYLON.Color3(1, 0, 1);
-        light_1.specular = new BABYLON.Color3(0, 0, 0);
-        var light_2 = new BABYLON.HemisphericLight("light_2", new BABYLON.Vector3(0, 0.5, 1), _this.scene);
-        light_2.diffuse = new BABYLON.Color3(0, 1, 1);
+        _this.light_1 = new BABYLON.DirectionalLight("light_1", new BABYLON.Vector3(-10, -10, 0), _this.scene);
+        _this.light_1.position = new BABYLON.Vector3(100, 100, 100);
+        _this.light_1.diffuse = new BABYLON.Color3(1, 1, 1);
+        _this.light_1.specular = new BABYLON.Color3(0, 0, 0);
+        _this.light_1.intensity = 0.5;
+        _this.light_1.autoCalcShadowZBounds = true;
+        var light_2 = new BABYLON.DirectionalLight("light_2", new BABYLON.Vector3(0, -10, 0), _this.scene);
+        light_2.diffuse = new BABYLON.Color3(1, 1, 1);
         light_2.specular = new BABYLON.Color3(0.3, 0.3, 0.3);
+        light_2.intensity = 0.5;
         _this.scene.ambientColor = new BABYLON.Color3(0.2, 0.2, 0.3);
         _this.land_material = new BABYLON.StandardMaterial("land_material", _this.scene);
-        _this.land_material.diffuseColor = new BABYLON.Color3(0.3, 0.7, 0.2);
+        _this.land_material.diffuseColor = new BABYLON.Color3(0.4, 0.6, 0.2);
         _this.land_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
         // this.land_material.backFaceCulling = false;
         _this.seabed_material = new BABYLON.StandardMaterial("seabed_material", _this.scene);
-        _this.seabed_material.diffuseColor = new BABYLON.Color3(0.3, 0.7, 0.2);
+        _this.seabed_material.diffuseColor = new BABYLON.Color3(0.4, 0.6, 0.2);
         _this.seabed_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
         // this.seabed_material.backFaceCulling = false;
         _this.sea_material = new BABYLON.StandardMaterial("sea_material", _this.scene);
-        _this.sea_material.diffuseColor = new BABYLON.Color3(0.2, 0.4, 0.7);
+        _this.sea_material.diffuseColor = new BABYLON.Color3(0.1, 0.2, 1.0);
         _this.sea_material.specularColor = new BABYLON.Color3(0.5, 0.5, 0.5);
         _this.sea_material.alpha = config.get("display.sea_transparency");
         _this.sea_material.backFaceCulling = false;
@@ -19161,10 +19169,10 @@ var Display3d = function (_flowing_terrain_1$Di) {
             this.rivers = [];
             for (var y = 0; y < this.config.get("enviroment.tile_count"); y++) {
                 for (var x = 0; x < this.config.get("enviroment.tile_count"); x++) {
-                    // TODO: Some of these positions are not actually used.
-                    // Tiles at the height of the seabed are not drawn.
-                    // Not populating these at this time would make calculating indexes into
-                    // the this.positions array much more challenging though.
+                    // These are the points at the corners of the grid.
+                    // We actually form these into triangles later in draw_tile(...) where
+                    // we populate the this.indices[] collection with indexes of
+                    // this.positions entries.
                     var tile = this.geography.get_tile({ x: x, y: y });
                     this.positions.push(tile.pos.x * this.tile_size);
                     this.positions.push(tile.height * this.tile_size);
@@ -19194,11 +19202,11 @@ var Display3d = function (_flowing_terrain_1$Di) {
             var height10 = this.positions[offset10 * 3 + 1];
             var height01 = this.positions[offset01 * 3 + 1];
             var height11 = this.positions[offset11 * 3 + 1];
-            if (height00 === 0 && height10 === 0 && height01 === 0 && height11 === 0) {
-                // The tile we are considering drawing is at the same height as the seabed.
-                // More efficient to just draw a single "seabed" tile under the whole map.
-                // return;
-            }
+            // if(height00 === 0 && height10 === 0 && height01 === 0 && height11 === 0) {
+            // The tile we are considering drawing is at the same height as the seabed.
+            // More efficient to just draw a single "seabed" tile under the whole map.
+            // return;
+            // }
             var height_lowest = Math.min(Math.min(Math.min(height00, height10), height01), height11);
             // Each square on the map is tiled with 2 triangles. It is important to
             // orientate these triangles with any river we may draw.
@@ -19220,34 +19228,24 @@ var Display3d = function (_flowing_terrain_1$Di) {
             // This will obscure any river drawn directly between "A" and "D".
             // Instead we should tile with triangles "ADC" and "ACB" so the edge of both
             // triangles is the same vertex as the river.
-            if (height00 === height_lowest) {
+            if (height00 === height_lowest || height11 === height_lowest) {
+                // First triangle.
                 this.indices.push(offset00);
                 this.indices.push(offset11);
                 this.indices.push(offset01);
+                // Second triangle.
+                this.indices.push(offset11);
                 this.indices.push(offset00);
                 this.indices.push(offset10);
-                this.indices.push(offset11);
-            } else if (height10 === height_lowest) {
-                this.indices.push(offset10);
-                this.indices.push(offset01);
-                this.indices.push(offset00);
-                this.indices.push(offset10);
-                this.indices.push(offset11);
-                this.indices.push(offset01);
-            } else if (height01 === height_lowest) {
-                this.indices.push(offset01);
-                this.indices.push(offset00);
-                this.indices.push(offset10);
-                this.indices.push(offset01);
-                this.indices.push(offset10);
-                this.indices.push(offset11);
             } else {
-                this.indices.push(offset11);
-                this.indices.push(offset00);
+                // First triangle.
                 this.indices.push(offset10);
-                this.indices.push(offset11);
                 this.indices.push(offset01);
                 this.indices.push(offset00);
+                // Second triangle.
+                this.indices.push(offset01);
+                this.indices.push(offset10);
+                this.indices.push(offset11);
             }
         }
         // Draw river between 2 points.
@@ -19295,11 +19293,17 @@ var Display3d = function (_flowing_terrain_1$Di) {
             vertexData.positions = this.positions;
             vertexData.indices = this.indices;
             vertexData.normals = this.normals;
-            var land = new BABYLON.Mesh("land");
-            land.material = this.land_material;
-            vertexData.applyToMesh(land, true);
-            land.checkCollisions = true;
-            // land.convertToFlatShadedMesh();
+            this.land_mesh = new BABYLON.Mesh("land");
+            this.land_mesh.material = this.land_material;
+            vertexData.applyToMesh(this.land_mesh, true);
+            this.land_mesh.isPickable = false;
+            // Required to keep camera above ground.
+            this.land_mesh.checkCollisions = true;
+            // this.land_mesh.convertToFlatShadedMesh();
+            // Show tile edges.
+            // this.land_mesh.enableEdgesRendering(.9999999999);
+            // this.land_mesh.edgesWidth = 5.0;
+            // this.land_mesh.edgesColor = new BABYLON.Color4(1, 1, 1, 1);
             // Rivers
             this.schedule_update_rivers();
             // Generate seabed.
@@ -19313,6 +19317,17 @@ var Display3d = function (_flowing_terrain_1$Di) {
             this.sea_mesh.material = this.sea_material;
             this.sea_mesh.checkCollisions = false;
             this.set_sealevel(this.config.get("geography.sealevel"));
+            // Plant trees.
+            this.planting();
+            // Tree shadows.
+            var shadowGenerator = new BABYLON.ShadowGenerator(4096, this.light_1);
+            shadowGenerator.usePoissonSampling = true;
+            //shadowGenerator.useExponentialShadowMap = false;
+            shadowGenerator.addShadowCaster(this.treesPine.trunk, true);
+            shadowGenerator.addShadowCaster(this.treesPine.leaves, true);
+            shadowGenerator.addShadowCaster(this.treesDeciduous.trunk, true);
+            shadowGenerator.addShadowCaster(this.treesDeciduous.leaves, true);
+            this.land_mesh.receiveShadows = true;
         }
         // Move the height of the sea mesh on the Z axis.
 
@@ -19368,7 +19383,178 @@ var Display3d = function (_flowing_terrain_1$Di) {
                 }
             }
             if (this.rivers.length > 0) {
-                this.rivers_mesh = BABYLON.MeshBuilder.CreateLineSystem("rivers", { lines: this.rivers }, this.scene);
+                this.rivers_mesh = BABYLON.MeshBuilder.CreateLineSystem("rivers", {
+                    lines: this.rivers,
+                    useVertexAlpha: false
+                }, this.scene);
+                this.rivers_mesh.color = new BABYLON.Color3(0.3, 0.3, 1);
+            }
+        }
+        /* Given a vector populated with the x and z coordinates, calculate the
+         * corresponding y (height). */
+
+    }, {
+        key: "setHeightToSurface",
+        value: function setHeightToSurface(point) {
+            // Get the 2 triangles that tile this square.
+            var indiceStartIndex = (Math.floor(point.z / this.tile_size) * (this.config.get("enviroment.tile_count") - 1) + Math.floor(point.x / this.tile_size)) * 6;
+            // Get points at corners of tile.
+            var points = [BABYLON.Vector3.FromArray(this.positions, this.indices[indiceStartIndex + 0] * 3), BABYLON.Vector3.FromArray(this.positions, this.indices[indiceStartIndex + 1] * 3), BABYLON.Vector3.FromArray(this.positions, this.indices[indiceStartIndex + 2] * 3), BABYLON.Vector3.FromArray(this.positions, this.indices[indiceStartIndex + 5] * 3)];
+            // Each tile is made up of 2 triangles. Calculate which one the point is in.
+            point.y = (points[2].y + points[3].y) / 2;
+            var triangle = void 0;
+            if (BABYLON.Vector3.DistanceSquared(point, points[2]) < BABYLON.Vector3.DistanceSquared(point, points[3])) {
+                triangle = [points[0], points[1], points[2]];
+            } else {
+                triangle = [points[0], points[1], points[3]];
+            }
+            var dx = point.x / this.tile_size - triangle[2].x / this.tile_size;
+            var dz = point.z / this.tile_size - triangle[2].z / this.tile_size;
+            var dy0 = triangle[2].y - triangle[0].y;
+            var dy1 = triangle[2].y - triangle[1].y;
+            // There are 4 possible triangle layouts.
+            if (triangle[0].x > triangle[1].x && triangle[0].x > triangle[2].x) {
+                // 1
+                // 2 0
+                // console.assert(triangle[0].z < triangle[1].z);
+                point.y = triangle[2].y - dx * dy0 - dz * dy1;
+            } else if (triangle[0].x <= triangle[1].x && triangle[0].x === triangle[2].x) {
+                // 2 1
+                // 0
+                // console.assert(triangle[0].z < triangle[1].z);
+                point.y = triangle[2].y - dx * dy1 + dz * dy0;
+            } else if (triangle[0].x > triangle[1].x && triangle[0].x === triangle[2].x) {
+                // 1 2
+                //   0
+                // console.assert(triangle[0].z < triangle[1].z);
+                point.y = triangle[2].y + dx * dy1 + dz * dy0;
+            } else {
+                //   1
+                // 0 2
+                point.y = triangle[2].y + dx * dy0 - dz * dy1;
+            }
+            return;
+        }
+    }, {
+        key: "planting",
+        value: function planting() {
+            var p = new Planting_1.Planting(this.geography, this.config, this.vegetation.data_combined);
+            if (this.treesPine) {
+                this.treesPine.trunk.dispose();
+                this.treesPine.leaves.dispose();
+            }
+            if (this.treesDeciduous) {
+                this.treesDeciduous.trunk.dispose();
+                this.treesDeciduous.leaves.dispose();
+            }
+            if (!this.config.get("vegetation.enabled")) {
+                return;
+            }
+            this.treesPine = new TreePine(this.scene);
+            this.treesDeciduous = new TreeDeciduous(this.scene);
+            var pineCount = 0;
+            var deciduousCount = 0;
+            var bufferMatricesPine = new Float32Array(16 * p.countByType[0 /* Pine */]);
+            var bufferMatricesDeciduous = new Float32Array(16 * p.countByType[1 /* Deciduous */]);
+            var _iteratorNormalCompletion = true;
+            var _didIteratorError = false;
+            var _iteratorError = undefined;
+
+            try {
+                for (var _iterator = p.locations.entries()[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+                    var _step$value = _slicedToArray(_step.value, 2),
+                        keyX = _step$value[0],
+                        row = _step$value[1];
+
+                    var _iteratorNormalCompletion2 = true;
+                    var _didIteratorError2 = false;
+                    var _iteratorError2 = undefined;
+
+                    try {
+                        for (var _iterator2 = row.entries()[Symbol.iterator](), _step2; !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {
+                            var _step2$value = _slicedToArray(_step2.value, 2),
+                                keyY = _step2$value[0],
+                                Plant = _step2$value[1];
+
+                            var _iteratorNormalCompletion3 = true;
+                            var _didIteratorError3 = false;
+                            var _iteratorError3 = undefined;
+
+                            try {
+                                for (var _iterator3 = p.get(keyX, keyY)[Symbol.iterator](), _step3; !(_iteratorNormalCompletion3 = (_step3 = _iterator3.next()).done); _iteratorNormalCompletion3 = true) {
+                                    var plant = _step3.value;
+
+                                    //const position = plant.position.clone() as BABYLON.Vector3;
+                                    var position = new BABYLON.Vector3(plant.position.x * this.tile_size, 0, plant.position.z * this.tile_size);
+                                    this.setHeightToSurface(position);
+                                    var matrix = BABYLON.Matrix.Compose(new BABYLON.Vector3(plant.height, plant.height, plant.height), BABYLON.Quaternion.Zero(), position);
+                                    switch (plant.type_) {
+                                        case 0 /* Pine */:
+                                            matrix.copyToArray(bufferMatricesPine, pineCount * 16);
+                                            pineCount++;
+                                            break;
+                                        case 1 /* Deciduous */:
+                                            matrix.copyToArray(bufferMatricesDeciduous, deciduousCount * 16);
+                                            deciduousCount++;
+                                            break;
+                                    }
+                                }
+                            } catch (err) {
+                                _didIteratorError3 = true;
+                                _iteratorError3 = err;
+                            } finally {
+                                try {
+                                    if (!_iteratorNormalCompletion3 && _iterator3.return) {
+                                        _iterator3.return();
+                                    }
+                                } finally {
+                                    if (_didIteratorError3) {
+                                        throw _iteratorError3;
+                                    }
+                                }
+                            }
+                        }
+                    } catch (err) {
+                        _didIteratorError2 = true;
+                        _iteratorError2 = err;
+                    } finally {
+                        try {
+                            if (!_iteratorNormalCompletion2 && _iterator2.return) {
+                                _iterator2.return();
+                            }
+                        } finally {
+                            if (_didIteratorError2) {
+                                throw _iteratorError2;
+                            }
+                        }
+                    }
+                }
+            } catch (err) {
+                _didIteratorError = true;
+                _iteratorError = err;
+            } finally {
+                try {
+                    if (!_iteratorNormalCompletion && _iterator.return) {
+                        _iterator.return();
+                    }
+                } finally {
+                    if (_didIteratorError) {
+                        throw _iteratorError;
+                    }
+                }
+            }
+
+            this.treesDeciduous.leaves.thinInstanceSetBuffer("matrix", bufferMatricesDeciduous, 16, true);
+            this.treesDeciduous.trunk.thinInstanceSetBuffer("matrix", bufferMatricesDeciduous, 16, true);
+            this.treesPine.leaves.thinInstanceSetBuffer("matrix", bufferMatricesPine, 16, true);
+            this.treesPine.trunk.thinInstanceSetBuffer("matrix", bufferMatricesPine, 16, true);
+            if (deciduousCount === 0) {
+                this.treesDeciduous.trunk.isVisible = false;
+                this.treesDeciduous.leaves.isVisible = false;
+            }
+            if (pineCount === 0) {
+                this.treesPine.trunk.isVisible = false;
+                this.treesPine.leaves.isVisible = false;
             }
         }
     }]);
@@ -19378,7 +19564,85 @@ var Display3d = function (_flowing_terrain_1$Di) {
 
 exports.Display3d = Display3d;
 
-},{"./flowing_terrain":20,"./freeCameraPointersInput":21,"babylonjs":2}],17:[function(require,module,exports){
+var TreeDeciduous = function TreeDeciduous(scene) {
+    _classCallCheck(this, TreeDeciduous);
+
+    this.tessellation = 3;
+    this.trunkHeight = 5;
+    this.leavesDiamiter = 10;
+    this.trunkMaterial = new BABYLON.StandardMaterial("trunkMaterial", scene);
+    this.trunkMaterial.diffuseColor = new BABYLON.Color3(0.5, 0.3, 0.3);
+    this.trunkMaterial.specularColor = new BABYLON.Color3(0.04, 0.04, 0.03);
+    this.leafMaterial = new BABYLON.StandardMaterial("leafMaterial", scene);
+    this.leafMaterial.diffuseColor = new BABYLON.Color3(0.2, 0.7, 0.3);
+    this.leafMaterial.specularColor = new BABYLON.Color3(0.03, 0.03, 0.03);
+    this.root = BABYLON.Mesh.CreateBox("pineTree", 1, scene);
+    this.root.isVisible = false;
+    this.trunk = BABYLON.MeshBuilder.CreateCylinder("trunk", {
+        height: this.trunkHeight + this.leavesDiamiter / 2,
+        tessellation: this.tessellation,
+        cap: BABYLON.Mesh.NO_CAP,
+        diameterTop: 1,
+        diameterBottom: 1.2
+    });
+    this.trunk.position.y = this.trunkHeight / 2;
+    this.trunk.material = this.trunkMaterial;
+    this.trunk.bakeCurrentTransformIntoVertices();
+    // const debug = BABYLON.MeshBuilder.CreateBox("debug", {size: 2, height: 0.02}, scene);
+    // this.trunk = BABYLON.Mesh.MergeMeshes([this.trunk, debug]);
+    this.leaves = BABYLON.MeshBuilder.CreateSphere("leaves", {
+        segments: 1,
+        diameter: this.leavesDiamiter
+    });
+    this.leaves.position.y = this.leavesDiamiter / 2 + this.trunkHeight;
+    this.leaves.material = this.leafMaterial;
+    this.leaves.bakeCurrentTransformIntoVertices();
+    this.leaves.parent = this.root;
+    this.trunk.parent = this.root;
+};
+
+var TreePine = function TreePine(scene) {
+    _classCallCheck(this, TreePine);
+
+    this.tessellation = 3;
+    this.trunkHeight = 5;
+    this.leavesHeight = 10;
+    this.leavesDiamiter = 10;
+    this.trunkMaterial = new BABYLON.StandardMaterial("trunkMaterial", scene);
+    this.trunkMaterial.diffuseColor = new BABYLON.Color3(0.5, 0.3, 0.3);
+    this.trunkMaterial.specularColor = new BABYLON.Color3(0.04, 0.04, 0.03);
+    this.leafMaterial = new BABYLON.StandardMaterial("leafMaterial", scene);
+    this.leafMaterial.diffuseColor = new BABYLON.Color3(0.2, 0.5, 0.1);
+    this.leafMaterial.specularColor = new BABYLON.Color3(0.03, 0.03, 0.03);
+    this.root = BABYLON.Mesh.CreateBox("pineTree", 1, scene);
+    this.root.isVisible = false;
+    this.trunk = BABYLON.MeshBuilder.CreateCylinder("trunk", {
+        height: this.trunkHeight,
+        tessellation: this.tessellation,
+        cap: BABYLON.Mesh.NO_CAP,
+        diameterTop: 1,
+        diameterBottom: 1.2
+    });
+    this.trunk.position.y = this.trunkHeight / 2;
+    this.trunk.material = this.trunkMaterial;
+    this.trunk.bakeCurrentTransformIntoVertices();
+    // const debug = BABYLON.MeshBuilder.CreateBox("debug", {size: 2, height: 0.02}, scene);
+    // this.trunk = BABYLON.Mesh.MergeMeshes([this.trunk, debug]);
+    this.leaves = BABYLON.MeshBuilder.CreateCylinder("leaves", {
+        height: this.leavesHeight,
+        tessellation: this.tessellation,
+        cap: BABYLON.Mesh.NO_CAP,
+        diameterTop: 0.1,
+        diameterBottom: this.leavesDiamiter
+    });
+    this.leaves.position.y = this.leavesHeight / 2 + this.trunkHeight;
+    this.leaves.material = this.leafMaterial;
+    this.leaves.bakeCurrentTransformIntoVertices();
+    this.leaves.parent = this.root;
+    this.trunk.parent = this.root;
+};
+
+},{"./Planting":18,"./flowing_terrain":21,"./freeCameraPointersInput":22,"babylonjs":2}],17:[function(require,module,exports){
 "use strict";
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
@@ -19699,6 +19963,152 @@ exports.BaseCameraPointersInput = BaseCameraPointersInput;
  * SOFTWARE.
  */
 
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.Planting = exports.Plant = void 0;
+var seedrandom = require("seedrandom");
+
+var Plant = function Plant(position, random) {
+    _classCallCheck(this, Plant);
+
+    this.positionBase = position;
+    this.height = random() * 0.1 + 0.05;
+    if (random() < 0.2) {
+        this.type_ = 0 /* Pine */;
+    } else {
+        this.type_ = 1 /* Deciduous */;
+    }
+    this.position = new BABYLON.Vector3(random() + this.positionBase.x, 0, random() + this.positionBase.z);
+};
+
+exports.Plant = Plant;
+
+var Planting = function () {
+    function Planting(geography, config, noise) {
+        _classCallCheck(this, Planting);
+
+        this.treesPerTile = 10;
+        this.geography = geography;
+        this.config = config;
+        this.noise = noise;
+        this.countByType = [0, 0, 0, 0];
+        this.locations = new Map();
+        this.populate();
+    }
+
+    _createClass(Planting, [{
+        key: "populate",
+        value: function populate() {
+            this.countByType = [0, 0, 0, 0];
+            this.count = 0;
+            for (var x = 0; x < this.noise.length; x++) {
+                var row = this.noise[x];
+                for (var y = 0; y < row.length; y++) {
+                    for (var i = 0; i < this.treesPerTile; i++) {
+                        this.set(x, y, this.createPlant(x, y));
+                    }
+                }
+            }
+        }
+    }, {
+        key: "set",
+        value: function set(keyX, keyY, value) {
+            var row = void 0;
+            if (this.locations.has(keyX)) {
+                row = this.locations.get(keyX);
+            } else if (value !== null) {
+                row = new Map();
+                this.locations.set(keyX, row);
+            } else {
+                return;
+            }
+            if (value === null) {
+                row.delete(keyY);
+            } else {
+                var plants = [];
+                if (row.has(keyY)) {
+                    plants = row.get(keyY);
+                } else {
+                    row.set(keyY, plants);
+                }
+                if (value !== null) {
+                    plants.push(value);
+                }
+            }
+        }
+    }, {
+        key: "get",
+        value: function get(keyX, keyY) {
+            if (!this.locations.has(keyX)) {
+                return [];
+            }
+            var row = this.locations.get(keyX);
+            if (!row.has(keyY)) {
+                return [];
+            }
+            return row.get(keyY);
+        }
+    }, {
+        key: "createPlant",
+        value: function createPlant(keyX, keyY) {
+            var sealevel = this.config.get("geography.sealevel");
+            var tileCount = this.config.get("enviroment.tile_count");
+            if (keyX >= tileCount - 1 || keyY >= tileCount - 1) {
+                return null;
+            }
+            var tile00 = this.geography.tiles[keyX][keyY];
+            var tile10 = this.geography.tiles[keyX + 1][keyY];
+            var tile01 = this.geography.tiles[keyX][keyY + 1];
+            var tile11 = this.geography.tiles[keyX + 1][keyY + 1];
+            if (tile00.height < sealevel || tile10.height < sealevel || tile01.height < sealevel || tile11.height < sealevel) {
+                return null;
+            }
+            var noiseVal = this.noise[keyX][keyY];
+            if (noiseVal < 0.1) {
+                return null;
+            }
+            var random = seedrandom(noiseVal + " " + this.count);
+            var plant = new Plant(new BABYLON.Vector3(keyX, tile00.height, keyY), random);
+            this.countByType[plant.type_]++;
+            this.count++;
+            return plant;
+        }
+    }]);
+
+    return Planting;
+}();
+
+exports.Planting = Planting;
+
+},{"seedrandom":7}],19:[function(require,module,exports){
+"use strict";
+/*
+ * MIT License
+ *
+ * Copyright (c) 2020 duncan law
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 var _slicedToArray = function () { function sliceIterator(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"]) _i["return"](); } finally { if (_d) throw _e; } } return _arr; } return function (arr, i) { if (Array.isArray(arr)) { return arr; } else if (Symbol.iterator in Object(arr)) { return sliceIterator(arr, i); } else { throw new TypeError("Invalid attempt to destructure non-iterable instance"); } }; }();
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
@@ -19943,7 +20353,7 @@ var Config = function () {
 
 exports.Config = Config;
 
-},{}],19:[function(require,module,exports){
+},{}],20:[function(require,module,exports){
 "use strict";
 /*
  * MIT License
@@ -20224,7 +20634,7 @@ var FeedbackSlider = function (_HTMLElement2) {
 exports.FeedbackSlider = FeedbackSlider;
 customElements.define("feedback-slider", FeedbackSlider);
 
-},{}],20:[function(require,module,exports){
+},{}],21:[function(require,module,exports){
 "use strict";
 /*
  * MIT License
@@ -20571,7 +20981,7 @@ var DisplayBase = function () {
 
 exports.DisplayBase = DisplayBase;
 
-},{"./ordered_set":24}],21:[function(require,module,exports){
+},{"./ordered_set":25}],22:[function(require,module,exports){
 "use strict";
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
@@ -20755,7 +21165,6 @@ var FreeCameraPointersInput = function (_BaseCameraPointersIn) {
             }
             if (Math.abs(deltaX) > 1000 || Math.abs(deltaY) > 1000) {
                 // Cursor dragged off page.
-                console.log("!!");
                 return;
             }
             this._deltaX = deltaX;
@@ -20876,7 +21285,7 @@ var FreeCameraPointersInput = function (_BaseCameraPointersIn) {
 exports.FreeCameraPointersInput = FreeCameraPointersInput;
 BABYLON.CameraInputTypes["FreeCameraPointersInput"] = FreeCameraPointersInput;
 
-},{"./BaseCameraPointersInput":17,"babylonjs":2}],22:[function(require,module,exports){
+},{"./BaseCameraPointersInput":17,"babylonjs":2}],23:[function(require,module,exports){
 "use strict";
 /*
  * MIT License
@@ -21007,9 +21416,10 @@ function seed_points(config, tile_count) {
 exports.seed_points = seed_points;
 
 var Noise = function () {
-    function Noise(config) {
+    function Noise(label, config) {
         _classCallCheck(this, Noise);
 
+        this.label = label;
         this.config = config;
     }
 
@@ -21027,25 +21437,25 @@ var Noise = function () {
                     scale = 20 / tile_count;
                     this.coefficients_low = [];
                     coefficients = this.coefficients_low;
-                    random = seedrandom(this.config.get("noise.random_seed_low"));
+                    random = seedrandom(this.config.get(this.label + ".random_seed_low"));
                     break;
                 case "mid":
                     scale = 100 / tile_count;
                     this.coefficients_mid = [];
                     coefficients = this.coefficients_mid;
-                    random = seedrandom(this.config.get("noise.random_seed_mid"));
+                    random = seedrandom(this.config.get(this.label + ".random_seed_mid"));
                     break;
                 case "high":
                     scale = 10;
                     this.coefficients_high = [];
                     coefficients = this.coefficients_high;
-                    random = seedrandom(this.config.get("noise.random_seed_high"));
+                    random = seedrandom(this.config.get(this.label + ".random_seed_high"));
                     break;
                 default:
                     console.trace();
             }
             // Get ranges of octaves to use from config.
-            var octave_count = this.config.get("noise." + octave + "_octave");
+            var octave_count = this.config.get(this.label + "." + octave + "_octave");
             for (var i = 0; i < octave_count; i++) {
                 coefficients.push([random() * scale - scale / 2, random() * scale - scale / 2]);
             }
@@ -21061,19 +21471,19 @@ var Noise = function () {
             var data = null;
             switch (octave) {
                 case "low":
-                    weight = this.config.get("noise.low_octave_weight");
+                    weight = this.config.get(this.label + ".low_octave_weight");
                     coefficients = this.coefficients_low;
                     this.data_low = [];
                     data = this.data_low;
                     break;
                 case "mid":
-                    weight = this.config.get("noise.mid_octave_weight");
+                    weight = this.config.get(this.label + ".mid_octave_weight");
                     coefficients = this.coefficients_mid;
                     this.data_mid = [];
                     data = this.data_mid;
                     break;
                 case "high":
-                    weight = this.config.get("noise.high_octave_weight");
+                    weight = this.config.get(this.label + ".high_octave_weight");
                     coefficients = this.coefficients_high;
                     this.data_high = [];
                     data = this.data_high;
@@ -21131,9 +21541,9 @@ var Noise = function () {
 
             if (regenerate) {
                 // Do not use same values again.
-                this.config.set("noise.random_seed_low", "low " + new Date().getTime());
-                this.config.set("noise.random_seed_mid", "mid " + new Date().getTime());
-                this.config.set("noise.random_seed_high", "high " + new Date().getTime());
+                this.config.set(this.label + ".random_seed_low", "low " + new Date().getTime());
+                this.config.set(this.label + ".random_seed_mid", "mid " + new Date().getTime());
+                this.config.set(this.label + ".random_seed_high", "high " + new Date().getTime());
             }
             // TODO: Calculate what needs updating and do only that.
             var octave = "all";
@@ -21170,21 +21580,21 @@ var Noise = function () {
             var coefficients_y = null;
             var text = "<code class='text-dark'>height =</code><br>";
             var weight = 0;
-            weight = this.config.get("noise.low_octave_weight");
+            weight = this.config.get(this.label + ".low_octave_weight");
             if (weight > 0) {
                 text += "<code class='text-info'>// low frequency</code><br>";
                 this.coefficients_low.forEach(function (both) {
                     text += line(weight, both[0], both[1]);
                 });
             }
-            weight = this.config.get("noise.mid_octave_weight");
+            weight = this.config.get(this.label + ".mid_octave_weight");
             if (weight > 0) {
                 text += "<code class='text-info'>// mid frequency</code><br>";
                 this.coefficients_mid.forEach(function (both) {
                     text += line(weight, both[0], both[1]);
                 });
             }
-            weight = this.config.get("noise.high_octave_weight");
+            weight = this.config.get(this.label + ".high_octave_weight");
             if (weight > 0) {
                 text += "<code class='text-info'>// high frequency</code><br>";
                 this.coefficients_high.forEach(function (both) {
@@ -21200,7 +21610,7 @@ var Noise = function () {
 
 exports.Noise = Noise;
 
-},{"./ordered_set":24,"seedrandom":7}],23:[function(require,module,exports){
+},{"./ordered_set":25,"seedrandom":7}],24:[function(require,module,exports){
 "use strict";
 /*
  * MIT License
@@ -21251,6 +21661,7 @@ window.onload = function () {
     var config = new config_1.Config();
     var seabed = null;
     var noise = null;
+    var vegetation = null;
     var geography = null;
     var display = null;
     config.set_if_null("enviroment.tile_count", 100);
@@ -21258,6 +21669,9 @@ window.onload = function () {
     config.set_if_null("noise.random_seed_low", "low " + new Date().getTime());
     config.set_if_null("noise.random_seed_mid", "mid " + new Date().getTime());
     config.set_if_null("noise.random_seed_high", "high " + new Date().getTime());
+    config.set_if_null("vegetation.random_seed_low", "v low " + new Date().getTime());
+    config.set_if_null("vegetation.random_seed_mid", "v mid " + new Date().getTime());
+    config.set_if_null("vegetation.random_seed_high", "v high " + new Date().getTime());
     config.set_if_null("seed_points.threshold", 0.18);
     config.set_callback("seed_points.threshold", seed_threshold_callback);
     config.set_if_null("noise.low_octave", 3);
@@ -21272,6 +21686,20 @@ window.onload = function () {
     config.set_callback("noise.mid_octave_weight", noise_octaves_callback);
     config.set_if_null("noise.high_octave_weight", 0.2);
     config.set_callback("noise.high_octave_weight", noise_octaves_callback);
+    config.set_if_null("vegetation.enabled", 1);
+    config.set_callback("vegetation.enabled", vegetation_enabled);
+    config.set_if_null("vegetation.low_octave", 3);
+    config.set_callback("vegetation.low_octave", vegetation_octaves_callback);
+    config.set_if_null("vegetation.mid_octave", 5);
+    config.set_callback("vegetation.mid_octave", vegetation_octaves_callback);
+    config.set_if_null("vegetation.high_octave", 10);
+    config.set_callback("vegetation.high_octave", vegetation_octaves_callback);
+    config.set_if_null("vegetation.low_octave_weight", 0.2);
+    config.set_callback("vegetation.low_octave_weight", vegetation_octaves_callback);
+    config.set_if_null("vegetation.mid_octave_weight", 0.5);
+    config.set_callback("vegetation.mid_octave_weight", vegetation_octaves_callback);
+    config.set_if_null("vegetation.high_octave_weight", 0.2);
+    config.set_callback("vegetation.high_octave_weight", vegetation_octaves_callback);
     config.set_if_null("terrain.height_constant", 0.01);
     config.set_callback("terrain.height_constant", terrain_callback);
     config.set_if_null("terrain.noise_height_weight", 1.0);
@@ -21307,7 +21735,7 @@ window.onload = function () {
 
         time("noise", function () {
             if (noise === null) {
-                noise = new genesis_1.Noise(config);
+                noise = new genesis_1.Noise("noise", config);
             }
             noise.generate(regenerate);
         });
@@ -21332,15 +21760,38 @@ window.onload = function () {
         });
         display = time("3d_display", function () {
             if (display === null) {
-                return new _3d_view_1.Display3d(geography, config);
+                return new _3d_view_1.Display3d(geography, vegetation, config);
             } else {
                 display.draw();
                 return display;
             }
         });
     }
+    function generate_vegetation() {
+        var regenerate = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : false;
+
+        time("vegetation", function () {
+            if (vegetation === null) {
+                vegetation = new genesis_1.Noise("vegetation", config);
+            }
+            vegetation.generate(regenerate);
+        });
+        time("vegetation_map", function () {
+            _2d_view_1.draw_2d("vegetation_map", vegetation.data_combined);
+            vegetation.text(document.getElementById("vegetation_debug"));
+        });
+    }
+    function draw_vegetation() {
+        time("vegetation_draw", function () {
+            if (display !== null) {
+                display.planting();
+            }
+        });
+    }
     generate_seed_points();
     generate_noise();
+    generate_vegetation();
+    draw_vegetation();
     generate_terrain();
     console.table(stats);
     // Start drawing the 3d view.
@@ -21466,7 +21917,7 @@ window.onload = function () {
         for (var _iterator3 = document.getElementsByTagName("feedback-slider")[Symbol.iterator](), _step3; !(_iteratorNormalCompletion3 = (_step3 = _iterator3.next()).done); _iteratorNormalCompletion3 = true) {
             _loop();
         }
-        // Button to regenerate the seed_point map.
+        // Initialise checkbox controls.
     } catch (err) {
         _didIteratorError3 = true;
         _iteratorError3 = err;
@@ -21478,6 +21929,45 @@ window.onload = function () {
         } finally {
             if (_didIteratorError3) {
                 throw _iteratorError3;
+            }
+        }
+    }
+
+    var _iteratorNormalCompletion4 = true;
+    var _didIteratorError4 = false;
+    var _iteratorError4 = undefined;
+
+    try {
+        var _loop2 = function _loop2() {
+            var node = _step4.value;
+
+            if (node.type === "checkbox") {
+                node.checked = config.get("vegetation.enabled");
+                node.addEventListener("change", function () {
+                    console.info("Checkbox " + node.name + " changed to " + node.checked);
+                    if (config.get(node.name, false) !== null) {
+                        // Callback to update map happens as part of the config.set(...).
+                        config.set(node.name, node.checked ? 1 : 0);
+                    }
+                });
+            }
+        };
+
+        for (var _iterator4 = document.getElementsByTagName("input")[Symbol.iterator](), _step4; !(_iteratorNormalCompletion4 = (_step4 = _iterator4.next()).done); _iteratorNormalCompletion4 = true) {
+            _loop2();
+        }
+        // Button to regenerate the seed_point map.
+    } catch (err) {
+        _didIteratorError4 = true;
+        _iteratorError4 = err;
+    } finally {
+        try {
+            if (!_iteratorNormalCompletion4 && _iterator4.return) {
+                _iterator4.return();
+            }
+        } finally {
+            if (_didIteratorError4) {
+                throw _iteratorError4;
             }
         }
     }
@@ -21526,6 +22016,39 @@ window.onload = function () {
         if (timer_slow === 0) {
             timer_slow = setTimeout(function () {
                 generate_terrain();
+                timer_slow = 0;
+            }, 2000);
+        }
+    }
+    // Button to regenerate all aspects of the vegetation map.
+    var menu_vegetation = document.getElementById("vegetation");
+    menu_vegetation.addEventListener("click", function (event) {
+        generate_vegetation(true);
+        draw_vegetation();
+    });
+    // Callback to set whether trees should be displayed or not.
+    function vegetation_enabled(keys, value) {
+        // Only do this every 200ms, even if more updates are sent.
+        if (timer_fast === 0) {
+            timer_fast = setTimeout(function () {
+                draw_vegetation();
+                timer_fast = 0;
+            }, 200);
+        }
+    }
+    // Callback to set vegetation noise octaves.
+    // This single callback will work for all octaves.
+    function vegetation_octaves_callback(keys, value) {
+        // Only do this every 200ms, even if more updates are sent.
+        if (timer_fast === 0) {
+            timer_fast = setTimeout(function () {
+                generate_vegetation();
+                timer_fast = 0;
+            }, 200);
+        }
+        if (timer_slow === 0) {
+            timer_slow = setTimeout(function () {
+                draw_vegetation();
                 timer_slow = 0;
             }, 2000);
         }
@@ -21579,7 +22102,7 @@ window.onload = function () {
     });
 };
 
-},{"./2d_view":15,"./3d_view":16,"./config":18,"./custom_html_elements":19,"./flowing_terrain":20,"./genesis":22,"@webcomponents/webcomponentsjs/custom-elements-es5-adapter.js":1,"bootstrap":3}],24:[function(require,module,exports){
+},{"./2d_view":15,"./3d_view":16,"./config":19,"./custom_html_elements":20,"./flowing_terrain":21,"./genesis":23,"@webcomponents/webcomponentsjs/custom-elements-es5-adapter.js":1,"bootstrap":3}],25:[function(require,module,exports){
 "use strict";
 /*
 # MIT License
@@ -21713,6 +22236,6 @@ var SortedSet = function () {
 
 exports.SortedSet = SortedSet;
 
-},{}]},{},[23])
+},{}]},{},[24])
 
 //# sourceMappingURL=bundle.js.map
