@@ -19319,15 +19319,6 @@ var Display3d = function (_flowing_terrain_1$Di) {
             this.set_sealevel(this.config.get("geography.sealevel"));
             // Plant trees.
             this.planting();
-            // Tree shadows.
-            var shadowGenerator = new BABYLON.ShadowGenerator(4096, this.light_1);
-            shadowGenerator.usePoissonSampling = true;
-            //shadowGenerator.useExponentialShadowMap = false;
-            shadowGenerator.addShadowCaster(this.treesPine.trunk, true);
-            shadowGenerator.addShadowCaster(this.treesPine.leaves, true);
-            shadowGenerator.addShadowCaster(this.treesDeciduous.trunk, true);
-            shadowGenerator.addShadowCaster(this.treesDeciduous.leaves, true);
-            this.land_mesh.receiveShadows = true;
         }
         // Move the height of the sea mesh on the Z axis.
 
@@ -19555,6 +19546,17 @@ var Display3d = function (_flowing_terrain_1$Di) {
             if (pineCount === 0) {
                 this.treesPine.trunk.isVisible = false;
                 this.treesPine.leaves.isVisible = false;
+            }
+            // Tree shadows.
+            if (this.config.get("vegetation.shadow_enabled")) {
+                var shadowGenerator = new BABYLON.ShadowGenerator(4096, this.light_1);
+                shadowGenerator.usePoissonSampling = true;
+                //shadowGenerator.useExponentialShadowMap = false;
+                shadowGenerator.addShadowCaster(this.treesPine.trunk, true);
+                shadowGenerator.addShadowCaster(this.treesPine.leaves, true);
+                shadowGenerator.addShadowCaster(this.treesDeciduous.trunk, true);
+                shadowGenerator.addShadowCaster(this.treesDeciduous.leaves, true);
+                this.land_mesh.receiveShadows = true;
             }
         }
     }]);
@@ -21688,6 +21690,8 @@ window.onload = function () {
     config.set_callback("noise.high_octave_weight", noise_octaves_callback);
     config.set_if_null("vegetation.enabled", 1);
     config.set_callback("vegetation.enabled", vegetation_enabled);
+    config.set_if_null("vegetation.shadow_enabled", 0);
+    config.set_callback("vegetation.shadow_enabled", vegetation_enabled);
     config.set_if_null("vegetation.low_octave", 3);
     config.set_callback("vegetation.low_octave", vegetation_octaves_callback);
     config.set_if_null("vegetation.mid_octave", 5);
@@ -21942,7 +21946,7 @@ window.onload = function () {
             var node = _step4.value;
 
             if (node.type === "checkbox") {
-                node.checked = config.get("vegetation.enabled");
+                node.checked = config.get(node.name);
                 node.addEventListener("change", function () {
                     console.info("Checkbox " + node.name + " changed to " + node.checked);
                     if (config.get(node.name, false) !== null) {
@@ -22028,18 +22032,13 @@ window.onload = function () {
     });
     // Callback to set whether trees should be displayed or not.
     function vegetation_enabled(keys, value) {
-        // Only do this every 200ms, even if more updates are sent.
-        if (timer_fast === 0) {
-            timer_fast = setTimeout(function () {
-                draw_vegetation();
-                timer_fast = 0;
-            }, 200);
-        }
+        draw_vegetation();
     }
     // Callback to set vegetation noise octaves.
     // This single callback will work for all octaves.
     function vegetation_octaves_callback(keys, value) {
         // Only do this every 200ms, even if more updates are sent.
+        // TODO: Timers should not be shared between actions.
         if (timer_fast === 0) {
             timer_fast = setTimeout(function () {
                 generate_vegetation();

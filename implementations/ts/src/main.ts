@@ -86,6 +86,8 @@ window.onload = () => {
 
   config.set_if_null("vegetation.enabled", 1);
   config.set_callback("vegetation.enabled", vegetation_enabled);
+  config.set_if_null("vegetation.shadow_enabled", 0);
+  config.set_callback("vegetation.shadow_enabled", vegetation_enabled);
   config.set_if_null("vegetation.low_octave", 3);
   config.set_callback("vegetation.low_octave", vegetation_octaves_callback);
   config.set_if_null("vegetation.mid_octave", 5);
@@ -290,7 +292,7 @@ window.onload = () => {
   // Initialise checkbox controls.
   for(const node of document.getElementsByTagName("input")) {
     if(node.type === "checkbox") {
-      node.checked = config.get("vegetation.enabled");
+      node.checked = config.get(node.name);
       node.addEventListener("change", () => {
         console.info(`Checkbox ${node.name} changed to ${node.checked}`);
         if(config.get(node.name, false) !== null) {
