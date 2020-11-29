@@ -414,16 +414,6 @@ export class Display3d extends DisplayBase {
 
     // Plant trees.
     this.planting();
-
-    // Tree shadows.
-    const shadowGenerator = new BABYLON.ShadowGenerator(4096, this.light_1);
-    shadowGenerator.usePoissonSampling = true;
-    //shadowGenerator.useExponentialShadowMap = false;
-    shadowGenerator.addShadowCaster(this.treesPine.trunk, true);
-    shadowGenerator.addShadowCaster(this.treesPine.leaves, true);
-    shadowGenerator.addShadowCaster(this.treesDeciduous.trunk, true);
-    shadowGenerator.addShadowCaster(this.treesDeciduous.leaves, true);
-    this.land_mesh.receiveShadows = true;
   }
 
   // Move the height of the sea mesh on the Z axis.
@@ -606,6 +596,18 @@ export class Display3d extends DisplayBase {
     if(pineCount === 0) {
       this.treesPine.trunk.isVisible = false;
       this.treesPine.leaves.isVisible = false;
+    }
+
+    // Tree shadows.
+    if(this.config.get("vegetation.shadow_enabled")) {
+      const shadowGenerator = new BABYLON.ShadowGenerator(4096, this.light_1);
+      shadowGenerator.usePoissonSampling = true;
+      //shadowGenerator.useExponentialShadowMap = false;
+      shadowGenerator.addShadowCaster(this.treesPine.trunk, true);
+      shadowGenerator.addShadowCaster(this.treesPine.leaves, true);
+      shadowGenerator.addShadowCaster(this.treesDeciduous.trunk, true);
+      shadowGenerator.addShadowCaster(this.treesDeciduous.leaves, true);
+      this.land_mesh.receiveShadows = true;
     }
   }
 }
