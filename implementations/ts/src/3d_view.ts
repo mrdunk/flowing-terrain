@@ -33,23 +33,22 @@ import {FreeCameraPointersInput} from './freeCameraPointersInput';
 import {Planting, PlantType} from './Planting';
 
 export class Display3d extends DisplayBase {
-  vegetation: Noise;
   config: Config = null;
   tile_size: number = 2;
   positions: number[] = [];
   indices: number[] = [];
   normals: number[] = [];
-  tileIterator: number = 0;
   rivers: BABYLON.Vector3[][] = [];
   land_mesh: BABYLON.Mesh;
-  treesPine: TreePine;
-  treesDeciduous: TreeDeciduous;
   sea_mesh: BABYLON.Mesh;
   rivers_mesh: BABYLON.Mesh;
   update_rivers_timer: ReturnType<typeof setTimeout> = 0;
 
+  vegetation: Noise;
+  treesPine: TreePine;
+  treesDeciduous: TreeDeciduous;
+
   canvas: HTMLCanvasElement;
-  fpsMeter: HTMLElement;
   engine: BABYLON.Engine;
   scene: BABYLON.Scene;
   camera: BABYLON.UniversalCamera;
@@ -58,6 +57,8 @@ export class Display3d extends DisplayBase {
   sea_material: BABYLON.StandardMaterial;
   seabed_material: BABYLON.StandardMaterial;
 
+  light_1:BABYLON.DirectionalLight;
+
   constructor(geography: Geography, vegetation: Noise, config: Config) {
     super(geography);
 
@@ -65,12 +66,9 @@ export class Display3d extends DisplayBase {
     this.config = config;
 
     this.canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
-    this.fpsMeter = document.getElementById("fps") as HTMLElement;
     this.engine = new BABYLON.Engine(this.canvas, true);
     this.scene = new BABYLON.Scene(this.engine);
     const mapsize = this.tile_size * config.get("enviroment.tile_count");
-
-    this.scene.registerBeforeRender(this.updateFps.bind(this));
 
     this.camera = new BABYLON.UniversalCamera(
       "UniversalCamera",
@@ -101,15 +99,15 @@ export class Display3d extends DisplayBase {
     this.camera.touchAngularSensibility = 60000;
 
     this.camera.attachControl(this.canvas, true);
-    const light_1 = new BABYLON.DirectionalLight(
+    this.light_1 = new BABYLON.DirectionalLight(
       "light_1",
       new BABYLON.Vector3(-10, -10, 0),
       this.scene);
-    light_1.position = new BABYLON.Vector3(100, 100, 100);
-    light_1.diffuse = new BABYLON.Color3(1, 1, 1);
-    light_1.specular = new BABYLON.Color3(0, 0, 0);
-    light_1.intensity = 0.5;
-    light_1.autoCalcShadowZBounds = true;
+    this.light_1.position = new BABYLON.Vector3(100, 100, 100);
+    this.light_1.diffuse = new BABYLON.Color3(1, 1, 1);
+    this.light_1.specular = new BABYLON.Color3(0, 0, 0);
+    this.light_1.intensity = 0.5;
+    this.light_1.autoCalcShadowZBounds = true;
 
     const light_2 = new BABYLON.DirectionalLight(
       "light_2",
@@ -139,27 +137,10 @@ export class Display3d extends DisplayBase {
 
     this.draw();
 
-    this.planting();
-
-    /*const shadowGenerator = new BABYLON.ShadowGenerator(4096, light_1);
-    shadowGenerator.usePoissonSampling = true;
-    //shadowGenerator.useExponentialShadowMap = false;
-    shadowGenerator.addShadowCaster(this.treesPine.trunk, true);
-    shadowGenerator.addShadowCaster(this.treesPine.leaves, true);
-    shadowGenerator.addShadowCaster(this.treesDeciduous.trunk, true);
-    shadowGenerator.addShadowCaster(this.treesDeciduous.leaves, true);
-    this.land_mesh.receiveShadows = true;*/
-
     this.camera.setTarget(new BABYLON.Vector3(mapsize / 2, 0, mapsize / 2));
 
     // Hide the HTML loader.
     document.getElementById("loader").style.display = "none";
-
-    console.log(this.indices.length, this.positions.length);
-  }
-
-  updateFps(): void {
-    this.fpsMeter.innerHTML = this.engine.getFps().toFixed() + " fps";
   }
 
   // Move camera to selected view.
@@ -407,6 +388,7 @@ export class Display3d extends DisplayBase {
     this.land_mesh.checkCollisions = true;
     // this.land_mesh.convertToFlatShadedMesh();
 
+    // Show tile edges.
     // this.land_mesh.enableEdgesRendering(.9999999999);
     // this.land_mesh.edgesWidth = 5.0;
     // this.land_mesh.edgesColor = new BABYLON.Color4(1, 1, 1, 1);
@@ -429,6 +411,19 @@ export class Display3d extends DisplayBase {
     this.sea_mesh.material = this.sea_material;
     this.sea_mesh.checkCollisions = false;
     this.set_sealevel(this.config.get("geography.sealevel"));
+
+    // Plant trees.
+    this.planting();
+
+    // Tree shadows.
+    const shadowGenerator = new BABYLON.ShadowGenerator(4096, this.light_1);
+    shadowGenerator.usePoissonSampling = true;
+    //shadowGenerator.useExponentialShadowMap = false;
+    shadowGenerator.addShadowCaster(this.treesPine.trunk, true);
+    shadowGenerator.addShadowCaster(this.treesPine.leaves, true);
+    shadowGenerator.addShadowCaster(this.treesDeciduous.trunk, true);
+    shadowGenerator.addShadowCaster(this.treesDeciduous.leaves, true);
+    this.land_mesh.receiveShadows = true;
   }
 
   // Move the height of the sea mesh on the Z axis.
@@ -548,6 +543,19 @@ export class Display3d extends DisplayBase {
   planting(): void {
     const p = new Planting(this.geography, this.config, this.vegetation.data_combined);
 
+    if(this.treesPine) {
+      this.treesPine.trunk.dispose();
+      this.treesPine.leaves.dispose();
+    }
+    if(this.treesDeciduous) {
+      this.treesDeciduous.trunk.dispose();
+      this.treesDeciduous.leaves.dispose();
+    }
+
+    if(! this.config.get("vegetation.enabled")) {
+      return;
+    }
+
     this.treesPine = new TreePine(this.scene);
     this.treesDeciduous = new TreeDeciduous(this.scene);
     let pineCount = 0;
@@ -590,6 +598,15 @@ export class Display3d extends DisplayBase {
     this.treesDeciduous.trunk.thinInstanceSetBuffer("matrix", bufferMatricesDeciduous, 16, true);
     this.treesPine.leaves.thinInstanceSetBuffer("matrix", bufferMatricesPine, 16, true);
     this.treesPine.trunk.thinInstanceSetBuffer("matrix", bufferMatricesPine, 16, true);
+
+    if(deciduousCount === 0) {
+      this.treesDeciduous.trunk.isVisible = false;
+      this.treesDeciduous.leaves.isVisible = false;
+    }
+    if(pineCount === 0) {
+      this.treesPine.trunk.isVisible = false;
+      this.treesPine.leaves.isVisible = false;
+    }
   }
 }
 

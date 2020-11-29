@@ -73,18 +73,61 @@
                     </div>
 
                     <div class="col-sm border">
+                      <div class="border higher-vis">
+                        <input type="checkbox" id="vegetation_enabled" name="vegetation.enabled">
+                        <label for="vegetation_enabled">Show trees</label>
+                      </div>
+
                       <canvas id="vegetation_map"></canvas><br>
                       <div class="border higher-vis">
                         <div class="form-group">
                           <label for="vegetation">Vegetation map</label>
                           <button type="button" class="btn btn-primary" id="vegetation" name="vegetation" value="regenerate" title="Generate a new vegetation map">
-                            <img src="./assets/arrow-clockwise.svg" alt="" width="16" height="16" title="Generate a new noise map">
+                            <img src="./assets/arrow-clockwise.svg" alt="" width="16" height="16" title="Generate a new vegetation map">
                           </button>
+                        </div>
+                      </div>
+
+                      <div class="border higher-vis">
+                        <feedback-slider title="Set number of low frequency (long wavelength) octaves. Complexity of the big features." id="vegetation_low_octave"
+                            name="vegetation.low_octave" min="0" max="10" value="3">
+                          Low octave components
+                        </feedback-slider>
+                        <feedback-slider title="Weight of low frequency (long wavelength) octaves. How pronounced the big features are." id="vegetation_low_octave_weight"
+                            name="vegetation.low_octave_weight" min="0" max="4" value="1" step="0.01">
+                          Weight
+                        </feedback-slider>
+                      </div>
+                      
+                      <div class="border higher-vis">
+                        <feedback-slider title="Set number of mid frequency octaves. Complexity of the medeum sized features." id="vegetation_mid_octave"
+                            name="vegetation.mid_octave" min="0" max="10" value="3">
+                          Mid octave components
+                        </feedback-slider>
+                        <feedback-slider title="Set number of mid frequency octaves. How pronounced the medeum sized features are." id="vegetation_mid_octave_weight"
+                            name="vegetation.mid_octave_weight" min="0" max="3" value="1" step="0.01">
+                          Weight
+                        </feedback-slider>
+                      </div>
+                      
+                      <div class="border higher-vis">
+                        <feedback-slider title="Set number of high frequency (short wavelength) octaves. The fine detail." id="vegetation_high_octave" name="vegetation.high_octave" min="0" max="20" value="10">
+                          High octave components
+                        </feedback-slider>
+                        <feedback-slider title="Weight of high frequency (long wavelength) octaves. How pronounced the fine detail is." id="vegetation_high_octave_weight"
+                            name="vegetation.high_octave_weight" min="0" max="2" value="1" step="0.01">
+                          Weight
+                        </feedback-slider>
+                      </div>
+                      
+                      <div class="collapse show border higher-vis" aria-expanded="true">
+                        <div style="height: 200px;" class="small overflow-auto mh-10 text-nowrap" id="vegetation_debug">
                         </div>
                       </div>
                     </div>
 
                   </div>
+
                 </div>
 
                 <div class="tab-pane fade show active" id="geography" role="tabpanel">
@@ -283,8 +326,6 @@
 
         </collapsable-menu>
       </div>
-
-      <div id="fps">0</div>
 
       <canvas id="renderCanvas" touch-action="none"></canvas>
 

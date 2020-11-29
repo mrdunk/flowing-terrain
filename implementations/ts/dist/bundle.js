@@ -19026,17 +19026,14 @@ var Display3d = function (_flowing_terrain_1$Di) {
         _this.positions = [];
         _this.indices = [];
         _this.normals = [];
-        _this.tileIterator = 0;
         _this.rivers = [];
         _this.update_rivers_timer = 0;
         _this.vegetation = vegetation;
         _this.config = config;
         _this.canvas = document.getElementById("renderCanvas");
-        _this.fpsMeter = document.getElementById("fps");
         _this.engine = new BABYLON.Engine(_this.canvas, true);
         _this.scene = new BABYLON.Scene(_this.engine);
         var mapsize = _this.tile_size * config.get("enviroment.tile_count");
-        _this.scene.registerBeforeRender(_this.updateFps.bind(_this));
         _this.camera = new BABYLON.UniversalCamera("UniversalCamera", new BABYLON.Vector3(0, 0, 0), _this.scene);
         _this.camera.inputs.addMouseWheel();
         _this.camera.inputs.attached['mousewheel'].wheelYMoveScene = BABYLON.Coordinate.Y;
@@ -19056,12 +19053,12 @@ var Display3d = function (_flowing_terrain_1$Di) {
         _this.camera.touchMoveSensibility = 200;
         _this.camera.touchAngularSensibility = 60000;
         _this.camera.attachControl(_this.canvas, true);
-        var light_1 = new BABYLON.DirectionalLight("light_1", new BABYLON.Vector3(-10, -10, 0), _this.scene);
-        light_1.position = new BABYLON.Vector3(100, 100, 100);
-        light_1.diffuse = new BABYLON.Color3(1, 1, 1);
-        light_1.specular = new BABYLON.Color3(0, 0, 0);
-        light_1.intensity = 0.5;
-        light_1.autoCalcShadowZBounds = true;
+        _this.light_1 = new BABYLON.DirectionalLight("light_1", new BABYLON.Vector3(-10, -10, 0), _this.scene);
+        _this.light_1.position = new BABYLON.Vector3(100, 100, 100);
+        _this.light_1.diffuse = new BABYLON.Color3(1, 1, 1);
+        _this.light_1.specular = new BABYLON.Color3(0, 0, 0);
+        _this.light_1.intensity = 0.5;
+        _this.light_1.autoCalcShadowZBounds = true;
         var light_2 = new BABYLON.DirectionalLight("light_2", new BABYLON.Vector3(0, -10, 0), _this.scene);
         light_2.diffuse = new BABYLON.Color3(1, 1, 1);
         light_2.specular = new BABYLON.Color3(0.3, 0.3, 0.3);
@@ -19081,30 +19078,15 @@ var Display3d = function (_flowing_terrain_1$Di) {
         _this.sea_material.alpha = config.get("display.sea_transparency");
         _this.sea_material.backFaceCulling = false;
         _this.draw();
-        _this.planting();
-        /*const shadowGenerator = new BABYLON.ShadowGenerator(4096, light_1);
-        shadowGenerator.usePoissonSampling = true;
-        //shadowGenerator.useExponentialShadowMap = false;
-        shadowGenerator.addShadowCaster(this.treesPine.trunk, true);
-        shadowGenerator.addShadowCaster(this.treesPine.leaves, true);
-        shadowGenerator.addShadowCaster(this.treesDeciduous.trunk, true);
-        shadowGenerator.addShadowCaster(this.treesDeciduous.leaves, true);
-        this.land_mesh.receiveShadows = true;*/
         _this.camera.setTarget(new BABYLON.Vector3(mapsize / 2, 0, mapsize / 2));
         // Hide the HTML loader.
         document.getElementById("loader").style.display = "none";
-        console.log(_this.indices.length, _this.positions.length);
         return _this;
     }
+    // Move camera to selected view.
+
 
     _createClass(Display3d, [{
-        key: "updateFps",
-        value: function updateFps() {
-            this.fpsMeter.innerHTML = this.engine.getFps().toFixed() + " fps";
-        }
-        // Move camera to selected view.
-
-    }, {
         key: "set_view",
         value: function set_view(direction) {
             var mapsize = this.tile_size * this.config.get("enviroment.tile_count");
@@ -19318,6 +19300,7 @@ var Display3d = function (_flowing_terrain_1$Di) {
             // Required to keep camera above ground.
             this.land_mesh.checkCollisions = true;
             // this.land_mesh.convertToFlatShadedMesh();
+            // Show tile edges.
             // this.land_mesh.enableEdgesRendering(.9999999999);
             // this.land_mesh.edgesWidth = 5.0;
             // this.land_mesh.edgesColor = new BABYLON.Color4(1, 1, 1, 1);
@@ -19334,6 +19317,17 @@ var Display3d = function (_flowing_terrain_1$Di) {
             this.sea_mesh.material = this.sea_material;
             this.sea_mesh.checkCollisions = false;
             this.set_sealevel(this.config.get("geography.sealevel"));
+            // Plant trees.
+            this.planting();
+            // Tree shadows.
+            var shadowGenerator = new BABYLON.ShadowGenerator(4096, this.light_1);
+            shadowGenerator.usePoissonSampling = true;
+            //shadowGenerator.useExponentialShadowMap = false;
+            shadowGenerator.addShadowCaster(this.treesPine.trunk, true);
+            shadowGenerator.addShadowCaster(this.treesPine.leaves, true);
+            shadowGenerator.addShadowCaster(this.treesDeciduous.trunk, true);
+            shadowGenerator.addShadowCaster(this.treesDeciduous.leaves, true);
+            this.land_mesh.receiveShadows = true;
         }
         // Move the height of the sea mesh on the Z axis.
 
@@ -19445,6 +19439,17 @@ var Display3d = function (_flowing_terrain_1$Di) {
         key: "planting",
         value: function planting() {
             var p = new Planting_1.Planting(this.geography, this.config, this.vegetation.data_combined);
+            if (this.treesPine) {
+                this.treesPine.trunk.dispose();
+                this.treesPine.leaves.dispose();
+            }
+            if (this.treesDeciduous) {
+                this.treesDeciduous.trunk.dispose();
+                this.treesDeciduous.leaves.dispose();
+            }
+            if (!this.config.get("vegetation.enabled")) {
+                return;
+            }
             this.treesPine = new TreePine(this.scene);
             this.treesDeciduous = new TreeDeciduous(this.scene);
             var pineCount = 0;
@@ -19543,6 +19548,14 @@ var Display3d = function (_flowing_terrain_1$Di) {
             this.treesDeciduous.trunk.thinInstanceSetBuffer("matrix", bufferMatricesDeciduous, 16, true);
             this.treesPine.leaves.thinInstanceSetBuffer("matrix", bufferMatricesPine, 16, true);
             this.treesPine.trunk.thinInstanceSetBuffer("matrix", bufferMatricesPine, 16, true);
+            if (deciduousCount === 0) {
+                this.treesDeciduous.trunk.isVisible = false;
+                this.treesDeciduous.leaves.isVisible = false;
+            }
+            if (pineCount === 0) {
+                this.treesPine.trunk.isVisible = false;
+                this.treesPine.leaves.isVisible = false;
+            }
         }
     }]);
 
@@ -20054,7 +20067,7 @@ var Planting = function () {
                 return null;
             }
             var noiseVal = this.noise[keyX][keyY];
-            if (noiseVal < 0.01) {
+            if (noiseVal < 0.1) {
                 return null;
             }
             var random = seedrandom(noiseVal + " " + this.count);
@@ -21673,18 +21686,20 @@ window.onload = function () {
     config.set_callback("noise.mid_octave_weight", noise_octaves_callback);
     config.set_if_null("noise.high_octave_weight", 0.2);
     config.set_callback("noise.high_octave_weight", noise_octaves_callback);
+    config.set_if_null("vegetation.enabled", 1);
+    config.set_callback("vegetation.enabled", vegetation_enabled);
     config.set_if_null("vegetation.low_octave", 3);
-    //config.set_callback("vegetation.low_octave", vegetation_octaves_callback);
+    config.set_callback("vegetation.low_octave", vegetation_octaves_callback);
     config.set_if_null("vegetation.mid_octave", 5);
-    //config.set_callback("vegetation.mid_octave", vegetation_octaves_callback);
+    config.set_callback("vegetation.mid_octave", vegetation_octaves_callback);
     config.set_if_null("vegetation.high_octave", 10);
-    //config.set_callback("vegetation.high_octave", vegetation_octaves_callback);
+    config.set_callback("vegetation.high_octave", vegetation_octaves_callback);
     config.set_if_null("vegetation.low_octave_weight", 0.2);
-    //config.set_callback("vegetation.low_octave_weight", vegetation_octaves_callback);
+    config.set_callback("vegetation.low_octave_weight", vegetation_octaves_callback);
     config.set_if_null("vegetation.mid_octave_weight", 0.5);
-    //config.set_callback("vegetation.mid_octave_weight", vegetation_octaves_callback);
+    config.set_callback("vegetation.mid_octave_weight", vegetation_octaves_callback);
     config.set_if_null("vegetation.high_octave_weight", 0.2);
-    //config.set_callback("vegetation.high_octave_weight", vegetation_octaves_callback);
+    config.set_callback("vegetation.high_octave_weight", vegetation_octaves_callback);
     config.set_if_null("terrain.height_constant", 0.01);
     config.set_callback("terrain.height_constant", terrain_callback);
     config.set_if_null("terrain.noise_height_weight", 1.0);
@@ -21729,20 +21744,6 @@ window.onload = function () {
             noise.text(document.getElementById("height_debug"));
         });
     }
-    function generate_vegetation() {
-        var regenerate = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : false;
-
-        time("vegetation", function () {
-            if (vegetation === null) {
-                vegetation = new genesis_1.Noise("vegetation", config);
-            }
-            vegetation.generate(regenerate);
-        });
-        time("vegetation_map", function () {
-            _2d_view_1.draw_2d("vegetation_map", vegetation.data_combined);
-            //vegetation.text(document.getElementById("vegetation_debug"));
-        });
-    }
     function generate_terrain() {
         geography = time("geography", function () {
             if (geography === null) {
@@ -21766,9 +21767,31 @@ window.onload = function () {
             }
         });
     }
+    function generate_vegetation() {
+        var regenerate = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : false;
+
+        time("vegetation", function () {
+            if (vegetation === null) {
+                vegetation = new genesis_1.Noise("vegetation", config);
+            }
+            vegetation.generate(regenerate);
+        });
+        time("vegetation_map", function () {
+            _2d_view_1.draw_2d("vegetation_map", vegetation.data_combined);
+            vegetation.text(document.getElementById("vegetation_debug"));
+        });
+    }
+    function draw_vegetation() {
+        time("vegetation_draw", function () {
+            if (display !== null) {
+                display.planting();
+            }
+        });
+    }
     generate_seed_points();
     generate_noise();
     generate_vegetation();
+    draw_vegetation();
     generate_terrain();
     console.table(stats);
     // Start drawing the 3d view.
@@ -21894,7 +21917,7 @@ window.onload = function () {
         for (var _iterator3 = document.getElementsByTagName("feedback-slider")[Symbol.iterator](), _step3; !(_iteratorNormalCompletion3 = (_step3 = _iterator3.next()).done); _iteratorNormalCompletion3 = true) {
             _loop();
         }
-        // Button to regenerate the seed_point map.
+        // Initialise checkbox controls.
     } catch (err) {
         _didIteratorError3 = true;
         _iteratorError3 = err;
@@ -21906,6 +21929,45 @@ window.onload = function () {
         } finally {
             if (_didIteratorError3) {
                 throw _iteratorError3;
+            }
+        }
+    }
+
+    var _iteratorNormalCompletion4 = true;
+    var _didIteratorError4 = false;
+    var _iteratorError4 = undefined;
+
+    try {
+        var _loop2 = function _loop2() {
+            var node = _step4.value;
+
+            if (node.type === "checkbox") {
+                node.checked = config.get("vegetation.enabled");
+                node.addEventListener("change", function () {
+                    console.info("Checkbox " + node.name + " changed to " + node.checked);
+                    if (config.get(node.name, false) !== null) {
+                        // Callback to update map happens as part of the config.set(...).
+                        config.set(node.name, node.checked ? 1 : 0);
+                    }
+                });
+            }
+        };
+
+        for (var _iterator4 = document.getElementsByTagName("input")[Symbol.iterator](), _step4; !(_iteratorNormalCompletion4 = (_step4 = _iterator4.next()).done); _iteratorNormalCompletion4 = true) {
+            _loop2();
+        }
+        // Button to regenerate the seed_point map.
+    } catch (err) {
+        _didIteratorError4 = true;
+        _iteratorError4 = err;
+    } finally {
+        try {
+            if (!_iteratorNormalCompletion4 && _iterator4.return) {
+                _iterator4.return();
+            }
+        } finally {
+            if (_didIteratorError4) {
+                throw _iteratorError4;
             }
         }
     }
@@ -21962,7 +22024,35 @@ window.onload = function () {
     var menu_vegetation = document.getElementById("vegetation");
     menu_vegetation.addEventListener("click", function (event) {
         generate_vegetation(true);
+        draw_vegetation();
     });
+    // Callback to set whether trees should be displayed or not.
+    function vegetation_enabled(keys, value) {
+        // Only do this every 200ms, even if more updates are sent.
+        if (timer_fast === 0) {
+            timer_fast = setTimeout(function () {
+                draw_vegetation();
+                timer_fast = 0;
+            }, 200);
+        }
+    }
+    // Callback to set vegetation noise octaves.
+    // This single callback will work for all octaves.
+    function vegetation_octaves_callback(keys, value) {
+        // Only do this every 200ms, even if more updates are sent.
+        if (timer_fast === 0) {
+            timer_fast = setTimeout(function () {
+                generate_vegetation();
+                timer_fast = 0;
+            }, 200);
+        }
+        if (timer_slow === 0) {
+            timer_slow = setTimeout(function () {
+                draw_vegetation();
+                timer_slow = 0;
+            }, 2000);
+        }
+    }
     // Move camera to selected view.
     var views = document.getElementById("views").querySelectorAll(".btn");
     views.forEach(function (view) {

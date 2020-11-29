@@ -150,7 +150,7 @@ export class Planting {
       return null;
     }
     const noiseVal = this.noise[keyX][keyY];
-    if(noiseVal < 0.01) {
+    if(noiseVal < 0.1) {
       return null;
     }
 
