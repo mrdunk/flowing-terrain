@@ -10,6 +10,7 @@ dimensional terrain maps and their likely watercourses.
 In the screenshots darker tiles indicate higher elevation.
 Red highlights show the drainage value; Areas with more red are where rivers will form.
 ![islands](https://github.com/mrdunk/flowing-terrain/blob/master/assets/watershed.png)
+![web_demo_with_trees](https://github.com/mrdunk/flowing-terrain/blob/master/assets/web_demo_with_trees.png)
 
 ## The problem:
 My previous experiments in creating maps for computer software models using
@@ -139,17 +140,22 @@ At the end of this process every tile will have a drainage value equivalent to
 the number of tiles draining into it. Rivers can be assumed to exist in tiles
 with a higher value.
 
+## Making terrain look less uniform:
+On it's own the algorithm described here tends to fall into the trap of may procedurally generated landscape algorithms: Although generally irregular in shape, high ground ends up being roughly equidistant from the shore. This leads to "cone" shaped islands. (Fine for a volcanic landscape maybe?)  
+The solution (demonstrated in the TypeScript version of the source code) is to use perlin noise when picking a "random" value to add to the height in the Heights algorithm. This gives the best of both worlds: Pelin noise chooses where mountains are but landscape still always slopes downwards until it reaches the sea.  
+To see this in action, play with the sliders in the Tools menu of the online demo: 
+https://mrdunk.github.io/flowing-terrain/implementations/ts/dist/flowing_terrain.html  
+
 ## Limitations:
 1. Since the heights algorithm requires seeding with the lowest points on the desired map and floods outwards from there, this method only lends it's self to generating whole maps. It is not possible to use this algorithm recursively.
 1. Terrain will be similar in style across the whole map. This style will largely be determined by the range used in the random increase in height when flooding the height algorithm.
 
 ## Future work:
 1. Experiment with ways of generating recursive layers of detail so a low resolution map can be generated with the heights algorithm then more detail can be added to a particular section as required.
-1. Experiment with noise functions to vary the height increase when flooding the heights algorithm to provide different styles of scenery in different regions of the map.
-1. Experiment with different distribution patterns for the height increase when flooding the heights algorithm to give different unevenness patterns to the terrain.
 
 ## Some more screenshots:
 ![lizard](https://github.com/mrdunk/flowing-terrain/blob/master/assets/lizard.png)
 ![lagoon](https://github.com/mrdunk/flowing-terrain/blob/master/assets/lagoon.png)
 ![web_demo_perspective](https://github.com/mrdunk/flowing-terrain/blob/master/assets/web_demo_perspective.png)
 ![web_demo_overhead](https://github.com/mrdunk/flowing-terrain/blob/master/assets/web_demo_overhead.png)
+![web_demo_with_trees](https://github.com/mrdunk/flowing-terrain/blob/master/assets/web_demo_with_trees.png)
