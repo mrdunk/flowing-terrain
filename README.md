@@ -39,7 +39,14 @@ you've seen it used before.
 This project describes a simple algorithm to generate terrain for which any
 selected point on the map which is above "height == 0" will always have at
 least one adjacent point lower than it.
-This algorithm has O(n log(n)) time complexity.
+This algorithm theoretically has O(n log(n)) time complexity providing a
+suitable Sorted Set data structure capable of log(n) add and pop operations is
+used.  
+In practice the algorithm described here actually /more/ efficient than that as
+the Sorted Set never approaches n members. (Typically it will contain
+approximately (4 * sqrt(m)) where m is the number of nodes left to be
+processed.) As a result it may not be necessary to source an efficient Sorted
+Set library if one is not available for your platform.
 
 A 2nd algorithm then calculates a "drainage index" for each point which is a
 simple count of how many tiles have a parent of this tile as their lowest
