@@ -148,7 +148,6 @@ https://mrdunk.github.io/flowing-terrain/implementations/ts/dist/flowing_terrain
 
 ## Limitations:
 1. Since the heights algorithm requires seeding with the lowest points on the desired map and floods outwards from there, this method only lends it's self to generating whole maps. It is not possible to use this algorithm recursively.
-1. Terrain will be similar in style across the whole map. This style will largely be determined by the range used in the random increase in height when flooding the height algorithm.
 
 ## Future work:
 1. Experiment with ways of generating recursive layers of detail so a low resolution map can be generated with the heights algorithm then more detail can be added to a particular section as required.
