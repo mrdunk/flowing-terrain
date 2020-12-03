@@ -19053,16 +19053,16 @@ var Display3d = function (_flowing_terrain_1$Di) {
         _this.camera.touchMoveSensibility = 200;
         _this.camera.touchAngularSensibility = 60000;
         _this.camera.attachControl(_this.canvas, true);
-        _this.light_1 = new BABYLON.DirectionalLight("light_1", new BABYLON.Vector3(-10, -10, 0), _this.scene);
-        _this.light_1.position = new BABYLON.Vector3(100, 100, 100);
+        _this.light_1 = new BABYLON.DirectionalLight("light_1", new BABYLON.Vector3(-100, -100, 0), _this.scene);
         _this.light_1.diffuse = new BABYLON.Color3(1, 1, 1);
         _this.light_1.specular = new BABYLON.Color3(0, 0, 0);
         _this.light_1.intensity = 0.5;
         _this.light_1.autoCalcShadowZBounds = true;
-        var light_2 = new BABYLON.DirectionalLight("light_2", new BABYLON.Vector3(0, -10, 0), _this.scene);
+        var light_2 = new BABYLON.DirectionalLight("light_2", new BABYLON.Vector3(0, -100, 0), _this.scene);
         light_2.diffuse = new BABYLON.Color3(1, 1, 1);
         light_2.specular = new BABYLON.Color3(0.3, 0.3, 0.3);
         light_2.intensity = 0.5;
+        light_2.autoCalcShadowZBounds = true;
         _this.scene.ambientColor = new BABYLON.Color3(0.2, 0.2, 0.3);
         _this.land_material = new BABYLON.StandardMaterial("land_material", _this.scene);
         _this.land_material.diffuseColor = new BABYLON.Color3(0.4, 0.6, 0.2);
@@ -19079,6 +19079,29 @@ var Display3d = function (_flowing_terrain_1$Di) {
         _this.sea_material.backFaceCulling = false;
         _this.draw();
         _this.camera.setTarget(new BABYLON.Vector3(mapsize / 2, 0, mapsize / 2));
+        // FPS meter.
+        var updateEvery = 10;
+        var sampleCount = 10;
+        var fpsDiv = document.getElementById("fps");
+        var fps = 0;
+        var fpsCount = 0;
+        var fpsSamples = Array(sampleCount).fill(0);
+        var fpsTotal = 0;
+        var fpsIndex = 0;
+        _this.scene.registerBeforeRender(function () {
+            if (!(fpsCount++ % updateEvery === 0)) {
+                return;
+            }
+            fps = _this.engine.getFps();
+            if (!isFinite(fps)) {
+                return;
+            }
+            fpsIndex = Math.round(fpsCount / updateEvery) % sampleCount;
+            fpsTotal -= fpsSamples[fpsIndex];
+            fpsTotal += fps;
+            fpsSamples[fpsIndex] = fps;
+            fpsDiv.innerHTML = (fpsTotal / sampleCount).toFixed() + "fps";
+        });
         // Hide the HTML loader.
         document.getElementById("loader").style.display = "none";
         return _this;
@@ -19549,9 +19572,10 @@ var Display3d = function (_flowing_terrain_1$Di) {
             }
             // Tree shadows.
             if (this.config.get("vegetation.shadow_enabled")) {
-                var shadowGenerator = new BABYLON.ShadowGenerator(4096, this.light_1);
-                shadowGenerator.usePoissonSampling = true;
-                //shadowGenerator.useExponentialShadowMap = false;
+                //const shadowGenerator = new BABYLON.ShadowGenerator(4096, this.light_1);
+                var shadowGenerator = new BABYLON.ShadowGenerator(1024, this.light_1);
+                //const shadowGenerator = new BABYLON.ShadowGenerator(512, this.light_1);
+                //shadowGenerator.usePoissonSampling = true;
                 shadowGenerator.addShadowCaster(this.treesPine.trunk, true);
                 shadowGenerator.addShadowCaster(this.treesPine.leaves, true);
                 shadowGenerator.addShadowCaster(this.treesDeciduous.trunk, true);
@@ -19976,8 +20000,9 @@ var seedrandom = require("seedrandom");
 var Plant = function Plant(position, random) {
     _classCallCheck(this, Plant);
 
+    this.heightMultiplier = 0.05;
     this.positionBase = position;
-    this.height = random() * 0.1 + 0.05;
+    this.height = (random() + 0.5) * this.heightMultiplier;
     if (random() < 0.2) {
         this.type_ = 0 /* Pine */;
     } else {
@@ -21721,6 +21746,7 @@ window.onload = function () {
     config.set_if_null("geography.sealevel", 0.5);
     config.set_callback("geography.sealevel", function (key, value) {
         display.set_sealevel(value);
+        vegetation_octaves_callback(null, null);
     });
     config.set_if_null("display.sea_transparency", 0.5);
     config.set_callback("display.sea_transparency", function (key, value) {
@@ -21983,16 +22009,11 @@ window.onload = function () {
         generate_terrain();
     });
     // Callback for adjusting detail of the seed_point map.
-    var timer_fast = 0;
     function seed_threshold_callback(keys, value) {
-        // Only change the minimap every 200ms, even if more updates are sent.
-        if (timer_fast === 0) {
-            timer_fast = setTimeout(function () {
-                config.set("seed_points.random_seed", "" + new Date().getTime());
-                generate_seed_points();
-                timer_fast = 0;
-            }, 200);
-        }
+        setTimeout(function () {
+            config.set("seed_points.random_seed", "" + new Date().getTime());
+            generate_seed_points();
+        }, 0);
         terrain_callback(keys, value);
     }
     // Button to regenerate all aspects of the noise map.
@@ -22004,23 +22025,19 @@ window.onload = function () {
     // Callback to set noise octaves.
     // This single callback will work for all octaves.
     function noise_octaves_callback(keys, value) {
-        // Only do this every 200ms, even if more updates are sent.
-        if (timer_fast === 0) {
-            timer_fast = setTimeout(function () {
-                generate_noise();
-                timer_fast = 0;
-            }, 200);
-        }
+        setTimeout(function () {
+            generate_noise();
+        }, 0);
         terrain_callback(keys, value);
     }
     // Callback to regenerate terrain after settings change.
-    var timer_slow = 0;
+    var terrain_timer = 0;
     function terrain_callback(keys, value) {
         // Only change the 3d display every 2 seconds.
-        if (timer_slow === 0) {
-            timer_slow = setTimeout(function () {
+        if (terrain_timer === 0) {
+            terrain_timer = setTimeout(function () {
+                terrain_timer = 0;
                 generate_terrain();
-                timer_slow = 0;
             }, 2000);
         }
     }
@@ -22036,20 +22053,17 @@ window.onload = function () {
     }
     // Callback to set vegetation noise octaves.
     // This single callback will work for all octaves.
+    var vegetation_timer = 0;
     function vegetation_octaves_callback(keys, value) {
         // Only do this every 200ms, even if more updates are sent.
-        // TODO: Timers should not be shared between actions.
-        if (timer_fast === 0) {
-            timer_fast = setTimeout(function () {
-                generate_vegetation();
-                timer_fast = 0;
-            }, 200);
-        }
-        if (timer_slow === 0) {
-            timer_slow = setTimeout(function () {
+        setTimeout(function () {
+            generate_vegetation();
+        }, 0);
+        if (vegetation_timer === 0) {
+            vegetation_timer = setTimeout(function () {
+                vegetation_timer = 0;
                 draw_vegetation();
-                timer_slow = 0;
-            }, 2000);
+            }, 1000);
         }
     }
     // Move camera to selected view.

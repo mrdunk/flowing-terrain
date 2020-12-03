@@ -101,9 +101,8 @@ export class Display3d extends DisplayBase {
     this.camera.attachControl(this.canvas, true);
     this.light_1 = new BABYLON.DirectionalLight(
       "light_1",
-      new BABYLON.Vector3(-10, -10, 0),
+      new BABYLON.Vector3(-100, -100, 0),
       this.scene);
-    this.light_1.position = new BABYLON.Vector3(100, 100, 100);
     this.light_1.diffuse = new BABYLON.Color3(1, 1, 1);
     this.light_1.specular = new BABYLON.Color3(0, 0, 0);
     this.light_1.intensity = 0.5;
@@ -111,11 +110,12 @@ export class Display3d extends DisplayBase {
 
     const light_2 = new BABYLON.DirectionalLight(
       "light_2",
-      new BABYLON.Vector3(0, -10, 0),
+      new BABYLON.Vector3(0, -100, 0),
       this.scene);
     light_2.diffuse = new BABYLON.Color3(1, 1, 1);
     light_2.specular = new BABYLON.Color3(0.3, 0.3, 0.3);
     light_2.intensity = 0.5;
+    light_2.autoCalcShadowZBounds = true;
 
     this.scene.ambientColor = new BABYLON.Color3(0.2, 0.2, 0.3);
 
@@ -138,6 +138,30 @@ export class Display3d extends DisplayBase {
     this.draw();
 
     this.camera.setTarget(new BABYLON.Vector3(mapsize / 2, 0, mapsize / 2));
+
+    // FPS meter.
+    const updateEvery = 10;
+    const sampleCount = 10;
+    const fpsDiv = document.getElementById("fps");
+    let fps = 0;
+    let fpsCount = 0;
+    const fpsSamples = Array(sampleCount).fill(0);
+    let fpsTotal = 0;
+    let fpsIndex = 0;
+    this.scene.registerBeforeRender(() => {
+      if(!((fpsCount++) % updateEvery === 0)) {
+        return;
+      }
+      fps = this.engine.getFps();
+      if(!isFinite(fps)) {
+        return;
+      }
+      fpsIndex = Math.round(fpsCount / updateEvery) % sampleCount;
+      fpsTotal -= fpsSamples[fpsIndex];
+      fpsTotal += fps;
+      fpsSamples[fpsIndex] = fps;
+      fpsDiv.innerHTML = (fpsTotal / sampleCount).toFixed() + "fps";
+    });
 
     // Hide the HTML loader.
     document.getElementById("loader").style.display = "none";
@@ -600,9 +624,10 @@ export class Display3d extends DisplayBase {
 
     // Tree shadows.
     if(this.config.get("vegetation.shadow_enabled")) {
-      const shadowGenerator = new BABYLON.ShadowGenerator(4096, this.light_1);
-      shadowGenerator.usePoissonSampling = true;
-      //shadowGenerator.useExponentialShadowMap = false;
+      //const shadowGenerator = new BABYLON.ShadowGenerator(4096, this.light_1);
+      const shadowGenerator = new BABYLON.ShadowGenerator(1024, this.light_1);
+      //const shadowGenerator = new BABYLON.ShadowGenerator(512, this.light_1);
+      //shadowGenerator.usePoissonSampling = true;
       shadowGenerator.addShadowCaster(this.treesPine.trunk, true);
       shadowGenerator.addShadowCaster(this.treesPine.leaves, true);
       shadowGenerator.addShadowCaster(this.treesDeciduous.trunk, true);

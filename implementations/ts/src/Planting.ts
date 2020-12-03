@@ -34,6 +34,7 @@ export const enum PlantType {
 }
 
 export class Plant {
+  readonly heightMultiplier: number = 0.05;
   type_: PlantType;
   height: number;
   positionBase: BABYLON.Vector3;
@@ -41,7 +42,7 @@ export class Plant {
 
   constructor(position: BABYLON.Vector3, random: seedrandom.prng) {
     this.positionBase = position;
-    this.height = random() * 0.1 + 0.05;
+    this.height = (random() + 0.5 ) * this.heightMultiplier;
 
     if(random() < 0.2) {
       this.type_ = PlantType.Pine;
