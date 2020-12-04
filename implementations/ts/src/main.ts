@@ -120,6 +120,7 @@ window.onload = () => {
   config.set_if_null("geography.sealevel", 0.5);
   config.set_callback("geography.sealevel", (key: string, value: any) => {
     display.set_sealevel(value);
+    vegetation_octaves_callback(null, null);
   });
 
   config.set_if_null("display.sea_transparency", 0.5);
@@ -313,16 +314,11 @@ window.onload = () => {
 
 
   // Callback for adjusting detail of the seed_point map.
-  let timer_fast: ReturnType<typeof setTimeout> = 0;
   function seed_threshold_callback(keys: string, value: any) {
-    // Only change the minimap every 200ms, even if more updates are sent.
-    if(timer_fast === 0) {
-      timer_fast = setTimeout(() => {
-        config.set("seed_points.random_seed", `${(new Date()).getTime()}`);
-        generate_seed_points();
-        timer_fast = 0;
-      }, 200);
-    }
+    setTimeout(() => {
+      config.set("seed_points.random_seed", `${(new Date()).getTime()}`);
+      generate_seed_points();
+    }, 0);
     terrain_callback(keys, value);
   }
 
@@ -338,25 +334,21 @@ window.onload = () => {
   // Callback to set noise octaves.
   // This single callback will work for all octaves.
   function noise_octaves_callback(keys: string, value: any) {
-    // Only do this every 200ms, even if more updates are sent.
-    if(timer_fast === 0) {
-      timer_fast = setTimeout(() => {
-        generate_noise();
-        timer_fast = 0;
-      }, 200);
-    }
+    setTimeout(() => {
+      generate_noise();
+    }, 0);
     terrain_callback(keys, value);
   }
 
 
   // Callback to regenerate terrain after settings change.
-  let timer_slow: ReturnType<typeof setTimeout> = 0;
+  let terrain_timer: ReturnType<typeof setTimeout> = 0;
   function terrain_callback(keys: string, value: any) {
     // Only change the 3d display every 2 seconds.
-    if(timer_slow === 0) {
-      timer_slow = setTimeout(() => {
+    if(terrain_timer === 0) {
+      terrain_timer = setTimeout(() => {
+        terrain_timer = 0;
         generate_terrain();
-        timer_slow = 0;
       }, 2000);
     }
   }
@@ -376,21 +368,18 @@ window.onload = () => {
 
   // Callback to set vegetation noise octaves.
   // This single callback will work for all octaves.
+  let vegetation_timer: ReturnType<typeof setTimeout> = 0;
   function vegetation_octaves_callback(keys: string, value: any) {
     // Only do this every 200ms, even if more updates are sent.
 
-    // TODO: Timers should not be shared between actions.
-    if(timer_fast === 0) {
-      timer_fast = setTimeout(() => {
-        generate_vegetation();
-        timer_fast = 0;
-      }, 200);
-    }
-    if(timer_slow === 0) {
-      timer_slow = setTimeout(() => {
+    setTimeout(() => {
+      generate_vegetation();
+    }, 0);
+    if(vegetation_timer === 0) {
+      vegetation_timer = setTimeout(() => {
+        vegetation_timer = 0;
         draw_vegetation();
-        timer_slow = 0;
-      }, 2000);
+      }, 1000);
     }
   }
 
