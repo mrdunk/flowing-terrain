@@ -19,7 +19,7 @@ img.logo{
   color: white;
   bottom: 15px;
   right: 10px;
-  width: 60px;
+  width: fit-content;
   height: fit-content;
 }
 
@@ -87,12 +87,10 @@ img.logo{
 
 #info .content {
   width: 600px;
-  //height: 400px;
 }
 
 #config .content {
   width: 800px;
-  //height: 400px;
 }
 
 #link .content {
@@ -123,6 +121,10 @@ img.logo{
   #info .content {
     width: 250px;
   }
+}
+
+.tab-content, .nav-tabs {
+  padding-right: 1em;
 }
 
 collapsable-menu .content {

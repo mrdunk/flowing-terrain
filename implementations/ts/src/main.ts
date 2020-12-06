@@ -86,7 +86,7 @@ window.onload = () => {
 
   config.set_if_null("vegetation.enabled", 1);
   config.set_callback("vegetation.enabled", vegetation_enabled);
-  config.set_if_null("vegetation.shadow_enabled", 0);
+  config.set_if_null("vegetation.shadow_enabled", 1);
   config.set_callback("vegetation.shadow_enabled", vegetation_enabled);
   config.set_if_null("vegetation.low_octave", 3);
   config.set_callback("vegetation.low_octave", vegetation_octaves_callback);
@@ -116,6 +116,9 @@ window.onload = () => {
   config.set_callback("display.river_threshold", (key: string, value: any) => {
     display.set_rivers(value);
   });
+
+  config.set_if_null("display.target_fps", 30);
+  config.set_callback("display.target_fps", reoptimize_3d);
 
   config.set_if_null("geography.sealevel", 0.5);
   config.set_callback("geography.sealevel", (key: string, value: any) => {
@@ -253,6 +256,8 @@ window.onload = () => {
         menu.setAttribute("active", "false");
       }
     }
+
+    display.optimize();
   }
   window.addEventListener("resize", onResize);
   onResize();
@@ -430,6 +435,18 @@ window.onload = () => {
     hyperlink.href = config.url.toString();
   }
   button.addEventListener("click", menu_link_button_handler, false);
+
+
+  // Button to run SceneOptimizer again.
+  const menu_reoprimize = document.getElementById("display_reoptimize") as HTMLInputElement;
+  menu_reoprimize.addEventListener("click", (event) => {
+    display.optimize();
+  });
+
+  // Run Babylon's SceneOptimizer again.
+  function reoptimize_3d(keys: string, fps: number): void {
+    display.optimize();
+  }
 
 
   // Return focus to canvas after any menu is clicked so keyboard controls

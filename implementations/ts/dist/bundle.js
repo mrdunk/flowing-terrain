@@ -19068,18 +19068,23 @@ var Display3d = function (_flowing_terrain_1$Di) {
         _this.land_material.diffuseColor = new BABYLON.Color3(0.4, 0.6, 0.2);
         _this.land_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
         // this.land_material.backFaceCulling = false;
+        //this.land_material.freeze();
         _this.seabed_material = new BABYLON.StandardMaterial("seabed_material", _this.scene);
         _this.seabed_material.diffuseColor = new BABYLON.Color3(0.4, 0.6, 0.2);
         _this.seabed_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
         // this.seabed_material.backFaceCulling = false;
+        //this.seabed_material.freeze();
         _this.sea_material = new BABYLON.StandardMaterial("sea_material", _this.scene);
         _this.sea_material.diffuseColor = new BABYLON.Color3(0.1, 0.2, 1.0);
         _this.sea_material.specularColor = new BABYLON.Color3(0.5, 0.5, 0.5);
         _this.sea_material.alpha = config.get("display.sea_transparency");
         _this.sea_material.backFaceCulling = false;
+        //this.sea_material.freeze();
         _this.draw();
         _this.camera.setTarget(new BABYLON.Vector3(mapsize / 2, 0, mapsize / 2));
         // FPS meter.
+        //const instrumentation = new BABYLON.EngineInstrumentation(this.engine);
+        //instrumentation.captureGPUFrameTime = true;
         var updateEvery = 10;
         var sampleCount = 10;
         var fpsDiv = document.getElementById("fps");
@@ -19100,16 +19105,92 @@ var Display3d = function (_flowing_terrain_1$Di) {
             fpsTotal -= fpsSamples[fpsIndex];
             fpsTotal += fps;
             fpsSamples[fpsIndex] = fps;
-            fpsDiv.innerHTML = (fpsTotal / sampleCount).toFixed() + "fps";
+            fpsDiv.innerHTML = (fpsTotal / sampleCount).toFixed() + "fps<br>";
+            //fpsDiv.innerHTML += "GPU average time: ";
+            //fpsDiv.innerHTML +=
+            //  (instrumentation.gpuFrameTimeCounter.average * 0.000001).toFixed(2) + "ms";
         });
         // Hide the HTML loader.
         document.getElementById("loader").style.display = "none";
+        // Optimizations.
+        // this.scene.freezeActiveMeshes();
+        // this.scene.autoClear = false;
+        // this.scene.autoClearDepthAndStencil = false;
+        // Optimizers
+        _this.optimizer = new BABYLON.SceneOptimizer(_this.scene, _this.optimizer_options());
+        _this.optimizer.onNewOptimizationAppliedObservable.add(function (optim) {
+            console.info(optim.getDescription());
+        });
+        _this.optimizer.onSuccessObservable.add(function (optim) {
+            console.info("Sucessfully optimized.");
+        });
+        _this.optimizer.onFailureObservable.add(function (optim) {
+            console.info("Failed to optimize.");
+        });
+        var o = new BABYLON.LensFlaresOptimization(0);
+        o.apply(_this.scene, _this.optimizer);
+        o = new BABYLON.MergeMeshesOptimization(0);
+        o.apply(_this.scene, _this.optimizer);
+        o = new BABYLON.PostProcessesOptimization(0);
+        o.apply(_this.scene, _this.optimizer);
+        o = new BABYLON.ParticlesOptimization(0);
+        o.apply(_this.scene, _this.optimizer);
+        _this.deoptimizer = new BABYLON.SceneOptimizer(_this.scene, new BABYLON.SceneOptimizerOptions(60, 2000), null, true);
+        _this.optimize();
         return _this;
     }
-    // Move camera to selected view.
-
 
     _createClass(Display3d, [{
+        key: "optimize",
+        value: function optimize() {
+            console.info("Optimizing for " + this.config.get("display.target_fps") + " fps.");
+            this.deoptimize();
+            this.optimizer.targetFrameRate = this.config.get("display.target_fps");
+            this.optimizer.reset();
+            this.optimizer.start();
+        }
+    }, {
+        key: "deoptimize",
+        value: function deoptimize() {
+            // Undo all optimizations.
+            var o = new BABYLON.ShadowsOptimization(0);
+            o.apply(this.scene, this.deoptimizer);
+            o = new BABYLON.TextureOptimization(0, 4896);
+            o.apply(this.scene, this.deoptimizer);
+            o = new BABYLON.HardwareScalingOptimization(0, 0.5);
+            o.apply(this.scene, this.deoptimizer);
+            this.deoptimizer.reset();
+            this.deoptimizer.start();
+        }
+    }, {
+        key: "optimizer_options",
+        value: function optimizer_options() {
+            var target_fps = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 60;
+
+            var result = new BABYLON.SceneOptimizerOptions(target_fps, 1000);
+            var priority = 0;
+            result.optimizations.push(new BABYLON.TextureOptimization(priority, 4096));
+            result.optimizations.push(new BABYLON.HardwareScalingOptimization(priority, 1));
+            // Next priority
+            priority++;
+            result.optimizations.push(new BABYLON.TextureOptimization(priority, 2048));
+            result.optimizations.push(new BABYLON.HardwareScalingOptimization(priority, 2));
+            // Next priority
+            priority++;
+            result.optimizations.push(new BABYLON.TextureOptimization(priority, 1024));
+            result.optimizations.push(new BABYLON.HardwareScalingOptimization(priority, 3));
+            // Next priority
+            priority++;
+            result.optimizations.push(new BABYLON.TextureOptimization(priority, 512));
+            result.optimizations.push(new BABYLON.HardwareScalingOptimization(priority, 4));
+            // Next priority
+            priority++;
+            result.optimizations.push(new BABYLON.ShadowsOptimization(priority));
+            return result;
+        }
+        // Move camera to selected view.
+
+    }, {
         key: "set_view",
         value: function set_view(direction) {
             var mapsize = this.tile_size * this.config.get("enviroment.tile_count");
@@ -19185,7 +19266,15 @@ var Display3d = function (_flowing_terrain_1$Di) {
             // Cleanup any existing meshes from previous draw.
             while (this.scene.meshes.length > 0) {
                 var mesh = this.scene.meshes.pop();
-                mesh.dispose();
+                if (mesh) {
+                    try {
+                        mesh.dispose();
+                    } catch (error) {
+                        // This error occurs inside Babylon after the optimizer reduces the
+                        // render target texture size.
+                        // It seems to be not harmful.
+                    }
+                }
             }
             this.positions = [];
             this.indices = [];
@@ -19327,6 +19416,7 @@ var Display3d = function (_flowing_terrain_1$Di) {
             // this.land_mesh.enableEdgesRendering(.9999999999);
             // this.land_mesh.edgesWidth = 5.0;
             // this.land_mesh.edgesColor = new BABYLON.Color4(1, 1, 1, 1);
+            this.land_mesh.freezeWorldMatrix();
             // Rivers
             this.schedule_update_rivers();
             // Generate seabed.
@@ -19340,6 +19430,7 @@ var Display3d = function (_flowing_terrain_1$Di) {
             this.sea_mesh.material = this.sea_material;
             this.sea_mesh.checkCollisions = false;
             this.set_sealevel(this.config.get("geography.sealevel"));
+            this.sea_mesh.freezeWorldMatrix();
             // Plant trees.
             this.planting();
         }
@@ -19403,6 +19494,7 @@ var Display3d = function (_flowing_terrain_1$Di) {
                 }, this.scene);
                 this.rivers_mesh.color = new BABYLON.Color3(0.3, 0.3, 1);
             }
+            this.rivers_mesh.freezeWorldMatrix();
         }
         /* Given a vector populated with the x and z coordinates, calculate the
          * corresponding y (height). */
@@ -19454,12 +19546,26 @@ var Display3d = function (_flowing_terrain_1$Di) {
         value: function planting() {
             var p = new Planting_1.Planting(this.geography, this.config, this.vegetation.data_combined);
             if (this.treesPine) {
-                this.treesPine.trunk.dispose();
-                this.treesPine.leaves.dispose();
+                try {
+                    this.treesPine.trunkMaterial.dispose();
+                    this.treesPine.leafMaterial.dispose();
+                    this.treesPine.root.dispose();
+                } catch (error) {
+                    // This error occurs inside Babylon after the optimizer reduces the
+                    // render target texture size.
+                    // It seems to be not harmful.
+                }
             }
             if (this.treesDeciduous) {
-                this.treesDeciduous.trunk.dispose();
-                this.treesDeciduous.leaves.dispose();
+                try {
+                    this.treesDeciduous.trunkMaterial.dispose();
+                    this.treesDeciduous.leafMaterial.dispose();
+                    this.treesDeciduous.root.dispose();
+                } catch (error) {
+                    // This error occurs inside Babylon after the optimizer reduces the
+                    // render target texture size.
+                    // It seems to be not harmful.
+                }
             }
             if (!this.config.get("vegetation.enabled")) {
                 return;
@@ -19572,8 +19678,8 @@ var Display3d = function (_flowing_terrain_1$Di) {
             }
             // Tree shadows.
             if (this.config.get("vegetation.shadow_enabled")) {
-                //const shadowGenerator = new BABYLON.ShadowGenerator(4096, this.light_1);
-                var shadowGenerator = new BABYLON.ShadowGenerator(1024, this.light_1);
+                var shadowGenerator = new BABYLON.ShadowGenerator(4096, this.light_1);
+                //const shadowGenerator = new BABYLON.ShadowGenerator(1024, this.light_1);
                 //const shadowGenerator = new BABYLON.ShadowGenerator(512, this.light_1);
                 //shadowGenerator.usePoissonSampling = true;
                 shadowGenerator.addShadowCaster(this.treesPine.trunk, true);
@@ -19599,10 +19705,12 @@ var TreeDeciduous = function TreeDeciduous(scene) {
     this.trunkMaterial = new BABYLON.StandardMaterial("trunkMaterial", scene);
     this.trunkMaterial.diffuseColor = new BABYLON.Color3(0.5, 0.3, 0.3);
     this.trunkMaterial.specularColor = new BABYLON.Color3(0.04, 0.04, 0.03);
+    this.trunkMaterial.freeze();
     this.leafMaterial = new BABYLON.StandardMaterial("leafMaterial", scene);
     this.leafMaterial.diffuseColor = new BABYLON.Color3(0.2, 0.7, 0.3);
     this.leafMaterial.specularColor = new BABYLON.Color3(0.03, 0.03, 0.03);
-    this.root = BABYLON.Mesh.CreateBox("pineTree", 1, scene);
+    this.leafMaterial.freeze();
+    this.root = BABYLON.Mesh.CreateBox("deciduousTree", 1, scene);
     this.root.isVisible = false;
     this.trunk = BABYLON.MeshBuilder.CreateCylinder("trunk", {
         height: this.trunkHeight + this.leavesDiamiter / 2,
@@ -19625,6 +19733,9 @@ var TreeDeciduous = function TreeDeciduous(scene) {
     this.leaves.bakeCurrentTransformIntoVertices();
     this.leaves.parent = this.root;
     this.trunk.parent = this.root;
+    this.root.freezeWorldMatrix();
+    this.leaves.freezeWorldMatrix();
+    this.trunk.freezeWorldMatrix();
 };
 
 var TreePine = function TreePine(scene) {
@@ -19637,9 +19748,11 @@ var TreePine = function TreePine(scene) {
     this.trunkMaterial = new BABYLON.StandardMaterial("trunkMaterial", scene);
     this.trunkMaterial.diffuseColor = new BABYLON.Color3(0.5, 0.3, 0.3);
     this.trunkMaterial.specularColor = new BABYLON.Color3(0.04, 0.04, 0.03);
+    this.trunkMaterial.freeze();
     this.leafMaterial = new BABYLON.StandardMaterial("leafMaterial", scene);
     this.leafMaterial.diffuseColor = new BABYLON.Color3(0.2, 0.5, 0.1);
     this.leafMaterial.specularColor = new BABYLON.Color3(0.03, 0.03, 0.03);
+    this.leafMaterial.freeze();
     this.root = BABYLON.Mesh.CreateBox("pineTree", 1, scene);
     this.root.isVisible = false;
     this.trunk = BABYLON.MeshBuilder.CreateCylinder("trunk", {
@@ -19666,6 +19779,9 @@ var TreePine = function TreePine(scene) {
     this.leaves.bakeCurrentTransformIntoVertices();
     this.leaves.parent = this.root;
     this.trunk.parent = this.root;
+    this.root.freezeWorldMatrix();
+    this.leaves.freezeWorldMatrix();
+    this.trunk.freezeWorldMatrix();
 };
 
 },{"./Planting":18,"./flowing_terrain":21,"./freeCameraPointersInput":22,"babylonjs":2}],17:[function(require,module,exports){
@@ -21715,7 +21831,7 @@ window.onload = function () {
     config.set_callback("noise.high_octave_weight", noise_octaves_callback);
     config.set_if_null("vegetation.enabled", 1);
     config.set_callback("vegetation.enabled", vegetation_enabled);
-    config.set_if_null("vegetation.shadow_enabled", 0);
+    config.set_if_null("vegetation.shadow_enabled", 1);
     config.set_callback("vegetation.shadow_enabled", vegetation_enabled);
     config.set_if_null("vegetation.low_octave", 3);
     config.set_callback("vegetation.low_octave", vegetation_octaves_callback);
@@ -21743,6 +21859,8 @@ window.onload = function () {
     config.set_callback("display.river_threshold", function (key, value) {
         display.set_rivers(value);
     });
+    config.set_if_null("display.target_fps", 30);
+    config.set_callback("display.target_fps", reoptimize_3d);
     config.set_if_null("geography.sealevel", 0.5);
     config.set_callback("geography.sealevel", function (key, value) {
         display.set_sealevel(value);
@@ -21905,6 +22023,7 @@ window.onload = function () {
                 }
             }
         }
+        display.optimize();
     }
     window.addEventListener("resize", onResize);
     onResize();
@@ -22106,6 +22225,15 @@ window.onload = function () {
         hyperlink.href = config.url.toString();
     }
     button.addEventListener("click", menu_link_button_handler, false);
+    // Button to run SceneOptimizer again.
+    var menu_reoprimize = document.getElementById("display_reoptimize");
+    menu_reoprimize.addEventListener("click", function (event) {
+        display.optimize();
+    });
+    // Run Babylon's SceneOptimizer again.
+    function reoptimize_3d(keys, fps) {
+        display.optimize();
+    }
     // Return focus to canvas after any menu is clicked so keyboard controls
     // work.
     window.addEventListener("mouseup", function (event) {
