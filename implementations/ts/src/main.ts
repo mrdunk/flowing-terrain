@@ -117,6 +117,9 @@ window.onload = () => {
     display.set_rivers(value);
   });
 
+  config.set_if_null("display.target_fps", 30);
+  config.set_callback("display.target_fps", reoptimize_3d);
+
   config.set_if_null("geography.sealevel", 0.5);
   config.set_callback("geography.sealevel", (key: string, value: any) => {
     display.set_sealevel(value);
@@ -253,6 +256,8 @@ window.onload = () => {
         menu.setAttribute("active", "false");
       }
     }
+
+    display.optimize();
   }
   window.addEventListener("resize", onResize);
   onResize();
@@ -430,6 +435,13 @@ window.onload = () => {
     hyperlink.href = config.url.toString();
   }
   button.addEventListener("click", menu_link_button_handler, false);
+
+
+  // Run Babylon's SceneOptimizer again.
+  function reoptimize_3d(keys: string, fps: number): void {
+    console.info("reoptimize_3d", display.optimizer.currentFrameRate, fps);
+    display.optimize();
+  }
 
 
   // Return focus to canvas after any menu is clicked so keyboard controls

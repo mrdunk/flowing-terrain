@@ -59,6 +59,9 @@ export class Display3d extends DisplayBase {
 
   light_1:BABYLON.DirectionalLight;
 
+  optimizer: BABYLON.SceneOptimizer;
+  deoptimizer: BABYLON.SceneOptimizer;
+
   constructor(geography: Geography, vegetation: Noise, config: Config) {
     super(geography);
 
@@ -123,23 +126,28 @@ export class Display3d extends DisplayBase {
     this.land_material.diffuseColor = new BABYLON.Color3(0.4, 0.6, 0.2);
     this.land_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
     // this.land_material.backFaceCulling = false;
+    //this.land_material.freeze();
 
     this.seabed_material = new BABYLON.StandardMaterial("seabed_material", this.scene);
     this.seabed_material.diffuseColor = new BABYLON.Color3(0.4, 0.6, 0.2);
     this.seabed_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
     // this.seabed_material.backFaceCulling = false;
+    //this.seabed_material.freeze();
 
     this.sea_material = new BABYLON.StandardMaterial("sea_material", this.scene);
     this.sea_material.diffuseColor = new BABYLON.Color3(0.1, 0.2, 1.0);
     this.sea_material.specularColor = new BABYLON.Color3(0.5, 0.5, 0.5);
     this.sea_material.alpha = config.get("display.sea_transparency");
     this.sea_material.backFaceCulling = false;
+    //this.sea_material.freeze();
 
     this.draw();
 
     this.camera.setTarget(new BABYLON.Vector3(mapsize / 2, 0, mapsize / 2));
 
     // FPS meter.
+    //const instrumentation = new BABYLON.EngineInstrumentation(this.engine);
+    //instrumentation.captureGPUFrameTime = true;
     const updateEvery = 10;
     const sampleCount = 10;
     const fpsDiv = document.getElementById("fps");
@@ -160,11 +168,96 @@ export class Display3d extends DisplayBase {
       fpsTotal -= fpsSamples[fpsIndex];
       fpsTotal += fps;
       fpsSamples[fpsIndex] = fps;
-      fpsDiv.innerHTML = (fpsTotal / sampleCount).toFixed() + "fps";
+      fpsDiv.innerHTML = (fpsTotal / sampleCount).toFixed() + "fps<br>";
+      //fpsDiv.innerHTML += "GPU average time: ";
+      //fpsDiv.innerHTML +=
+      //  (instrumentation.gpuFrameTimeCounter.average * 0.000001).toFixed(2) + "ms";
     });
 
     // Hide the HTML loader.
     document.getElementById("loader").style.display = "none";
+
+    // Optimizations.
+    // this.scene.freezeActiveMeshes();
+    // this.scene.autoClear = false;
+    // this.scene.autoClearDepthAndStencil = false;
+
+    // Optimizers
+    this.optimizer =
+      new BABYLON.SceneOptimizer(this.scene, this.optimizer_options());
+    this.optimizer.onNewOptimizationAppliedObservable.add((optim) => {
+      console.info(optim.getDescription());
+    });
+    this.optimizer.onSuccessObservable.add((optim) => {
+      console.info("Sucessfully optimized.");
+    });
+    this.optimizer.onFailureObservable.add((optim) => {
+      console.info("Failed to optimize.");
+    });
+
+    let o = new BABYLON.LensFlaresOptimization(0);
+    o.apply(this.scene, this.optimizer);
+    o = new BABYLON.MergeMeshesOptimization(0);
+    o.apply(this.scene, this.optimizer);
+    o = new BABYLON.PostProcessesOptimization(0);
+    o.apply(this.scene, this.optimizer);
+    o = new BABYLON.ParticlesOptimization(0);
+    o.apply(this.scene, this.optimizer);
+
+    this.deoptimizer =
+      new BABYLON.SceneOptimizer(
+        this.scene, new BABYLON.SceneOptimizerOptions(60, 2000), null, true);
+
+    this.optimize();
+  }
+
+  optimize(): void {
+    this.deoptimize();
+    this.optimizer.targetFrameRate = this.config.get("display.target_fps");
+    this.optimizer.reset();
+    this.optimizer.start();
+  }
+
+  deoptimize(): void {
+    // Undo all optimizations.
+    let o = new BABYLON.ShadowsOptimization(0);
+    o.apply(this.scene, this.deoptimizer);
+    o = new BABYLON.TextureOptimization(0, 4896);
+    o.apply(this.scene, this.deoptimizer);
+    o = new BABYLON.HardwareScalingOptimization(0, 0.5);
+    o.apply(this.scene, this.deoptimizer);
+
+    this.deoptimizer.reset();
+    this.deoptimizer.start();
+  }
+
+  optimizer_options(target_fps: number = 60): BABYLON.SceneOptimizerOptions {
+    const result = new BABYLON.SceneOptimizerOptions(target_fps, 1000);
+    let priority = 0;
+
+    result.optimizations.push(new BABYLON.TextureOptimization(priority, 4096));
+    result.optimizations.push(new BABYLON.HardwareScalingOptimization(priority, 1));
+
+    // Next priority
+    priority++;
+    result.optimizations.push(new BABYLON.TextureOptimization(priority, 2048));
+    result.optimizations.push(new BABYLON.HardwareScalingOptimization(priority, 2));
+
+    // Next priority
+    priority++;
+    result.optimizations.push(new BABYLON.TextureOptimization(priority, 1024));
+    result.optimizations.push(new BABYLON.HardwareScalingOptimization(priority, 3));
+
+    // Next priority
+    priority++;
+    result.optimizations.push(new BABYLON.TextureOptimization(priority, 512));
+    result.optimizations.push(new BABYLON.HardwareScalingOptimization(priority, 4));
+
+    // Next priority
+    priority++;
+    result.optimizations.push(new BABYLON.ShadowsOptimization(priority));
+
+    return result;
   }
 
   // Move camera to selected view.
@@ -253,7 +346,15 @@ export class Display3d extends DisplayBase {
     // Cleanup any existing meshes from previous draw.
     while(this.scene.meshes.length > 0) {
       const mesh = this.scene.meshes.pop();
-      mesh.dispose();
+      if(mesh) {
+        try {
+          mesh.dispose();
+        } catch(error) {
+          // This error occurs inside Babylon after the optimizer reduces the
+          // render target texture size.
+          // It seems to be not harmful.
+        }
+      }
     }
 
     this.positions = [];
@@ -417,6 +518,8 @@ export class Display3d extends DisplayBase {
     // this.land_mesh.edgesWidth = 5.0;
     // this.land_mesh.edgesColor = new BABYLON.Color4(1, 1, 1, 1);
 
+    this.land_mesh.freezeWorldMatrix();
+
     // Rivers
     this.schedule_update_rivers();
 
@@ -435,6 +538,8 @@ export class Display3d extends DisplayBase {
     this.sea_mesh.material = this.sea_material;
     this.sea_mesh.checkCollisions = false;
     this.set_sealevel(this.config.get("geography.sealevel"));
+
+    this.sea_mesh.freezeWorldMatrix();
 
     // Plant trees.
     this.planting();
@@ -495,6 +600,7 @@ export class Display3d extends DisplayBase {
         this.scene);
       (<any>this.rivers_mesh).color = new BABYLON.Color3(0.3, 0.3, 1);
     }
+    this.rivers_mesh.freezeWorldMatrix();
   }
 
   /* Given a vector populated with the x and z coordinates, calculate the
@@ -558,12 +664,26 @@ export class Display3d extends DisplayBase {
     const p = new Planting(this.geography, this.config, this.vegetation.data_combined);
 
     if(this.treesPine) {
-      this.treesPine.trunk.dispose();
-      this.treesPine.leaves.dispose();
+      try {
+        this.treesPine.trunkMaterial.dispose();
+        this.treesPine.leafMaterial.dispose();
+        this.treesPine.root.dispose();
+      } catch(error) {
+        // This error occurs inside Babylon after the optimizer reduces the
+        // render target texture size.
+        // It seems to be not harmful.
+      }
     }
     if(this.treesDeciduous) {
-      this.treesDeciduous.trunk.dispose();
-      this.treesDeciduous.leaves.dispose();
+      try {
+        this.treesDeciduous.trunkMaterial.dispose();
+        this.treesDeciduous.leafMaterial.dispose();
+        this.treesDeciduous.root.dispose();
+      } catch(error) {
+        // This error occurs inside Babylon after the optimizer reduces the
+        // render target texture size.
+        // It seems to be not harmful.
+      }
     }
 
     if(! this.config.get("vegetation.enabled")) {
@@ -624,8 +744,8 @@ export class Display3d extends DisplayBase {
 
     // Tree shadows.
     if(this.config.get("vegetation.shadow_enabled")) {
-      //const shadowGenerator = new BABYLON.ShadowGenerator(4096, this.light_1);
-      const shadowGenerator = new BABYLON.ShadowGenerator(1024, this.light_1);
+      const shadowGenerator = new BABYLON.ShadowGenerator(4096, this.light_1);
+      //const shadowGenerator = new BABYLON.ShadowGenerator(1024, this.light_1);
       //const shadowGenerator = new BABYLON.ShadowGenerator(512, this.light_1);
       //shadowGenerator.usePoissonSampling = true;
       shadowGenerator.addShadowCaster(this.treesPine.trunk, true);
@@ -651,12 +771,14 @@ class TreeDeciduous {
     this.trunkMaterial = new BABYLON.StandardMaterial("trunkMaterial", scene);
     this.trunkMaterial.diffuseColor = new BABYLON.Color3(0.5, 0.3, 0.3);
     this.trunkMaterial.specularColor = new BABYLON.Color3(0.04, 0.04, 0.03);
+    this.trunkMaterial.freeze();
 
     this.leafMaterial = new BABYLON.StandardMaterial("leafMaterial", scene);
     this.leafMaterial.diffuseColor = new BABYLON.Color3(0.2, 0.7, 0.3);
     this.leafMaterial.specularColor = new BABYLON.Color3(0.03, 0.03, 0.03);
+    this.leafMaterial.freeze();
 
-    this.root = BABYLON.Mesh.CreateBox("pineTree", 1, scene);
+    this.root = BABYLON.Mesh.CreateBox("deciduousTree", 1, scene);
     this.root.isVisible = false;
 
     this.trunk = BABYLON.MeshBuilder.CreateCylinder(
@@ -689,6 +811,10 @@ class TreeDeciduous {
 
     this.leaves.parent = this.root;
     this.trunk.parent = this.root;
+
+    this.root.freezeWorldMatrix();
+    this.leaves.freezeWorldMatrix();
+    this.trunk.freezeWorldMatrix();
   }
 }
 
@@ -707,10 +833,12 @@ class TreePine {
     this.trunkMaterial = new BABYLON.StandardMaterial("trunkMaterial", scene);
     this.trunkMaterial.diffuseColor = new BABYLON.Color3(0.5, 0.3, 0.3);
     this.trunkMaterial.specularColor = new BABYLON.Color3(0.04, 0.04, 0.03);
+    this.trunkMaterial.freeze();
 
     this.leafMaterial = new BABYLON.StandardMaterial("leafMaterial", scene);
     this.leafMaterial.diffuseColor = new BABYLON.Color3(0.2, 0.5, 0.1);
     this.leafMaterial.specularColor = new BABYLON.Color3(0.03, 0.03, 0.03);
+    this.leafMaterial.freeze();
 
     this.root = BABYLON.Mesh.CreateBox("pineTree", 1, scene);
     this.root.isVisible = false;
@@ -748,5 +876,9 @@ class TreePine {
 
     this.leaves.parent = this.root;
     this.trunk.parent = this.root;
+
+    this.root.freezeWorldMatrix();
+    this.leaves.freezeWorldMatrix();
+    this.trunk.freezeWorldMatrix();
   }
 }
