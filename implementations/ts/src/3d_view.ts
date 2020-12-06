@@ -189,10 +189,10 @@ export class Display3d extends DisplayBase {
       console.info(optim.getDescription());
     });
     this.optimizer.onSuccessObservable.add((optim) => {
-      console.info("Sucessfully optimized.");
+      console.info("Requested framerate acheived.");
     });
     this.optimizer.onFailureObservable.add((optim) => {
-      console.info("Failed to optimize.");
+      console.info("Failed to optimize. Did not acheive requested framerate.");
     });
 
     let o = new BABYLON.LensFlaresOptimization(0);
@@ -212,6 +212,7 @@ export class Display3d extends DisplayBase {
   }
 
   optimize(): void {
+    console.info(`Optimizing for ${this.config.get("display.target_fps")} fps.`);
     this.deoptimize();
     this.optimizer.targetFrameRate = this.config.get("display.target_fps");
     this.optimizer.reset();

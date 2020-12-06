@@ -246,18 +246,33 @@
                 </div>
 
                 <div class="tab-pane fade" id="debug" role="tabpanel">
+                  <div class="row">
+                    <div class="col-sm border">
                       <div class="border higher-vis">
                         <div>
                           <input type="button" id="inspector" name="inspector" value="Launch Inspector">
                         </div>
                       </div>
+                    </div>
 
+                    <div class="col-sm border">
                       <div class="border higher-vis">
+
+                        <div class="form-group">
+                          <label for="display.reoptimize">Re-optimize scene</label>
+                          <button type="button" class="btn btn-primary" id="display_reoptimize" name="display.reoptimize" value="display.reoptimize"
+                           title="Reduce display settings in an attempt to reach acceptable FPS">
+                            <img src="./assets/arrow-clockwise.svg" alt="" width="16" height="16" title="Reduce display settings in an attempt to reach acceptable FPS">
+                          </button>
+                        </div>
+
                         <feedback-slider title="Apply optimizations until reached." id="display_target_fps"
                             name="display.target_fps" min="10" max="60" value="30" step="1">
                           Target FPS
                         </feedback-slider>
                       </div>
+                    </div>
+                  </div>
                 </div>
 
               </div>

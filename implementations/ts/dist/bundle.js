@@ -19143,6 +19143,7 @@ var Display3d = function (_flowing_terrain_1$Di) {
     _createClass(Display3d, [{
         key: "optimize",
         value: function optimize() {
+            console.info("Optimizing for " + this.config.get("display.target_fps") + " fps.");
             this.deoptimize();
             this.optimizer.targetFrameRate = this.config.get("display.target_fps");
             this.optimizer.reset();
@@ -21830,7 +21831,7 @@ window.onload = function () {
     config.set_callback("noise.high_octave_weight", noise_octaves_callback);
     config.set_if_null("vegetation.enabled", 1);
     config.set_callback("vegetation.enabled", vegetation_enabled);
-    config.set_if_null("vegetation.shadow_enabled", 0);
+    config.set_if_null("vegetation.shadow_enabled", 1);
     config.set_callback("vegetation.shadow_enabled", vegetation_enabled);
     config.set_if_null("vegetation.low_octave", 3);
     config.set_callback("vegetation.low_octave", vegetation_octaves_callback);
@@ -22224,9 +22225,13 @@ window.onload = function () {
         hyperlink.href = config.url.toString();
     }
     button.addEventListener("click", menu_link_button_handler, false);
+    // Button to run SceneOptimizer again.
+    var menu_reoprimize = document.getElementById("display_reoptimize");
+    menu_reoprimize.addEventListener("click", function (event) {
+        display.optimize();
+    });
     // Run Babylon's SceneOptimizer again.
     function reoptimize_3d(keys, fps) {
-        console.info("reoptimize_3d", display.optimizer.currentFrameRate, fps);
         display.optimize();
     }
     // Return focus to canvas after any menu is clicked so keyboard controls

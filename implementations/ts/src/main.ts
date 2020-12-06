@@ -86,7 +86,7 @@ window.onload = () => {
 
   config.set_if_null("vegetation.enabled", 1);
   config.set_callback("vegetation.enabled", vegetation_enabled);
-  config.set_if_null("vegetation.shadow_enabled", 0);
+  config.set_if_null("vegetation.shadow_enabled", 1);
   config.set_callback("vegetation.shadow_enabled", vegetation_enabled);
   config.set_if_null("vegetation.low_octave", 3);
   config.set_callback("vegetation.low_octave", vegetation_octaves_callback);
@@ -437,9 +437,14 @@ window.onload = () => {
   button.addEventListener("click", menu_link_button_handler, false);
 
 
+  // Button to run SceneOptimizer again.
+  const menu_reoprimize = document.getElementById("display_reoptimize") as HTMLInputElement;
+  menu_reoprimize.addEventListener("click", (event) => {
+    display.optimize();
+  });
+
   // Run Babylon's SceneOptimizer again.
   function reoptimize_3d(keys: string, fps: number): void {
-    console.info("reoptimize_3d", display.optimizer.currentFrameRate, fps);
     display.optimize();
   }
 
