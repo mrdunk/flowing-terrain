@@ -47,6 +47,7 @@ export class Display3d extends DisplayBase {
   vegetation: Noise;
   treesPine: TreePine;
   treesDeciduous: TreeDeciduous;
+  treeShadowMapSize: number = 512;
 
   canvas: HTMLCanvasElement;
   engine: BABYLON.Engine;
@@ -183,80 +184,70 @@ export class Display3d extends DisplayBase {
     // this.scene.autoClearDepthAndStencil = false;
 
     // Optimizers
-    this.optimizer =
-      new BABYLON.SceneOptimizer(this.scene, this.optimizer_options());
-    this.optimizer.onNewOptimizationAppliedObservable.add((optim) => {
-      console.info(optim.getDescription());
-    });
-    this.optimizer.onSuccessObservable.add((optim) => {
-      console.info("Requested framerate acheived.");
-    });
-    this.optimizer.onFailureObservable.add((optim) => {
-      console.info("Failed to optimize. Did not acheive requested framerate.");
-    });
-
-    let o = new BABYLON.LensFlaresOptimization(0);
-    o.apply(this.scene, this.optimizer);
-    o = new BABYLON.MergeMeshesOptimization(0);
-    o.apply(this.scene, this.optimizer);
-    o = new BABYLON.PostProcessesOptimization(0);
-    o.apply(this.scene, this.optimizer);
-    o = new BABYLON.ParticlesOptimization(0);
-    o.apply(this.scene, this.optimizer);
-
     this.deoptimizer =
       new BABYLON.SceneOptimizer(
-        this.scene, new BABYLON.SceneOptimizerOptions(60, 2000), null, true);
+        this.scene,
+        this.optimizer_options(),
+        true,
+        true);
+    this.deoptimizer.onNewOptimizationAppliedObservable.add((optim) => {
+      console.info(optim.getDescription());
+    });
+    this.deoptimizer.onSuccessObservable.add((optim) => {
+      console.info("deoptimizer Requested framerate acheived.");
+    });
+    this.deoptimizer.onFailureObservable.add((optim) => {
+      console.info("deoptimizer Failed to optimize. Did not acheive requested framerate.");
+    });
 
     this.optimize();
   }
 
   optimize(): void {
     console.info(`Optimizing for ${this.config.get("display.target_fps")} fps.`);
-    this.deoptimize();
-    this.optimizer.targetFrameRate = this.config.get("display.target_fps");
-    this.optimizer.reset();
-    this.optimizer.start();
-  }
 
-  deoptimize(): void {
-    // Undo all optimizations.
-    let o = new BABYLON.ShadowsOptimization(0);
-    o.apply(this.scene, this.deoptimizer);
-    o = new BABYLON.TextureOptimization(0, 4896);
-    o.apply(this.scene, this.deoptimizer);
-    o = new BABYLON.HardwareScalingOptimization(0, 0.5);
-    o.apply(this.scene, this.deoptimizer);
+    this.scene.lensFlaresEnabled = false;
+    this.scene.postProcessesEnabled = false;
+    this.scene.particlesEnabled = false;
+    this.scene.shadowsEnabled = false;
+    this.engine.setHardwareScalingLevel(4);
+    this.treeShadowMapSize = 512;
+    this.planting();
 
+    this.deoptimizer.targetFrameRate = this.config.get("display.target_fps") - 1;
     this.deoptimizer.reset();
-    this.deoptimizer.start();
+    const that = this;
+    setTimeout(() => {that.deoptimizer.start();}, 0);
   }
 
-  optimizer_options(target_fps: number = 60): BABYLON.SceneOptimizerOptions {
+  optimizer_options(target_fps: number = 30): BABYLON.SceneOptimizerOptions {
     const result = new BABYLON.SceneOptimizerOptions(target_fps, 1000);
     let priority = 0;
 
-    result.optimizations.push(new BABYLON.TextureOptimization(priority, 4096));
-    result.optimizations.push(new BABYLON.HardwareScalingOptimization(priority, 1));
-
-    // Next priority
-    priority++;
-    result.optimizations.push(new BABYLON.TextureOptimization(priority, 2048));
-    result.optimizations.push(new BABYLON.HardwareScalingOptimization(priority, 2));
-
-    // Next priority
-    priority++;
-    result.optimizations.push(new BABYLON.TextureOptimization(priority, 1024));
-    result.optimizations.push(new BABYLON.HardwareScalingOptimization(priority, 3));
-
-    // Next priority
-    priority++;
-    result.optimizations.push(new BABYLON.TextureOptimization(priority, 512));
-    result.optimizations.push(new BABYLON.HardwareScalingOptimization(priority, 4));
+    result.optimizations.push(new BABYLON.MergeMeshesOptimization(0));
 
     // Next priority
     priority++;
     result.optimizations.push(new BABYLON.ShadowsOptimization(priority));
+    result.optimizations.push(new HardwareScalingOptimization(priority, 3));
+
+    // Next priority
+    priority++;
+    result.optimizations.push(new ShadowMapOptimization(priority, this, 1024));
+    result.optimizations.push(new HardwareScalingOptimization(priority, 2));
+
+    // Next priority
+    priority++;
+    result.optimizations.push(new ShadowMapOptimization(priority, this, 2048));
+    result.optimizations.push(new HardwareScalingOptimization(priority, 1.5));
+
+    // Next priority
+    priority++;
+    result.optimizations.push(new HardwareScalingOptimization(priority, 1));
+
+    // Next priority
+    priority++;
+    result.optimizations.push(new ShadowMapOptimization(priority, this, 4096));
 
     return result;
   }
@@ -662,6 +653,10 @@ export class Display3d extends DisplayBase {
   }
 
   planting(): void {
+    if(this.treeShadowMapSize < 0) {
+      this.treeShadowMapSize = 2048;
+    }
+
     const p = new Planting(this.geography, this.config, this.vegetation.data_combined);
 
     if(this.treesPine) {
@@ -745,9 +740,8 @@ export class Display3d extends DisplayBase {
 
     // Tree shadows.
     if(this.config.get("vegetation.shadow_enabled")) {
-      const shadowGenerator = new BABYLON.ShadowGenerator(4096, this.light_1);
-      //const shadowGenerator = new BABYLON.ShadowGenerator(1024, this.light_1);
-      //const shadowGenerator = new BABYLON.ShadowGenerator(512, this.light_1);
+      const shadowGenerator =
+        new BABYLON.ShadowGenerator(this.treeShadowMapSize, this.light_1);
       //shadowGenerator.usePoissonSampling = true;
       shadowGenerator.addShadowCaster(this.treesPine.trunk, true);
       shadowGenerator.addShadowCaster(this.treesPine.leaves, true);
@@ -881,5 +875,50 @@ class TreePine {
     this.root.freezeWorldMatrix();
     this.leaves.freezeWorldMatrix();
     this.trunk.freezeWorldMatrix();
+  }
+}
+
+/**
+ * Defines an optimization used to set the size of the trees shadow map.
+ */
+class ShadowMapOptimization extends BABYLON.SceneOptimization {
+
+  public getDescription(): string {
+    return "Setting shadpwMap size to " + this.requestedSize;
+  }
+
+  constructor(
+    public priority: number = 0,
+    public display: Display3d,
+    public requestedSize: number = 1024) {
+    super(priority);
+  }
+
+  public apply(scene: BABYLON.Scene, optimizer: BABYLON.SceneOptimizer): boolean {
+    this.display.treeShadowMapSize = this.requestedSize;
+    this.display.planting();
+
+    return true;
+  }
+}
+
+/**
+ * Defines an optimization used to set the hardware scaling;
+ */
+class HardwareScalingOptimization extends BABYLON.SceneOptimization {
+
+  public getDescription(): string {
+    return "Setting shadpwMap size to " + this.requestedSize;
+  }
+
+  constructor(
+    public priority: number = 0,
+    public requestedSize: number = 1024) {
+    super(priority);
+  }
+
+  public apply(scene: BABYLON.Scene, optimizer: BABYLON.SceneOptimizer): boolean {
+    scene.getEngine().setHardwareScalingLevel(this.requestedSize);
+    return true;
   }
 }

@@ -19028,6 +19028,7 @@ var Display3d = function (_flowing_terrain_1$Di) {
         _this.normals = [];
         _this.rivers = [];
         _this.update_rivers_timer = 0;
+        _this.treeShadowMapSize = 512;
         _this.vegetation = vegetation;
         _this.config = config;
         _this.canvas = document.getElementById("renderCanvas");
@@ -19117,25 +19118,16 @@ var Display3d = function (_flowing_terrain_1$Di) {
         // this.scene.autoClear = false;
         // this.scene.autoClearDepthAndStencil = false;
         // Optimizers
-        _this.optimizer = new BABYLON.SceneOptimizer(_this.scene, _this.optimizer_options());
-        _this.optimizer.onNewOptimizationAppliedObservable.add(function (optim) {
+        _this.deoptimizer = new BABYLON.SceneOptimizer(_this.scene, _this.optimizer_options(), true, true);
+        _this.deoptimizer.onNewOptimizationAppliedObservable.add(function (optim) {
             console.info(optim.getDescription());
         });
-        _this.optimizer.onSuccessObservable.add(function (optim) {
-            console.info("Sucessfully optimized.");
+        _this.deoptimizer.onSuccessObservable.add(function (optim) {
+            console.info("deoptimizer Requested framerate acheived.");
         });
-        _this.optimizer.onFailureObservable.add(function (optim) {
-            console.info("Failed to optimize.");
+        _this.deoptimizer.onFailureObservable.add(function (optim) {
+            console.info("deoptimizer Failed to optimize. Did not acheive requested framerate.");
         });
-        var o = new BABYLON.LensFlaresOptimization(0);
-        o.apply(_this.scene, _this.optimizer);
-        o = new BABYLON.MergeMeshesOptimization(0);
-        o.apply(_this.scene, _this.optimizer);
-        o = new BABYLON.PostProcessesOptimization(0);
-        o.apply(_this.scene, _this.optimizer);
-        o = new BABYLON.ParticlesOptimization(0);
-        o.apply(_this.scene, _this.optimizer);
-        _this.deoptimizer = new BABYLON.SceneOptimizer(_this.scene, new BABYLON.SceneOptimizerOptions(60, 2000), null, true);
         _this.optimize();
         return _this;
     }
@@ -19144,48 +19136,46 @@ var Display3d = function (_flowing_terrain_1$Di) {
         key: "optimize",
         value: function optimize() {
             console.info("Optimizing for " + this.config.get("display.target_fps") + " fps.");
-            this.deoptimize();
-            this.optimizer.targetFrameRate = this.config.get("display.target_fps");
-            this.optimizer.reset();
-            this.optimizer.start();
-        }
-    }, {
-        key: "deoptimize",
-        value: function deoptimize() {
-            // Undo all optimizations.
-            var o = new BABYLON.ShadowsOptimization(0);
-            o.apply(this.scene, this.deoptimizer);
-            o = new BABYLON.TextureOptimization(0, 4896);
-            o.apply(this.scene, this.deoptimizer);
-            o = new BABYLON.HardwareScalingOptimization(0, 0.5);
-            o.apply(this.scene, this.deoptimizer);
+            this.scene.lensFlaresEnabled = false;
+            this.scene.postProcessesEnabled = false;
+            this.scene.particlesEnabled = false;
+            this.scene.shadowsEnabled = false;
+            this.engine.setHardwareScalingLevel(4);
+            this.treeShadowMapSize = 512;
+            this.planting();
+            this.deoptimizer.targetFrameRate = this.config.get("display.target_fps") - 1;
             this.deoptimizer.reset();
-            this.deoptimizer.start();
+            var that = this;
+            setTimeout(function () {
+                that.deoptimizer.start();
+            }, 0);
         }
     }, {
         key: "optimizer_options",
         value: function optimizer_options() {
-            var target_fps = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 60;
+            var target_fps = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 30;
 
             var result = new BABYLON.SceneOptimizerOptions(target_fps, 1000);
             var priority = 0;
-            result.optimizations.push(new BABYLON.TextureOptimization(priority, 4096));
-            result.optimizations.push(new BABYLON.HardwareScalingOptimization(priority, 1));
-            // Next priority
-            priority++;
-            result.optimizations.push(new BABYLON.TextureOptimization(priority, 2048));
-            result.optimizations.push(new BABYLON.HardwareScalingOptimization(priority, 2));
-            // Next priority
-            priority++;
-            result.optimizations.push(new BABYLON.TextureOptimization(priority, 1024));
-            result.optimizations.push(new BABYLON.HardwareScalingOptimization(priority, 3));
-            // Next priority
-            priority++;
-            result.optimizations.push(new BABYLON.TextureOptimization(priority, 512));
-            result.optimizations.push(new BABYLON.HardwareScalingOptimization(priority, 4));
+            result.optimizations.push(new BABYLON.MergeMeshesOptimization(0));
             // Next priority
             priority++;
             result.optimizations.push(new BABYLON.ShadowsOptimization(priority));
+            result.optimizations.push(new HardwareScalingOptimization(priority, 3));
+            // Next priority
+            priority++;
+            result.optimizations.push(new ShadowMapOptimization(priority, this, 1024));
+            result.optimizations.push(new HardwareScalingOptimization(priority, 2));
+            // Next priority
+            priority++;
+            result.optimizations.push(new ShadowMapOptimization(priority, this, 2048));
+            result.optimizations.push(new HardwareScalingOptimization(priority, 1.5));
+            // Next priority
+            priority++;
+            result.optimizations.push(new HardwareScalingOptimization(priority, 1));
+            // Next priority
+            priority++;
+            result.optimizations.push(new ShadowMapOptimization(priority, this, 4096));
             return result;
         }
         // Move camera to selected view.
@@ -19544,6 +19534,9 @@ var Display3d = function (_flowing_terrain_1$Di) {
     }, {
         key: "planting",
         value: function planting() {
+            if (this.treeShadowMapSize < 0) {
+                this.treeShadowMapSize = 2048;
+            }
             var p = new Planting_1.Planting(this.geography, this.config, this.vegetation.data_combined);
             if (this.treesPine) {
                 try {
@@ -19678,9 +19671,7 @@ var Display3d = function (_flowing_terrain_1$Di) {
             }
             // Tree shadows.
             if (this.config.get("vegetation.shadow_enabled")) {
-                var shadowGenerator = new BABYLON.ShadowGenerator(4096, this.light_1);
-                //const shadowGenerator = new BABYLON.ShadowGenerator(1024, this.light_1);
-                //const shadowGenerator = new BABYLON.ShadowGenerator(512, this.light_1);
+                var shadowGenerator = new BABYLON.ShadowGenerator(this.treeShadowMapSize, this.light_1);
                 //shadowGenerator.usePoissonSampling = true;
                 shadowGenerator.addShadowCaster(this.treesPine.trunk, true);
                 shadowGenerator.addShadowCaster(this.treesPine.leaves, true);
@@ -19783,6 +19774,81 @@ var TreePine = function TreePine(scene) {
     this.leaves.freezeWorldMatrix();
     this.trunk.freezeWorldMatrix();
 };
+/**
+ * Defines an optimization used to set the size of the trees shadow map.
+ */
+
+
+var ShadowMapOptimization = function (_BABYLON$SceneOptimiz) {
+    _inherits(ShadowMapOptimization, _BABYLON$SceneOptimiz);
+
+    function ShadowMapOptimization() {
+        var priority = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 0;
+        var display = arguments[1];
+        var requestedSize = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 1024;
+
+        _classCallCheck(this, ShadowMapOptimization);
+
+        var _this3 = _possibleConstructorReturn(this, (ShadowMapOptimization.__proto__ || Object.getPrototypeOf(ShadowMapOptimization)).call(this, priority));
+
+        _this3.priority = priority;
+        _this3.display = display;
+        _this3.requestedSize = requestedSize;
+        return _this3;
+    }
+
+    _createClass(ShadowMapOptimization, [{
+        key: "getDescription",
+        value: function getDescription() {
+            return "Setting shadpwMap size to " + this.requestedSize;
+        }
+    }, {
+        key: "apply",
+        value: function apply(scene, optimizer) {
+            this.display.treeShadowMapSize = this.requestedSize;
+            this.display.planting();
+            return true;
+        }
+    }]);
+
+    return ShadowMapOptimization;
+}(BABYLON.SceneOptimization);
+/**
+ * Defines an optimization used to set the hardware scaling;
+ */
+
+
+var HardwareScalingOptimization = function (_BABYLON$SceneOptimiz2) {
+    _inherits(HardwareScalingOptimization, _BABYLON$SceneOptimiz2);
+
+    function HardwareScalingOptimization() {
+        var priority = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 0;
+        var requestedSize = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 1024;
+
+        _classCallCheck(this, HardwareScalingOptimization);
+
+        var _this4 = _possibleConstructorReturn(this, (HardwareScalingOptimization.__proto__ || Object.getPrototypeOf(HardwareScalingOptimization)).call(this, priority));
+
+        _this4.priority = priority;
+        _this4.requestedSize = requestedSize;
+        return _this4;
+    }
+
+    _createClass(HardwareScalingOptimization, [{
+        key: "getDescription",
+        value: function getDescription() {
+            return "Setting shadpwMap size to " + this.requestedSize;
+        }
+    }, {
+        key: "apply",
+        value: function apply(scene, optimizer) {
+            scene.getEngine().setHardwareScalingLevel(this.requestedSize);
+            return true;
+        }
+    }]);
+
+    return HardwareScalingOptimization;
+}(BABYLON.SceneOptimization);
 
 },{"./Planting":18,"./flowing_terrain":21,"./freeCameraPointersInput":22,"babylonjs":2}],17:[function(require,module,exports){
 "use strict";
