@@ -19669,14 +19669,22 @@ var Display3d = function (_flowing_terrain_1$Di) {
                 this.treesPine.trunk.isVisible = false;
                 this.treesPine.leaves.isVisible = false;
             }
+            this.treeShadows();
+        }
+    }, {
+        key: "treeShadows",
+        value: function treeShadows() {
+            if (this.treeShadowGenerator) {
+                this.treeShadowGenerator.dispose();
+            }
             // Tree shadows.
             if (this.config.get("vegetation.shadow_enabled")) {
-                var shadowGenerator = new BABYLON.ShadowGenerator(this.treeShadowMapSize, this.light_1);
-                //shadowGenerator.usePoissonSampling = true;
-                shadowGenerator.addShadowCaster(this.treesPine.trunk, true);
-                shadowGenerator.addShadowCaster(this.treesPine.leaves, true);
-                shadowGenerator.addShadowCaster(this.treesDeciduous.trunk, true);
-                shadowGenerator.addShadowCaster(this.treesDeciduous.leaves, true);
+                this.treeShadowGenerator = new BABYLON.ShadowGenerator(this.treeShadowMapSize, this.light_1);
+                //this.treeShadowGenerator.usePoissonSampling = true;
+                this.treeShadowGenerator.addShadowCaster(this.treesPine.trunk, true);
+                this.treeShadowGenerator.addShadowCaster(this.treesPine.leaves, true);
+                this.treeShadowGenerator.addShadowCaster(this.treesDeciduous.trunk, true);
+                this.treeShadowGenerator.addShadowCaster(this.treesDeciduous.leaves, true);
                 this.land_mesh.receiveShadows = true;
             }
         }
@@ -19806,7 +19814,7 @@ var ShadowMapOptimization = function (_BABYLON$SceneOptimiz) {
         key: "apply",
         value: function apply(scene, optimizer) {
             this.display.treeShadowMapSize = this.requestedSize;
-            this.display.planting();
+            this.display.treeShadows();
             return true;
         }
     }]);
