@@ -195,10 +195,12 @@ export class Display3d extends DisplayBase {
       console.info(optim.getDescription());
     });
     this.deoptimizer.onSuccessObservable.add((optim) => {
-      console.info("deoptimizer Requested framerate acheived.");
+      const requestedFps = this.config.get("display.target_fps");
+      console.info(`Successfully enhanced display until lower than ${requestedFps} fps.`);
     });
     this.deoptimizer.onFailureObservable.add((optim) => {
-      console.info("deoptimizer Failed to optimize. Did not acheive requested framerate.");
+      const requestedFps = this.config.get("display.target_fps");
+      console.info(`Ran out of display enhancements before going below ${requestedFps} fps.`);
     });
 
     this.optimize();

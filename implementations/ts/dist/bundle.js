@@ -19123,10 +19123,12 @@ var Display3d = function (_flowing_terrain_1$Di) {
             console.info(optim.getDescription());
         });
         _this.deoptimizer.onSuccessObservable.add(function (optim) {
-            console.info("deoptimizer Requested framerate acheived.");
+            var requestedFps = _this.config.get("display.target_fps");
+            console.info("Successfully enhanced display until lower than " + requestedFps + " fps.");
         });
         _this.deoptimizer.onFailureObservable.add(function (optim) {
-            console.info("deoptimizer Failed to optimize. Did not acheive requested framerate.");
+            var requestedFps = _this.config.get("display.target_fps");
+            console.info("Ran out of display enhancements before going below " + requestedFps + " fps.");
         });
         _this.optimize();
         return _this;
