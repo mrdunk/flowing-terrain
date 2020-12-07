@@ -48,6 +48,7 @@ export class Display3d extends DisplayBase {
   treesPine: TreePine;
   treesDeciduous: TreeDeciduous;
   treeShadowMapSize: number = 512;
+  treeShadowGenerator: BABYLON.ShadowGenerator;
 
   canvas: HTMLCanvasElement;
   engine: BABYLON.Engine;
@@ -194,10 +195,12 @@ export class Display3d extends DisplayBase {
       console.info(optim.getDescription());
     });
     this.deoptimizer.onSuccessObservable.add((optim) => {
-      console.info("deoptimizer Requested framerate acheived.");
+      const requestedFps = this.config.get("display.target_fps");
+      console.info(`Successfully enhanced display until lower than ${requestedFps} fps.`);
     });
     this.deoptimizer.onFailureObservable.add((optim) => {
-      console.info("deoptimizer Failed to optimize. Did not acheive requested framerate.");
+      const requestedFps = this.config.get("display.target_fps");
+      console.info(`Ran out of display enhancements before going below ${requestedFps} fps.`);
     });
 
     this.optimize();
@@ -738,15 +741,23 @@ export class Display3d extends DisplayBase {
       this.treesPine.leaves.isVisible = false;
     }
 
+    this.treeShadows();
+  }
+
+  treeShadows(): void {
+    if(this.treeShadowGenerator) {
+      this.treeShadowGenerator.dispose();
+    }
+
     // Tree shadows.
     if(this.config.get("vegetation.shadow_enabled")) {
-      const shadowGenerator =
+      this.treeShadowGenerator =
         new BABYLON.ShadowGenerator(this.treeShadowMapSize, this.light_1);
-      //shadowGenerator.usePoissonSampling = true;
-      shadowGenerator.addShadowCaster(this.treesPine.trunk, true);
-      shadowGenerator.addShadowCaster(this.treesPine.leaves, true);
-      shadowGenerator.addShadowCaster(this.treesDeciduous.trunk, true);
-      shadowGenerator.addShadowCaster(this.treesDeciduous.leaves, true);
+      //this.treeShadowGenerator.usePoissonSampling = true;
+      this.treeShadowGenerator.addShadowCaster(this.treesPine.trunk, true);
+      this.treeShadowGenerator.addShadowCaster(this.treesPine.leaves, true);
+      this.treeShadowGenerator.addShadowCaster(this.treesDeciduous.trunk, true);
+      this.treeShadowGenerator.addShadowCaster(this.treesDeciduous.leaves, true);
       this.land_mesh.receiveShadows = true;
     }
   }
@@ -896,7 +907,7 @@ class ShadowMapOptimization extends BABYLON.SceneOptimization {
 
   public apply(scene: BABYLON.Scene, optimizer: BABYLON.SceneOptimizer): boolean {
     this.display.treeShadowMapSize = this.requestedSize;
-    this.display.planting();
+    this.display.treeShadows();
 
     return true;
   }
