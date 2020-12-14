@@ -1,5 +1,4 @@
 import * as BABYLON from 'babylonjs';
-import { BaseCameraPointersInput } from './BaseCameraPointersInput';
 
 enum _CameraProperty {
     /**
@@ -60,7 +59,7 @@ enum _MouseButtons {
  * Manage the pointers inputs to control a free camera.
  * @see https://doc.babylonjs.com/how_to/customizing_camera_inputs
  */
-export class FreeCameraPointersInput extends BaseCameraPointersInput {
+export class FreeCameraPointersInput extends BABYLON.BaseCameraPointersInput {
     /**
      * Instantiates a new FreeCameraPointersInput.
      */
