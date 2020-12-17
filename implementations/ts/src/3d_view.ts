@@ -34,9 +34,12 @@ import {Planting, PlantType} from './Planting';
 
 export class Display3d extends DisplayBase {
   config: Config = null;
-  tile_size: number = 2;
+  readonly tile_size: number = 2;
+  readonly texture_resolution: number = 8;
+  mapsize: number;
   positions: number[] = [];
   indices: number[] = [];
+  uvs: number[] = [];
   normals: number[] = [];
   rivers: BABYLON.Vector3[][] = [];
   land_mesh: BABYLON.Mesh;
@@ -64,8 +67,11 @@ export class Display3d extends DisplayBase {
   optimizer: BABYLON.SceneOptimizer;
   deoptimizer: BABYLON.SceneOptimizer;
 
+  texture: BABYLON.RawTexture;
+
   constructor(geography: Geography, vegetation: Noise, config: Config) {
     super(geography);
+    this.mapsize = this.tile_size * config.get("enviroment.tile_count");
 
     this.vegetation = vegetation;
     this.config = config;
@@ -73,7 +79,6 @@ export class Display3d extends DisplayBase {
     this.canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
     this.engine = new BABYLON.Engine(this.canvas, true);
     this.scene = new BABYLON.Scene(this.engine);
-    const mapsize = this.tile_size * config.get("enviroment.tile_count");
 
     this.camera = new BABYLON.UniversalCamera(
       "UniversalCamera",
@@ -94,7 +99,8 @@ export class Display3d extends DisplayBase {
     pointerInput.angularSensitivity = new BABYLON.Vector3(0.001, 0.001, 0.001);
     this.camera.inputs.add(pointerInput);
 
-    this.camera.position = new BABYLON.Vector3(-mapsize / 4, mapsize / 4, -mapsize / 4);
+    this.camera.position = new BABYLON.Vector3(
+      -this.mapsize / 4, this.mapsize / 4, -this.mapsize / 4);
     this.camera.checkCollisions = true;
     this.camera.ellipsoid = new BABYLON.Vector3(1.0, 0.5, 1.0);
     this.camera.updateUpVectorFromRotation = true;
@@ -125,7 +131,7 @@ export class Display3d extends DisplayBase {
     this.scene.ambientColor = new BABYLON.Color3(0.2, 0.2, 0.3);
 
     this.land_material = new BABYLON.StandardMaterial("land_material", this.scene);
-    this.land_material.diffuseColor = new BABYLON.Color3(0.4, 0.6, 0.2);
+    //this.land_material.diffuseColor = new BABYLON.Color3(0.4, 0.6, 0.2);
     this.land_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
     // this.land_material.backFaceCulling = false;
     //this.land_material.freeze();
@@ -144,8 +150,9 @@ export class Display3d extends DisplayBase {
     //this.sea_material.freeze();
 
     this.draw();
+    this.set_land_texture();
 
-    this.camera.setTarget(new BABYLON.Vector3(mapsize / 2, 0, mapsize / 2));
+    this.camera.setTarget(new BABYLON.Vector3(this.mapsize / 2, 0, this.mapsize / 2));
 
     // FPS meter.
     //const instrumentation = new BABYLON.EngineInstrumentation(this.engine);
@@ -255,20 +262,71 @@ export class Display3d extends DisplayBase {
     return result;
   }
 
+  set_land_texture(): void {
+    const tileCount = this.config.get("enviroment.tile_count");
+    const textureSize = tileCount * this.texture_resolution;
+    const sealevel = this.config.get("geography.sealevel");
+    const data = new Uint8Array(textureSize * textureSize * 3);
+
+    for(let tx = 0; tx < textureSize; tx ++) {
+      for(let ty = 0; ty < textureSize; ty ++) {
+        const offset = (ty * textureSize + tx) * 3;
+        const x = tx / this.texture_resolution;
+        const y = ty / this.texture_resolution;
+        const position = new BABYLON.Vector3(x * this.tile_size, 0, y * this.tile_size);
+        this.setHeightToSurface(position);
+        if (position.y / this.tile_size <= sealevel) {
+          data[offset] = 10;
+          data[offset + 1] = 100;
+          data[offset + 2] = 200;
+        } else if (position.y / this.tile_size >= 7 ) {
+          data[offset] = 170;
+          data[offset + 1] = 200;
+          data[offset + 2] = 210;
+        } else if (position.y / this.tile_size >= sealevel + 0.1) {
+          data[offset] = 60;
+          data[offset + 1] = 110;
+          data[offset + 2] = 40;
+        } else {
+          data[offset] = 230;
+          data[offset + 1] = 200;
+          data[offset + 2] = 70;
+        }
+      }
+    }
+
+    data[0] = 255;
+    data[1] = 0;
+    data[2] = 0;
+
+    this.texture = BABYLON.RawTexture.CreateRGBTexture(
+      data,
+      textureSize, textureSize,
+      this.scene,
+      false, false
+      //, BABYLON.Texture.NEAREST_LINEAR
+      //, BABYLON.Texture.NEAREST_SAMPLINGMODE
+    );
+    //this.texture = <any>(new BABYLON.Texture("http://i.imgur.com/JbvoYlB.png", this.scene));
+    this.land_material.diffuseTexture = this.texture;
+    //this.land_material.specularTexture = this.texture;
+    //this.land_material.emissiveTexture = this.texture;
+    //this.land_material.ambientTexture = this.texture;
+  }
+
   // Move camera to selected view.
   set_view(direction: string): void {
-    const mapsize = this.tile_size * this.config.get("enviroment.tile_count");
-    const map_center = new BABYLON.Vector3(mapsize / 2, 0, mapsize / 2);
-    const view_pos = 1.5 * mapsize
-    const view_pos_diag =  mapsize + mapsize / 2.8
-    const view_mid = mapsize / 2;
-    const view_neg = - mapsize / 2
-    const view_neg_diag = - mapsize / 2.8
+    const map_center = new BABYLON.Vector3(this.mapsize / 2, 0, this.mapsize / 2);
+    const view_pos = 1.5 * this.mapsize
+    const view_pos_diag =  this.mapsize + this.mapsize / 2.8
+    const view_mid = this.mapsize / 2;
+    const view_neg = - this.mapsize / 2
+    const view_neg_diag = - this.mapsize / 2.8
 
     const ease = new BABYLON.CubicEase();
     ease.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEINOUT);
 
-    let position = new BABYLON.Vector3(view_mid, mapsize * 2, view_mid);
+    let position = new BABYLON.Vector3(view_mid, this.mapsize * 2, view_mid);
 
     switch(direction) {
       case "down-right":
@@ -284,7 +342,7 @@ export class Display3d extends DisplayBase {
         position = new BABYLON.Vector3(view_pos, view_mid, view_mid);
         break;
       case "overhead":
-        position = new BABYLON.Vector3(view_mid, mapsize * 2, view_mid);
+        position = new BABYLON.Vector3(view_mid, this.mapsize * 2, view_mid);
         break;
       case "left":
         position = new BABYLON.Vector3(view_neg, view_mid, view_mid);
@@ -356,16 +414,21 @@ export class Display3d extends DisplayBase {
     this.indices = [];
     this.rivers = [];
 
-    for(let y = 0; y < this.config.get("enviroment.tile_count"); y++) {
-      for(let x = 0; x < this.config.get("enviroment.tile_count"); x++) {
+    const tile_count = this.config.get("enviroment.tile_count");
+    for(let y = 0; y < tile_count; y++) {
+      for(let x = 0; x < tile_count; x++) {
         // These are the points at the corners of the grid.
         // We actually form these into triangles later in draw_tile(...) where
         // we populate the this.indices[] collection with indexes of
         // this.positions entries.
         const tile = this.geography.get_tile({x, y});
-        this.positions.push(tile.pos.x * this.tile_size);
+        this.positions.push(x * this.tile_size);
         this.positions.push(tile.height * this.tile_size);
-        this.positions.push(tile.pos.y * this.tile_size);
+        this.positions.push(y * this.tile_size);
+        //this.uvs.push(x / (tile_count * this.texture_resolution / 2));
+        //this.uvs.push(y / (tile_count * this.texture_resolution / 2));
+        this.uvs.push(x / tile_count);
+        this.uvs.push(y / tile_count);
       }
     }
   }
@@ -498,38 +561,38 @@ export class Display3d extends DisplayBase {
     const vertexData = new BABYLON.VertexData();
     vertexData.positions = this.positions;
     vertexData.indices = this.indices;
+    vertexData.uvs = this.uvs;
     vertexData.normals = this.normals;
 
     this.land_mesh = new BABYLON.Mesh("land");
     this.land_mesh.material = this.land_material;
-    vertexData.applyToMesh(this.land_mesh, true);
+    vertexData.applyToMesh(this.land_mesh);
     this.land_mesh.isPickable = false;
     // Required to keep camera above ground.
     this.land_mesh.checkCollisions = true;
-    // this.land_mesh.convertToFlatShadedMesh();
+    //this.land_mesh.convertToFlatShadedMesh();
 
     // Show tile edges.
-    // this.land_mesh.enableEdgesRendering(.9999999999);
-    // this.land_mesh.edgesWidth = 5.0;
-    // this.land_mesh.edgesColor = new BABYLON.Color4(1, 1, 1, 1);
+    /*this.land_mesh.enableEdgesRendering(.9999999999);
+    this.land_mesh.edgesWidth = 5.0;
+    this.land_mesh.edgesColor = new BABYLON.Color4(1, 1, 1, 1);*/
 
-    this.land_mesh.freezeWorldMatrix();
+    //this.land_mesh.freezeWorldMatrix();
 
     // Rivers
     this.schedule_update_rivers();
 
     // Generate seabed.
-    const mapsize = this.tile_size * this.config.get("enviroment.tile_count");
     const seabed = BABYLON.MeshBuilder.CreateGround(
-      "seabed", {width: mapsize * 2, height: mapsize * 2});
+      "seabed", {width: this.mapsize * 2, height: this.mapsize * 2});
     seabed.position = new BABYLON.Vector3(
-      mapsize / 2, -0.01, mapsize / 2);
+      this.mapsize / 2, -0.01, this.mapsize / 2);
     seabed.material = this.seabed_material;
     seabed.checkCollisions = true;
 
     // Generate sea.
     this.sea_mesh = BABYLON.MeshBuilder.CreateGround(
-      "sea", {width: mapsize * 2, height: mapsize * 2});
+      "sea", {width: this.mapsize * 2, height: this.mapsize * 2});
     this.sea_mesh.material = this.sea_material;
     this.sea_mesh.checkCollisions = false;
     this.set_sealevel(this.config.get("geography.sealevel"));
@@ -542,9 +605,8 @@ export class Display3d extends DisplayBase {
 
   // Move the height of the sea mesh on the Z axis.
   set_sealevel(sealevel: number): void {
-    const mapsize = this.tile_size * this.config.get("enviroment.tile_count");
     this.sea_mesh.position = new BABYLON.Vector3(
-      mapsize / 2, (sealevel + 0.02) * this.tile_size, mapsize / 2);
+      this.mapsize / 2, (sealevel + 0.02) * this.tile_size, this.mapsize / 2);
 
     // Now recalculate the rivers as they now meet the sea at a different height
     // so length will be different.
