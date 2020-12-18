@@ -29,7 +29,7 @@ import * as $ from "jquery";
 import "bootstrap";
 
 import {Enviroment, Geography, Tile} from "./flowing_terrain";
-import {seed_points, seed_points_to_array, Noise} from "./genesis";
+import {seed_points, seed_point_get_value, Noise} from "./genesis";
 import {draw_2d} from "./2d_view";
 import {Display3d} from "./3d_view";
 import {Config} from "./config";
@@ -136,7 +136,7 @@ window.onload = () => {
       return seed_points(config, config.get("enviroment.tile_count"));
     });
     time("2d_seed_map", () => {
-      draw_2d("2d_seed_map", seed_points_to_array(config.get("enviroment.tile_count"), seabed));
+      draw_2d("2d_seed_map", config.get("enviroment.tile_count"), seabed, seed_point_get_value, 2);
     });
   }
 
@@ -144,11 +144,17 @@ window.onload = () => {
     time("noise", () => {
       if(noise === null) {
         noise = new Noise("noise", config);
+      } else {
+        noise.generate(regenerate);
       }
-      noise.generate(regenerate);
     });
     time("2d_noise_map", () => {
-      draw_2d("2d_noise_map", noise.data_combined);
+      draw_2d(
+        "2d_noise_map",
+        noise.length,
+        null,
+        (x, y, unused) => {return noise.get_value(x, y);},
+        2);
       noise.text(document.getElementById("height_debug"));
     });
   }
@@ -156,17 +162,20 @@ window.onload = () => {
   function generate_terrain() {
     geography = time("geography", () => {
       if(geography === null) {
-        return new Geography(enviroment, config, seabed, noise.data_combined);
+        return new Geography(enviroment, config, seabed, noise);
       } else {
-        geography.terraform(enviroment, seabed, noise.data_combined);
+        geography.terraform(enviroment, seabed, noise);
         return geography;
       }
     });
 
     time("2d_height_map", () => {
-      draw_2d("2d_height_map",
-        geography.tiles,
-        (tile: Tile) => { return tile.height / enviroment.highest_point;});
+      draw_2d(
+        "2d_height_map",
+        config.get("enviroment.tile_count"),
+        null,
+        (x, y, unused) => {return geography.tiles[x][y].height / enviroment.highest_point;},
+        2);
     });
 
     display = time("3d_display", () => {
@@ -183,11 +192,17 @@ window.onload = () => {
     time("vegetation", () => {
       if(vegetation === null) {
         vegetation = new Noise("vegetation", config);
+      } else {
+        vegetation.generate(regenerate);
       }
-      vegetation.generate(regenerate);
     });
     time("vegetation_map", () => {
-      draw_2d("vegetation_map", vegetation.data_combined);
+      draw_2d(
+        "vegetation_map",
+        vegetation.length,
+        null,
+        (x, y, unused) => {return vegetation.get_value(x, y);},
+        2);
       vegetation.text(document.getElementById("vegetation_debug"));
     });
   }

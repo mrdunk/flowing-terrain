@@ -25,6 +25,7 @@
 import * as seedrandom from 'seedrandom';
 import {Config} from "./config";
 import {Geography, Tile} from "./flowing_terrain";
+import {Noise} from "./genesis";
 
 export const enum PlantType {
   Pine,
@@ -59,19 +60,23 @@ export class Planting {
   readonly treesPerTile: number = 10;
   geography: Geography;
   config: Config;
-  noise: number[][];
+  noise: Noise;
   locations: Map<number, Map<number, Plant[]>>;
   countByType: number[];
   count: number;
+  sealevel: number;
+  tileCount: number;
 
   constructor(geography: Geography,
               config: Config,
-              noise: number[][]) {
+              noise: Noise) {
     this.geography = geography;
     this.config = config;
     this.noise = noise;
     this.countByType = [0, 0, 0, 0];
     this.locations = new Map();
+    this.sealevel = this.config.get("geography.sealevel");
+    this.tileCount = this.config.get("enviroment.tile_count");
 
     this.populate();
   }
@@ -80,8 +85,7 @@ export class Planting {
     this.countByType = [0, 0, 0, 0];
     this.count = 0;
     for(let x = 0; x < this.noise.length; x++) {
-      const row = this.noise[x];
-      for(let y = 0; y < row.length; y++) {
+      for(let y = 0; y < this.noise.length; y++) {
         for(let i = 0; i < this.treesPerTile; i++) {
           this.set(x, y, this.createPlant(x, y));
         }
@@ -131,10 +135,7 @@ export class Planting {
   }
 
   createPlant(keyX: number, keyY: number): BABYLON.Nullable<Plant> {
-    const sealevel = this.config.get("geography.sealevel");
-    const tileCount = this.config.get("enviroment.tile_count");
-
-    if(keyX >= tileCount - 1 || keyY >= tileCount - 1){
+    if(keyX >= this.tileCount - 1 || keyY >= this.tileCount - 1){
       return null;
     }
 
@@ -143,14 +144,16 @@ export class Planting {
     const tile01 = this.geography.tiles[keyX][keyY + 1];
     const tile11 = this.geography.tiles[keyX + 1][keyY + 1];
 
+    // No trees under water.
     if(
-        tile00.height < sealevel ||
-        tile10.height < sealevel ||
-        tile01.height < sealevel ||
-        tile11.height < sealevel) {
+        tile00.height < this.sealevel ||
+        tile10.height < this.sealevel ||
+        tile01.height < this.sealevel ||
+        tile11.height < this.sealevel) {
       return null;
     }
-    const noiseVal = this.noise[keyX][keyY];
+
+    const noiseVal = this.noise.get_value(keyX, keyY);
     if(noiseVal < 0.1) {
       return null;
     }

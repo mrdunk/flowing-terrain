@@ -36,7 +36,6 @@ export class Display3d extends DisplayBase {
   config: Config = null;
   readonly tile_size: number = 2;
   readonly texture_resolution: number = 8;
-  tile_count: number;
   mapsize: number;
   positions: number[] = [];
   indices: number[] = [];
@@ -72,7 +71,6 @@ export class Display3d extends DisplayBase {
 
   constructor(geography: Geography, vegetation: Noise, config: Config) {
     super(geography);
-    this.tile_count = config.get("enviroment.tile_count");
     this.mapsize = this.tile_size * this.tile_count;
 
     this.vegetation = vegetation;
@@ -153,7 +151,6 @@ export class Display3d extends DisplayBase {
     //this.sea_material.freeze();
 
     this.draw();
-    this.set_land_texture();
 
     this.camera.setTarget(new BABYLON.Vector3(this.mapsize / 2, 0, this.mapsize / 2));
 
@@ -615,6 +612,9 @@ export class Display3d extends DisplayBase {
     // Now recalculate the rivers as they now meet the sea at a different height
     // so length will be different.
     this.schedule_update_rivers();
+
+    // Re-texture everything so beaches are at the right height.
+    this.set_land_texture();
   }
 
   // Set what Tile.dampness value to display rivers at and schedule a re-draw.
@@ -739,7 +739,7 @@ export class Display3d extends DisplayBase {
       this.treeShadowMapSize = 2048;
     }
 
-    const p = new Planting(this.geography, this.config, this.vegetation.data_combined);
+    const p = new Planting(this.geography, this.config, this.vegetation);
 
     if(this.treesPine) {
       try {

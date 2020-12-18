@@ -22,25 +22,25 @@
  * SOFTWARE.
  */
 
-export function draw_2d(id: string,
-                        data: any[][],
-                        accessor: any = (item: any) => {return item;},
-                        size: number = 2): void {
+export function draw_2d(
+  id: string,
+  size: number,
+  data_container: any,
+  data_accessor: (x: number, y: number, contaner: any) => number,
+  scale: number
+): void {
   const canvas = document.getElementById(id) as HTMLCanvasElement;
   console.assert(canvas !== undefined, `Can't find canvas element: ${id}`);
   const ctx = canvas.getContext('2d');
 
-  console.assert(data.length > 0, "Invalid data");
-  const y_len: number = data[0].length;
-  ctx.canvas.width = y_len * size;
-  ctx.canvas.height = data.length * size;
+  ctx.canvas.width = size * scale;
+  ctx.canvas.height = size * scale;
 
-  for(let x = 0; x < data.length; x++) {
-    console.assert(y_len === data[x].length, "Mismatched data lengths");
-    for(let y = 0; y < data[x].length; y++) {
-      const val = accessor(data[x][y]) * 255;
+  for(let x = 0; x < size; x++) {
+    for(let y = 0; y < size; y++) {
+      const val = data_accessor(x, y, data_container) * 255;
       ctx.fillStyle = `rgba(${val}, ${val}, ${val}, 1`;
-      ctx.fillRect((data.length - x - 1) * size, y * size, size, size);
+      ctx.fillRect((size - x - 1) * scale, y * scale, scale, scale);
     }
   }
 }

@@ -73,18 +73,8 @@ function compare_floods(a: Flood, b: Flood): number {
   return a.coordinate.y - b.coordinate.y;
 }
 
-export function seed_points_to_array(
-  tile_count: number, sea: Set<string>): number[][] {
-    const sea_array = [];
-    for(let x = 0; x < tile_count; x++) {
-      const row: number[] = [];
-      for(let y = 0; y < tile_count; y++) {
-        row.push(sea.has(coord_to_str({x, y}))? 1 : 0);
-      }
-      sea_array.push(row);
-    }
-
-    return sea_array;
+export function seed_point_get_value(x: number, y: number, sea: Set<string>): number {
+  return sea.has(coord_to_str({x, y})) ? 1 : 0;
 }
 
 /* Function to generate an area of seabed from which to generate land.
@@ -121,6 +111,7 @@ export function seed_points(config: Config, tile_count: number): Set<string> {
     open.push(new Flood({x, y}, dist_from_center));
   }
 
+  const threshold = config.get("seed_points.threshold");
   while(open.length > 0) {
     const tile = open.pop();
     seabed.add(coord_to_str(tile.coordinate));
@@ -128,7 +119,7 @@ export function seed_points(config: Config, tile_count: number): Set<string> {
     get_neighbours(tile.coordinate).forEach((neighbour) => {
       if(neighbour.x >= 0 && neighbour.x < tile_count &&
          neighbour.y >= 0 && neighbour.y < tile_count) {
-        if(random() < config.get("seed_points.threshold")) {
+        if(random() < threshold) {
           if(! seabed.has(coord_to_str(neighbour))) {
             open.push(new Flood(neighbour, tile.value));
           }
@@ -152,18 +143,16 @@ export class Noise {
   weight_mid: number;
   weight_high: number;
 
-  data_low: number[][];
-  data_mid: number[][];
-  data_high: number[][];
-  data_combined: number[][];
+  length: number;
 
   constructor(label: string, config: Config) {
     this.label = label;
     this.config = config;
+    this.length = this.config.get("enviroment.tile_count");
+    this.generate(true);
   }
 
   set_octave(octave: string) {
-    const tile_count = this.config.get("enviroment.tile_count");
     let scale: number = 1;
     let coefficients: number[][] = null;
     const coefficients_x: number[] = null;
@@ -172,13 +161,13 @@ export class Noise {
 
     switch (octave) {
       case "low":
-        scale = 20 / tile_count;
+        scale = 20 / this.length;
         this.coefficients_low = [];
         coefficients = this.coefficients_low;
         random = seedrandom(this.config.get(`${this.label}.random_seed_low`));
         break;
       case "mid":
-        scale = 100 / tile_count;
+        scale = 100 / this.length;
         this.coefficients_mid = [];
         coefficients = this.coefficients_mid;
         random = seedrandom(this.config.get(`${this.label}.random_seed_mid`));
@@ -255,16 +244,6 @@ export class Noise {
     this.set_octave("low");
     this.set_octave("mid");
     this.set_octave("high");
-    this.data_combined = [];
-
-    const tile_count = this.config.get("enviroment.tile_count");
-    for(let x = 0; x < tile_count; x++){
-      const row: number[] = [];
-      for(let y = 0; y < tile_count; y++){
-        row.push(this.get_value(x, y));
-      }
-      this.data_combined.push(row);
-    }
   }
 
   text(element: HTMLElement): void {
