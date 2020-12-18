@@ -36,6 +36,7 @@ export class Display3d extends DisplayBase {
   config: Config = null;
   readonly tile_size: number = 2;
   readonly texture_resolution: number = 8;
+  tile_count: number;
   mapsize: number;
   positions: number[] = [];
   indices: number[] = [];
@@ -71,7 +72,8 @@ export class Display3d extends DisplayBase {
 
   constructor(geography: Geography, vegetation: Noise, config: Config) {
     super(geography);
-    this.mapsize = this.tile_size * config.get("enviroment.tile_count");
+    this.tile_count = config.get("enviroment.tile_count");
+    this.mapsize = this.tile_size * this.tile_count;
 
     this.vegetation = vegetation;
     this.config = config;
@@ -89,13 +91,14 @@ export class Display3d extends DisplayBase {
     (this.camera.inputs.attached['mousewheel'] as BABYLON.FreeCameraMouseWheelInput).
       wheelYMoveScene = BABYLON.Coordinate.Y;
     (this.camera.inputs.attached['mousewheel'] as BABYLON.FreeCameraMouseWheelInput).
-      wheelPrecisionY = -1;
+      wheelPrecisionY = -this.tile_size / 2;
 
     this.camera.inputs.removeMouse();
     this.camera.inputs.remove(this.camera.inputs.attached.touch);
     //this.camera.inputs.addPointers();
     let pointerInput = new FreeCameraPointersInput();
-    pointerInput.panSensitivity = new BABYLON.Vector3(-0.02, -0.02, 0.02);
+    pointerInput.panSensitivity =
+      new BABYLON.Vector3(-0.01 * this.tile_size, -0.01 * this.tile_size, 0.01 * this.tile_size);
     pointerInput.angularSensitivity = new BABYLON.Vector3(0.001, 0.001, 0.001);
     this.camera.inputs.add(pointerInput);
 
@@ -137,7 +140,7 @@ export class Display3d extends DisplayBase {
     //this.land_material.freeze();
 
     this.seabed_material = new BABYLON.StandardMaterial("seabed_material", this.scene);
-    this.seabed_material.diffuseColor = new BABYLON.Color3(0.4, 0.6, 0.2);
+    this.seabed_material.diffuseColor = new BABYLON.Color3(0, 0, 0);
     this.seabed_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
     // this.seabed_material.backFaceCulling = false;
     //this.seabed_material.freeze();
@@ -263,41 +266,46 @@ export class Display3d extends DisplayBase {
   }
 
   set_land_texture(): void {
-    const tileCount = this.config.get("enviroment.tile_count");
-    const textureSize = tileCount * this.texture_resolution;
+    const textureSize = this.tile_count * this.texture_resolution;
     const sealevel = this.config.get("geography.sealevel");
     const data = new Uint8Array(textureSize * textureSize * 3);
+    const shoreline = 0.05;
 
-    for(let tx = 0; tx < textureSize; tx ++) {
-      for(let ty = 0; ty < textureSize; ty ++) {
+    for(let tx = 0; tx < textureSize; tx++) {
+      for(let ty = 0; ty < textureSize; ty++) {
         const offset = (ty * textureSize + tx) * 3;
         const x = tx / this.texture_resolution;
         const y = ty / this.texture_resolution;
         const position = new BABYLON.Vector3(x * this.tile_size, 0, y * this.tile_size);
-        this.setHeightToSurface(position);
-        if (position.y / this.tile_size <= sealevel) {
-          data[offset] = 10;
-          data[offset + 1] = 100;
-          data[offset + 2] = 200;
-        } else if (position.y / this.tile_size >= 7 ) {
+        const gradient = this.setHeightToSurface(position);
+
+        if (position.y / this.tile_size >= 7 ) {
+          // Snow
           data[offset] = 170;
           data[offset + 1] = 200;
           data[offset + 2] = 210;
-        } else if (position.y / this.tile_size >= sealevel + 0.1) {
+        } else if (position.y / this.tile_size >= sealevel + shoreline) {
+          // Land
           data[offset] = 60;
           data[offset + 1] = 110;
           data[offset + 2] = 40;
         } else {
-          data[offset] = 230;
-          data[offset + 1] = 200;
-          data[offset + 2] = 70;
+          const multiplier = Math.min(1, Math.max(0,
+            position.y / this.tile_size / (sealevel + shoreline)));
+          if (false && gradient > 0.5) {
+            // Rock
+            data[offset] = 70 * multiplier;
+            data[offset + 1] = 50 * multiplier;
+            data[offset + 2] = 30 * multiplier;
+          } else {
+            // Sand
+            data[offset] = 200 * multiplier;
+            data[offset + 1] = 200 * multiplier;
+            data[offset + 2] = 70 * multiplier;
+          }
         }
       }
     }
-
-    data[0] = 255;
-    data[1] = 0;
-    data[2] = 0;
 
     this.texture = BABYLON.RawTexture.CreateRGBTexture(
       data,
@@ -305,7 +313,7 @@ export class Display3d extends DisplayBase {
       this.scene,
       false, false
       //, BABYLON.Texture.NEAREST_LINEAR
-      //, BABYLON.Texture.NEAREST_SAMPLINGMODE
+      , BABYLON.Texture.NEAREST_SAMPLINGMODE
     );
     //this.texture = <any>(new BABYLON.Texture("http://i.imgur.com/JbvoYlB.png", this.scene));
     this.land_material.diffuseTexture = this.texture;
@@ -391,7 +399,7 @@ export class Display3d extends DisplayBase {
   }
 
   coordinate_to_index(coordinate: Coordinate): number {
-    return (coordinate.y * this.config.get("enviroment.tile_count") + coordinate.x);
+    return (coordinate.y * this.tile_count + coordinate.x);
   }
 
   // Called before iteration through map's points.
@@ -414,9 +422,8 @@ export class Display3d extends DisplayBase {
     this.indices = [];
     this.rivers = [];
 
-    const tile_count = this.config.get("enviroment.tile_count");
-    for(let y = 0; y < tile_count; y++) {
-      for(let x = 0; x < tile_count; x++) {
+    for(let y = 0; y < this.tile_count; y++) {
+      for(let x = 0; x < this.tile_count; x++) {
         // These are the points at the corners of the grid.
         // We actually form these into triangles later in draw_tile(...) where
         // we populate the this.indices[] collection with indexes of
@@ -425,10 +432,8 @@ export class Display3d extends DisplayBase {
         this.positions.push(x * this.tile_size);
         this.positions.push(tile.height * this.tile_size);
         this.positions.push(y * this.tile_size);
-        //this.uvs.push(x / (tile_count * this.texture_resolution / 2));
-        //this.uvs.push(y / (tile_count * this.texture_resolution / 2));
-        this.uvs.push(x / tile_count);
-        this.uvs.push(y / tile_count);
+        this.uvs.push(x / this.tile_count);
+        this.uvs.push(y / this.tile_count);
       }
     }
   }
@@ -437,8 +442,8 @@ export class Display3d extends DisplayBase {
   draw_tile(tile: Tile): void {
     const x = tile.pos.x;
     const y = tile.pos.y;
-    if( x < 0 || x >= this.config.get("enviroment.tile_count") -1||
-        y < 0 || y >= this.config.get("enviroment.tile_count") -1) {
+    if( x < 0 || x >= this.tile_count -1||
+        y < 0 || y >= this.tile_count -1) {
       return;
     }
 
@@ -507,15 +512,14 @@ export class Display3d extends DisplayBase {
   }
 
   // Draw river between 2 points.
-  draw_river(highest: Tile, lowest: Tile): void {
-    const sealevel = this.config.get("geography.sealevel");
+  draw_river(highest: Tile, lowest: Tile, sealevel: number, threshold: number): void {
     if(highest === null || lowest === null) {
       return;
     }
     if(highest.height < sealevel) {
       return;
     }
-    if(highest.dampness <= this.config.get("display.river_threshold")) {
+    if(highest.dampness <= threshold) {
       return;
     }
 
@@ -641,10 +645,12 @@ export class Display3d extends DisplayBase {
       this.rivers_mesh.dispose();
     }
 
-    for(let y = 0; y < this.config.get("enviroment.tile_count"); y++) {
-      for(let x = 0; x < this.config.get("enviroment.tile_count"); x++) {
+    const sealevel = this.config.get("geography.sealevel");
+    const threshold = this.config.get("display.river_threshold");
+    for(let y = 0; y < this.tile_count; y++) {
+      for(let x = 0; x < this.tile_count; x++) {
         const tile = this.geography.get_tile({x, y});
-        this.draw_river(tile, tile.lowest_neighbour);
+        this.draw_river(tile, tile.lowest_neighbour, sealevel, threshold);
       }
     }
     if(this.rivers.length > 0) {
@@ -662,14 +668,24 @@ export class Display3d extends DisplayBase {
 
   /* Given a vector populated with the x and z coordinates, calculate the
    * corresponding y (height). */
-  setHeightToSurface(point: BABYLON.Vector3): void {
+  setHeightToSurface(point: BABYLON.Vector3): number {
+
+    if(point.x >= this.mapsize - this.tile_size ||
+      point.z >= this.mapsize - this.tile_size) {
+      point.y = 0;
+      return 0;
+    }
+
     // Get the 2 triangles that tile this square.
     const indiceStartIndex = (
-      (Math.floor(point.z / this.tile_size) *
-        (this.config.get("enviroment.tile_count") - 1) +
+      (Math.floor(point.z / this.tile_size) * (this.tile_count - 1) +
         Math.floor(point.x / this.tile_size)) * 6);
 
     // Get points at corners of tile.
+    console.assert(indiceStartIndex >= 0);
+    console.assert((indiceStartIndex + 5) < this.indices.length);
+    console.assert((this.indices[indiceStartIndex + 5] * 3 + 3) < this.positions.length);
+
     const points = [
       BABYLON.Vector3.FromArray(this.positions, this.indices[indiceStartIndex + 0] * 3),
       BABYLON.Vector3.FromArray(this.positions, this.indices[indiceStartIndex + 1] * 3),
@@ -678,7 +694,7 @@ export class Display3d extends DisplayBase {
     ];
 
     // Each tile is made up of 2 triangles. Calculate which one the point is in.
-    point.y = (points[2].y + points[3].y) / 2;
+    point.y = (points[2].y + points[3].y) / 2; // Get the height close to add precision.
     let triangle: [BABYLON.Vector3, BABYLON.Vector3, BABYLON.Vector3];
     if(BABYLON.Vector3.DistanceSquared(point, points[2]) <
        BABYLON.Vector3.DistanceSquared(point, points[3])) {
@@ -714,7 +730,8 @@ export class Display3d extends DisplayBase {
       point.y = triangle[2].y + (dx * dy0) - (dz * dy1);
     }
 
-    return;
+    // Return the gradient of the tile.
+    return Math.abs((triangle[0].y + triangle[1].y) / 2 - triangle[2].y);
   }
 
   planting(): void {

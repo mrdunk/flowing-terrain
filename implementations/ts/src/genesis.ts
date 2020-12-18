@@ -148,6 +148,10 @@ export class Noise {
   coefficients_mid: number[][];
   coefficients_high: number[][];
 
+  weight_low: number;
+  weight_mid: number;
+  weight_high: number;
+
   data_low: number[][];
   data_mid: number[][];
   data_high: number[][];
@@ -198,70 +202,42 @@ export class Noise {
     }
   }
 
-  generate_octave(octave: string): void {
-    const tile_count = this.config.get("enviroment.tile_count");
+  get_value(x: number, y: number): number {
+    return (this.get_octave_value("high", x, y) +
+      this.get_octave_value("mid", x, y) +
+      this.get_octave_value("low", x, y)) / 3;
+  }
 
+  get_octave_value(octave: string, x: number, y: number): number {
     let weight: number = 1;
     let coefficients: number[][] = null;
-    const coefficients_x: number[] = null;
-    const coefficients_y: number[] = null;
-    let data: number[][] = null;
 
     switch (octave) {
       case "low":
-        weight = this.config.get(`${this.label}.low_octave_weight`);
+        weight = this.weight_low;
         coefficients = this.coefficients_low;
-        this.data_low = [];
-        data = this.data_low;
         break;
       case "mid":
-        weight = this.config.get(`${this.label}.mid_octave_weight`);
+        weight = this.weight_mid;
         coefficients = this.coefficients_mid;
-        this.data_mid = [];
-        data = this.data_mid;
         break;
       case "high":
-        weight = this.config.get(`${this.label}.high_octave_weight`);
+        weight = this.weight_high;
         coefficients = this.coefficients_high;
-        this.data_high = [];
-        data = this.data_high;
         break;
       default:
         console.trace();
     }
 
-    for(let y = 0; y < tile_count; y++){
-      const row: number[] = [];
-      for(let x = 0; x < tile_count; x++){
-        let val = 0;
-        coefficients.forEach((both) => {
-          const coef_x = both[0];
-          const coef_y = both[1];
-          val += Math.sin(coef_x * x + coef_y * y);
-        });
-        if(coefficients.length > 0) {
-          // Normalize output.
-          val /= Math.sqrt(coefficients.length);
-        }
-        val *= weight;
-        row.push(val);
-      }
-      data.push(row);
+    let val = 0;
+    coefficients.forEach(([coef_x, coef_y]) => {
+      val += Math.sin(coef_x * x + coef_y * y);
+    });
+    if(coefficients.length > 0) {
+      // Normalize output.
+      val /= Math.sqrt(coefficients.length);
     }
-  }
-
-  combine_octaves(): void {
-    const tile_count = this.config.get("enviroment.tile_count");
-    this.data_combined = [];
-
-    for(let y = 0; y < tile_count; y++){
-      const row: number[] = [];
-      for(let x = 0; x < tile_count; x++){
-        const val = (this.data_low[y][x] + this.data_mid[y][x] + this.data_high[y][x]) / 3;
-        row.push(val);
-      }
-      this.data_combined.push(row);
-    }
+    return val * weight;
   }
 
   generate(regenerate: boolean = false) {
@@ -272,28 +248,23 @@ export class Noise {
       this.config.set(`${this.label}.random_seed_high`, `high ${(new Date()).getTime()}`);
     }
 
-    // TODO: Calculate what needs updating and do only that.
-    let octave = "all";
+    this.weight_low = this.config.get(`${this.label}.low_octave_weight`);
+    this.weight_mid = this.config.get(`${this.label}.mid_octave_weight`);
+    this.weight_high = this.config.get(`${this.label}.high_octave_weight`);
 
-    switch (octave) {
-      case "low":
-      case "mid":
-      case "high":
-        this.set_octave(octave);
-        this.generate_octave(octave);
-        break;
-      case "all":
-        this.set_octave("low");
-        this.set_octave("mid");
-        this.set_octave("high");
-        this.generate_octave("low");
-        this.generate_octave("mid");
-        this.generate_octave("high");
-        break;
-      default:
-        console.trace();
+    this.set_octave("low");
+    this.set_octave("mid");
+    this.set_octave("high");
+    this.data_combined = [];
+
+    const tile_count = this.config.get("enviroment.tile_count");
+    for(let x = 0; x < tile_count; x++){
+      const row: number[] = [];
+      for(let y = 0; y < tile_count; y++){
+        row.push(this.get_value(x, y));
+      }
+      this.data_combined.push(row);
     }
-    this.combine_octaves();
   }
 
   text(element: HTMLElement): void {
@@ -309,27 +280,24 @@ export class Noise {
     let text: string = "<code class='text-dark'>height =</code><br>";
     let weight: number = 0;
 
-    weight = this.config.get(`${this.label}.low_octave_weight`);
-    if(weight > 0) {
+    if(this.weight_low > 0) {
       text += "<code class='text-info'>// low frequency</code><br>";
       this.coefficients_low.forEach((both) => {
-        text += line(weight, both[0], both[1]);
+        text += line(this.weight_low, both[0], both[1]);
       });
     }
 
-    weight = this.config.get(`${this.label}.mid_octave_weight`);
-    if(weight > 0) {
+    if(this.weight_mid > 0) {
       text += "<code class='text-info'>// mid frequency</code><br>";
       this.coefficients_mid.forEach((both) => {
-        text += line(weight, both[0], both[1]);
+        text += line(this.weight_mid, both[0], both[1]);
       });
     }
 
-    weight = this.config.get(`${this.label}.high_octave_weight`);
-    if(weight > 0) {
+    if(this.weight_high > 0) {
       text += "<code class='text-info'>// high frequency</code><br>";
       this.coefficients_high.forEach((both) => {
-        text += line(weight, both[0], both[1]);
+        text += line(this.weight_high, both[0], both[1]);
       });
     }
 
