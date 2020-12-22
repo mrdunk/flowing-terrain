@@ -30,8 +30,8 @@ import {Noise} from "./genesis";
 export const enum PlantType {
   Pine,
   Deciduous,
-  Thicket,
-  Shrub,
+  // Thicket,
+  // Shrub,
 }
 
 export class Plant {
@@ -154,7 +154,7 @@ export class Planting {
     }
 
     const noiseVal = this.noise.get_value(keyX, keyY);
-    if(noiseVal < 0.1) {
+    if (noiseVal < 0.1) {
       return null;
     }
 

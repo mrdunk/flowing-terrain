@@ -126,7 +126,7 @@ window.onload = () => {
     vegetation_octaves_callback(null, null);
   });
 
-  config.set_if_null("display.sea_transparency", 0.5);
+  config.set_if_null("display.sea_transparency", 0.9);
   config.set_callback("display.sea_transparency", (key: string, value: any) => {
     display.sea_material.alpha = value;
   });

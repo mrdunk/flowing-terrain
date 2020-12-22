@@ -59,7 +59,7 @@ export class Display3d extends DisplayBase {
   camera: BABYLON.UniversalCamera;
 
   land_material: BABYLON.StandardMaterial;
-  sea_material: BABYLON.StandardMaterial;
+  sea_material: BABYLON.ShaderMaterial;
   seabed_material: BABYLON.StandardMaterial;
 
   light_1:BABYLON.DirectionalLight;
@@ -143,12 +143,12 @@ export class Display3d extends DisplayBase {
     // this.seabed_material.backFaceCulling = false;
     //this.seabed_material.freeze();
 
-    this.sea_material = new BABYLON.StandardMaterial("sea_material", this.scene);
-    this.sea_material.diffuseColor = new BABYLON.Color3(0.1, 0.2, 1.0);
-    this.sea_material.specularColor = new BABYLON.Color3(0.5, 0.5, 0.5);
-    this.sea_material.alpha = config.get("display.sea_transparency");
-    this.sea_material.backFaceCulling = false;
+    //this.sea_material = new BABYLON.StandardMaterial("sea_material", this.scene);
+    //this.sea_material.diffuseColor = new BABYLON.Color3(0.1, 0.2, 1.0);
+    //this.sea_material.specularColor = new BABYLON.Color3(0.5, 0.5, 0.5);
+    //this.sea_material.backFaceCulling = false;
     //this.sea_material.freeze();
+    this.set_sea_material();
 
     this.draw();
 
@@ -262,7 +262,74 @@ export class Display3d extends DisplayBase {
     return result;
   }
 
-  set_land_texture(): void {
+  set_sea_material(): void {
+    /*const textureSize = 1024;
+    const data = new Uint8Array(textureSize * textureSize * 3);
+
+    const coefficients = [[1, 0], [1.5, 1]];
+
+    for(let x = 0; x < textureSize; x++) {
+      for(let y = 0; y < textureSize; y++) {
+        const offset = (y * textureSize + x) * 3;
+        let val = 0;
+        coefficients.forEach(([coef_x, coef_y]) => {
+          val += 1 + Math.sin(coef_x * x + coef_y * y);
+        });
+        val /= (2 * coefficients.length);
+        data[offset] = 50;
+        data[offset + 1] = 100;
+        data[offset + 2] = 100 + val * 155;
+      }
+    }
+
+    const sea_texture = BABYLON.RawTexture.CreateRGBTexture(
+      data,
+      textureSize, textureSize,
+      this.scene,
+      false, false
+      , BABYLON.Texture.NEAREST_LINEAR
+      //, BABYLON.Texture.NEAREST_SAMPLINGMODE
+    );
+    //const sea_texture = new BABYLON.Texture("http://i.imgur.com/2b1C7UH.jpg", this.scene);
+
+    this.sea_material.diffuseTexture = sea_texture;*/
+
+    this.sea_material = new BABYLON.ShaderMaterial(
+      "shader",
+      this.scene,
+      "./seaTexture",
+      {
+        attributes: [
+          "position",
+          "normal",
+          "uv"],
+        uniforms: [
+          "world",
+          "worldView",
+          "worldViewProjection",
+          "view",
+          "projection",
+          "direction",
+          "time",
+          "size",
+          "offset",
+          "alpha"
+        ]
+      });
+
+    this.sea_material.setFloat("size", this.mapsize * 2);
+    this.sea_material.setFloat("offset", this.mapsize);
+    this.sea_material.setFloat("alpha", 1.0);//this.config.get("display.sea_transparency"));
+    this.sea_material.alpha = 0.5;
+    const that = this;
+    let time = 0.0;
+    this.scene.registerBeforeRender(() => {
+      time += 0.002;
+      that.sea_material.setFloat("time", time);
+    });
+  }
+
+  land_texture(): void {
     const textureSize = this.tile_count * this.texture_resolution;
     const sealevel = this.config.get("geography.sealevel");
     const data = new Uint8Array(textureSize * textureSize * 3);
@@ -275,25 +342,34 @@ export class Display3d extends DisplayBase {
         const y = ty / this.texture_resolution;
         const position = new BABYLON.Vector3(x * this.tile_size, 0, y * this.tile_size);
         const gradient = this.setHeightToSurface(position);
+        const noise_val = this.geography.noise.get_value(x, y);
 
-        if (position.y / this.tile_size >= 7 ) {
+        if (position.y / this.tile_size >= 10 - 5 * noise_val) {
           // Snow
           data[offset] = 170;
           data[offset + 1] = 200;
           data[offset + 2] = 210;
         } else if (position.y / this.tile_size >= sealevel + shoreline) {
           // Land
-          data[offset] = 60;
-          data[offset + 1] = 110;
-          data[offset + 2] = 40;
+          if (Math.pow(noise_val, 5) * position.y > 2) {
+            // Rock
+            data[offset] = 90;
+            data[offset + 1] = 95;
+            data[offset + 2] = 95;
+          } else {
+            data[offset] = 60;
+            data[offset + 1] = 60 + 50 / position.y - noise_val;
+            data[offset + 2] = 40;
+          }
         } else {
+          // Below shoreline
           const multiplier = Math.min(1, Math.max(0,
             position.y / this.tile_size / (sealevel + shoreline)));
-          if (false && gradient > 0.5) {
+          if (noise_val > 0.2) {
             // Rock
-            data[offset] = 70 * multiplier;
-            data[offset + 1] = 50 * multiplier;
-            data[offset + 2] = 30 * multiplier;
+            data[offset] = 100 * multiplier;
+            data[offset + 1] = 95 * multiplier;
+            data[offset + 2] = 65 * multiplier;
           } else {
             // Sand
             data[offset] = 200 * multiplier;
@@ -310,7 +386,7 @@ export class Display3d extends DisplayBase {
       this.scene,
       false, false
       //, BABYLON.Texture.NEAREST_LINEAR
-      , BABYLON.Texture.NEAREST_SAMPLINGMODE
+      //, BABYLON.Texture.NEAREST_SAMPLINGMODE
     );
     //this.texture = <any>(new BABYLON.Texture("http://i.imgur.com/JbvoYlB.png", this.scene));
     this.land_material.diffuseTexture = this.texture;
@@ -592,13 +668,21 @@ export class Display3d extends DisplayBase {
     seabed.checkCollisions = true;
 
     // Generate sea.
+    /*this.sea_mesh = BABYLON.MeshBuilder.CreateTiledGround(
+      "sea",
+      {xmin: -this.mapsize, xmax: this.mapsize,
+        zmin: -this.mapsize, zmax: this.mapsize,
+        subdivisions: {w: 1, h: 1}}
+    );*/
     this.sea_mesh = BABYLON.MeshBuilder.CreateGround(
-      "sea", {width: this.mapsize * 2, height: this.mapsize * 2});
+      "sea",
+      {width: this.mapsize * 2, height: this.mapsize * 2}
+    );
     this.sea_mesh.material = this.sea_material;
     this.sea_mesh.checkCollisions = false;
     this.set_sealevel(this.config.get("geography.sealevel"));
 
-    this.sea_mesh.freezeWorldMatrix();
+    //this.sea_mesh.freezeWorldMatrix();
 
     // Plant trees.
     this.planting();
@@ -614,7 +698,7 @@ export class Display3d extends DisplayBase {
     this.schedule_update_rivers();
 
     // Re-texture everything so beaches are at the right height.
-    this.set_land_texture();
+    this.land_texture();
   }
 
   // Set what Tile.dampness value to display rivers at and schedule a re-draw.
@@ -741,6 +825,7 @@ export class Display3d extends DisplayBase {
 
     const p = new Planting(this.geography, this.config, this.vegetation);
 
+    // Scrap any existing trees so we can regenerate.
     if(this.treesPine) {
       try {
         this.treesPine.trunkMaterial.dispose();
@@ -781,7 +866,6 @@ export class Display3d extends DisplayBase {
     for(let [keyX, row] of p.locations.entries()) {
       for(let [keyY, Plant] of row.entries()) {
         for(let plant of p.get(keyX, keyY)) {
-          //const position = plant.position.clone() as BABYLON.Vector3;
           const position = new BABYLON.Vector3(
             plant.position.x * this.tile_size, 0, plant.position.z * this.tile_size);
           this.setHeightToSurface(position);
