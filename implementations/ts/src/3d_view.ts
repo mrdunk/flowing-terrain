@@ -263,39 +263,12 @@ export class Display3d extends DisplayBase {
   }
 
   set_sea_material(): void {
-    /*const textureSize = 1024;
-    const data = new Uint8Array(textureSize * textureSize * 3);
-
-    const coefficients = [[1, 0], [1.5, 1]];
-
-    for(let x = 0; x < textureSize; x++) {
-      for(let y = 0; y < textureSize; y++) {
-        const offset = (y * textureSize + x) * 3;
-        let val = 0;
-        coefficients.forEach(([coef_x, coef_y]) => {
-          val += 1 + Math.sin(coef_x * x + coef_y * y);
-        });
-        val /= (2 * coefficients.length);
-        data[offset] = 50;
-        data[offset + 1] = 100;
-        data[offset + 2] = 100 + val * 155;
-      }
+    if (this.sea_material) {
+      this.sea_material.dispose();
     }
 
-    const sea_texture = BABYLON.RawTexture.CreateRGBTexture(
-      data,
-      textureSize, textureSize,
-      this.scene,
-      false, false
-      , BABYLON.Texture.NEAREST_LINEAR
-      //, BABYLON.Texture.NEAREST_SAMPLINGMODE
-    );
-    //const sea_texture = new BABYLON.Texture("http://i.imgur.com/2b1C7UH.jpg", this.scene);
-
-    this.sea_material.diffuseTexture = sea_texture;*/
-
     this.sea_material = new BABYLON.ShaderMaterial(
-      "shader",
+      "sea_material",
       this.scene,
       "./seaTexture",
       {
@@ -314,19 +287,23 @@ export class Display3d extends DisplayBase {
           "size",
           "offset",
           "alpha"
-        ]
+        ],
+        needAlphaBlending: true
       });
 
     this.sea_material.setFloat("size", this.mapsize * 2);
     this.sea_material.setFloat("offset", this.mapsize);
-    this.sea_material.setFloat("alpha", 1.0);//this.config.get("display.sea_transparency"));
-    this.sea_material.alpha = 0.5;
+    this.sea_material.setFloat("alpha", this.config.get("display.sea_transparency"));
     const that = this;
     let time = 0.0;
     this.scene.registerBeforeRender(() => {
-      time += 0.002;
+      time += 0.003;
       that.sea_material.setFloat("time", time);
     });
+
+    if(this.sea_mesh) {
+      this.sea_mesh.material = this.sea_material;
+    }
   }
 
   land_texture(): void {

@@ -149,7 +149,7 @@ export class Noise {
     this.label = label;
     this.config = config;
     this.length = this.config.get("enviroment.tile_count");
-    this.generate(true);
+    this.generate();
   }
 
   set_octave(octave: string) {
