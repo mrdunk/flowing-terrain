@@ -2,9 +2,6 @@
 precision highp float;
 
 //Uniforms
-uniform mat4 u_World;
-uniform mat4 u_ViewProjection;
-uniform float size;
 uniform float offset;
 uniform float alpha;
 uniform float time;
@@ -29,7 +26,7 @@ void main(void) {
 
   val += sin(30. * x + 30. * z);
   val += sin(20. * x + 7. * z);
-  
+
   val *= 1.0 + 0.3 * sin(17.1 * x + 23.4 * z);
   val *= 1.0 + 0.3 * sin(33.4 * x + 16.1 * z);
 
@@ -38,12 +35,11 @@ void main(void) {
 
   val *= 1.0 + 0.25 * sin(1.0 * z);
   val *= 1.0 + 0.25 * sin(0.7 * x + 0.7 * z);
-  
+
   val *= 1.0 + 0.5 * sin(0.1 * x);
   val *= 1.0 + 0.5 * sin(0.07 * x + 0.07 * z);
-  
+
   val /= 50.0;
-  //val = min(0.1, max(-0.2, val));
 
 
   vec4 rgba = vec4(0.1, 0.5 + val / 2.0, 0.9 + val, alpha);

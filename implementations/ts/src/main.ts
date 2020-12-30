@@ -128,7 +128,9 @@ window.onload = () => {
 
   config.set_if_null("display.sea_transparency", 0.9);
   config.set_callback("display.sea_transparency", (key: string, value: any) => {
-    display.set_sea_material();
+    if (display && display.sea_material) {
+      display.sea_material.setFloat("alpha", config.get("display.sea_transparency"));
+    }
   });
 
   function generate_seed_points() {

@@ -135,9 +135,9 @@ export class Noise {
   label: string;
   config: Config;
 
-  coefficients_low: number[][];
-  coefficients_mid: number[][];
-  coefficients_high: number[][];
+  coefficients_low: [number, number][];
+  coefficients_mid: [number, number][];
+  coefficients_high: [number, number][];
 
   weight_low: number;
   weight_mid: number;
@@ -154,29 +154,33 @@ export class Noise {
 
   set_octave(octave: string) {
     let scale: number = 1;
-    let coefficients: number[][] = null;
-    const coefficients_x: number[] = null;
-    const coefficients_y: number[] = null;
+    let coefficients: [number, number][] = null;
     let random: seedrandom.prng = null;
 
     switch (octave) {
       case "low":
         scale = 20 / this.length;
-        this.coefficients_low = [];
+        this.coefficients_low = new Array;
         coefficients = this.coefficients_low;
         random = seedrandom(this.config.get(`${this.label}.random_seed_low`));
+        //console.assert(this.coefficients_low !== this.coefficients_mid);
+        //console.assert(this.coefficients_low !== this.coefficients_high);
         break;
       case "mid":
         scale = 100 / this.length;
-        this.coefficients_mid = [];
+        this.coefficients_mid = new Array;
         coefficients = this.coefficients_mid;
         random = seedrandom(this.config.get(`${this.label}.random_seed_mid`));
+        //console.assert(this.coefficients_mid !== this.coefficients_low);
+        //console.assert(this.coefficients_mid !== this.coefficients_high);
         break;
       case "high":
         scale = 10;
-        this.coefficients_high = [];
+        this.coefficients_high = new Array;
         coefficients = this.coefficients_high;
         random = seedrandom(this.config.get(`${this.label}.random_seed_high`));
+        //console.assert(this.coefficients_high !== this.coefficients_low);
+        //console.assert(this.coefficients_high !== this.coefficients_mid);
         break;
       default:
         console.trace();
