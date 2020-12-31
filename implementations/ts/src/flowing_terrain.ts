@@ -29,6 +29,7 @@
 import {SortedSet} from "./ordered_set"
 import {draw_2d} from "./2d_view"
 import {Config} from "./config"
+import {Noise} from "./genesis";
 
 export interface Coordinate {
   x: number;
@@ -69,20 +70,22 @@ export class Geography {
   enviroment: Enviroment;
   config: Config;
   seed_points: Set<string>;
-  noise: number[][];
+  noise: Noise;
   tiles: Tile[][] = [];
   open_set_sorted: SortedSet = new SortedSet([], this.compare_tiles);
+  tile_count: number;
 
   constructor(enviroment: Enviroment,
               config: Config,
               seed_points: Set<string>,
-              noise: number[][]) {
+              noise: Noise) {
     this.config = config;
+    this.tile_count = this.config.get("enviroment.tile_count");
     this.terraform(enviroment, seed_points, noise);
   }
 
   // Calculate the terrain.
-  terraform(enviroment: Enviroment, seed_points: Set<string>, noise: number[][]) {
+  terraform(enviroment: Enviroment, seed_points: Set<string>, noise: Noise) {
     this.enviroment = enviroment;
     this.seed_points = seed_points;
     this.noise = noise;
@@ -94,9 +97,9 @@ export class Geography {
     this.tiles = [];
 
     // Populate tile array with un-configured Tile elements.
-    for(let x = 0; x < this.config.get("enviroment.tile_count"); x++) {
+    for(let x = 0; x < this.tile_count; x++) {
       const row: Tile[] = [];
-      for(let y = 0; y < this.config.get("enviroment.tile_count"); y++) {
+      for(let y = 0; y < this.tile_count; y++) {
         const tile: Tile = new Tile({x, y}, this.enviroment);
         row.push(tile);
       }
@@ -165,10 +168,10 @@ export class Geography {
           const orientation_mod = (x !== nx && y !== ny) ? 1.414 : 1;
 
           // Basic value of the point on the noise map.
-          const height_diff = noise_height_weight * Math.max(this.noise[x][y], 0);
+          const height_diff = noise_height_weight * Math.max(this.noise.get_value(x, y), 0);
           // Gradient of the slope between point and the one the algorithm is flooding out to.
           const unevenness = ( noise_gradient_weight * 2 *
-            Math.max((this.noise[x][y] - this.noise[nx][ny]) + 0.03, 0));
+            Math.max((this.noise.get_value(x, y) - this.noise.get_value(nx, ny)) + 0.03, 0));
 
           neighbour.height = tile.height + height_constant;
           neighbour.height += orientation_mod * Math.pow(height_diff, noise_height_polarize);
@@ -188,8 +191,8 @@ export class Geography {
   // map. High tile.dampness values indicate a river runs through that tile.
   drainage_algorithm(): void {
     this.open_set_sorted.clear();
-    for(let y = 0; y < this.config.get("enviroment.tile_count"); y++) {
-      for(let x = 0; x < this.config.get("enviroment.tile_count"); x++) {
+    for(let y = 0; y < this.tile_count; y++) {
+      for(let x = 0; x < this.tile_count; x++) {
         const tile = this.get_tile({x, y});
         this.open_set_sorted.push(tile);
       }
@@ -230,8 +233,8 @@ export class Geography {
   get_tile(coordinate: Coordinate): Tile {
     if(coordinate.x < 0 ||
        coordinate.y < 0 ||
-       coordinate.x >= this.config.get("enviroment.tile_count") ||
-       coordinate.y >= this.config.get("enviroment.tile_count")) {
+       coordinate.x >= this.tile_count ||
+       coordinate.y >= this.tile_count) {
       return null;
     }
     return this.tiles[coordinate.x][coordinate.y];
@@ -257,17 +260,19 @@ export class Geography {
 export class DisplayBase {
   geography: Geography;
   config: Config;
+  tile_count: number;
 
   constructor(geography: Geography) {
     this.geography = geography;
     this.config = this.geography.config;
+    this.tile_count = this.config.get("enviroment.tile_count");
   }
 
   // Access all points in Geography and call `draw_tile(...)` method on each.
   draw(): void {
     this.draw_start();
-    for(let y = 0; y < this.config.get("enviroment.tile_count"); y += 1) {
-      for(let x = 0; x < this.config.get("enviroment.tile_count"); x += 1) {
+    for(let y = 0; y < this.tile_count; y += 1) {
+      for(let x = 0; x < this.tile_count; x += 1) {
         const tile = this.geography.get_tile({x, y});
         this.draw_tile(tile);
       }
