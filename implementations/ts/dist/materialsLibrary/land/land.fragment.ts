@@ -37,20 +37,20 @@ uniform vec2 vDiffuseInfos;
 
 float get_octave_value(float[40] coefficients, float weight, float x, float y) {
   int index = 0;
-  int count = 0;
+  float count = 0.;
   float returnVal = 0.0;
   while(index < 20) {
     if(coefficients[2 * index] > 0.0 || coefficients[2 * index + 1] > 0.0) {
       returnVal += sin(coefficients[2 * index] * x / scale +
                        coefficients[2 * index + 1] * y / scale);
-      count++;
+      count += 1.;
     //} else {
     //  break;;
     }
     index++;
   }
-  if(index > 0) {
-    returnVal /= sqrt(float(count));
+  if(count > 0.) {
+    returnVal /= sqrt(count);
   }
 
   return returnVal * weight;
@@ -81,8 +81,8 @@ void main(void) {
     float z = vPositionW.z;
 
     float noiseVal = get_noise(x, z);
-    float clampedNoiseVal = clamp(noiseVal, 0.0, 10.0);
-    if (y / scale >= snowline - (snowline * noiseVal / 2.0)) {
+    float clampedNoiseVal = clamp(noiseVal, 0.001, 10.0);
+    if (y / scale >= snowline - (snowline * clampedNoiseVal / 2.0)) {
       // Snow
       diffuseColor.rgb = snow;
     } else if (y / scale >= shoreline + clampedNoiseVal / 4.0) {
@@ -96,14 +96,13 @@ void main(void) {
     } else {
       // Below shoreline
       float multiplier = clamp(y / scale / shoreline, 0.0, 1.0);
-      if (noiseVal > 0.2) {
+      if (clampedNoiseVal > 0.1) {
         diffuseColor.rgb = rock * multiplier;
       } else {
         diffuseColor.rgb = sand * multiplier;
       }
     }
 
-    //float clampedNoiseVal = clamp(noiseVal, 0.0, 1.0);
     //diffuseColor.rgb = vec3(clampedNoiseVal, clampedNoiseVal, clampedNoiseVal);
 
     float alpha = vDiffuseColor.a;
