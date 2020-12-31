@@ -62,6 +62,13 @@ float get_noise(float x, float y) {
           get_octave_value(noiseCoeficientHigh, noiseWeightHigh, x, y)) / 3.0;
 }
 
+const vec3 snow = vec3(0.66, 0.78, 0.82);
+const vec3 grass = vec3(0.24, 0.5, 0.16);
+const vec3 scrub = vec3(0.24, 0.2, 0.16);
+const vec3 rock = vec3(0.25, 0.3, 0.3);
+const vec3 sand = vec3(0.78, 0.78, 0.27);
+const float snowline = 10.0;
+
 void main(void) {
     #include<clipPlaneFragment>
     vec3 viewDirectionW = normalize(vEyePosition.xyz - vPositionW);
@@ -74,27 +81,25 @@ void main(void) {
     float z = vPositionW.z;
 
     float noiseVal = get_noise(x, z);
-    if (y / scale >= 10.0 - 5.0 * noiseVal) {
+    float clampedNoiseVal = clamp(noiseVal, 0.0, 10.0);
+    if (y / scale >= snowline - (snowline * noiseVal / 2.0)) {
       // Snow
-      diffuseColor.rgb = vec3(0.66, 0.78, .82);
-    } else if (y / scale >= shoreline) {
+      diffuseColor.rgb = snow;
+    } else if (y / scale >= shoreline + clampedNoiseVal / 4.0) {
       // Land
-      if (pow(noiseVal, 5.) * y > 2.) {
-        // Rock
-        diffuseColor.rgb = vec3(0.35, 0.4, 0.4);
+      if (pow(clampedNoiseVal, 5.) * y > 2.) {
+        diffuseColor.rgb = rock;
       } else {
-        // Grass
-        diffuseColor.rgb = vec3(0.24, 0.24 + 0.23 / y - (noiseVal / 255.0), 0.16);
+        //diffuseColor.rgb = vec3(0.24, 0.24 + 0.23 / y - (noiseVal / 255.0), 0.16);
+        diffuseColor.rgb = mix(grass, scrub, (y / snowline + noiseVal) / 2.0);
       }
     } else {
       // Below shoreline
       float multiplier = clamp(y / scale / shoreline, 0.0, 1.0);
       if (noiseVal > 0.2) {
-        // Rock
-        diffuseColor.rgb = vec3(0.45 * multiplier, 0.4 * multiplier, 0.3 * multiplier);
+        diffuseColor.rgb = rock * multiplier;
       } else {
-        // Sand
-        diffuseColor.rgb = vec3(0.78 * multiplier, 0.78 * multiplier, 0.27 * multiplier);
+        diffuseColor.rgb = sand * multiplier;
       }
     }
 

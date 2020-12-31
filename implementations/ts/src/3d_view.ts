@@ -292,6 +292,8 @@ export class Display3d extends DisplayBase {
       that.sea_material.setFloat("time", time);
     });
 
+    this.sea_material.backFaceCulling = false;
+
     if(this.sea_mesh) {
       this.sea_mesh.material = this.sea_material;
     }
