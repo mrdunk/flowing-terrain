@@ -240,7 +240,7 @@ export class Geography {
     return this.tiles[coordinate.x][coordinate.y];
   }
 
-  get_neighbours(tile: Tile): Tile[] {
+  get_neighbours(tile: Tile, filter: Boolean=true): Tile[] {
     const neighbours = [
       this.get_tile({x: tile.pos.x - 1, y: tile.pos.y - 1}),
       this.get_tile({x: tile.pos.x - 1, y: tile.pos.y}),
@@ -252,7 +252,10 @@ export class Geography {
       this.get_tile({x: tile.pos.x + 1, y: tile.pos.y + 1}),
     ];
 
-    return neighbours.filter((neighbour) => neighbour !== null);
+    if (filter) {
+      return neighbours.filter((neighbour) => neighbour !== null);
+    }
+    return neighbours;
   }
 }
 

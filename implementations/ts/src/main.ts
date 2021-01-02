@@ -133,6 +133,28 @@ window.onload = () => {
     }
   });
 
+  config.set_if_null("geography.shoreline", 0.05);
+  config.set_callback("geography.shoreline", (key: string, value: any) => {
+    console.log("geography.shoreline");
+    if (display && display.land_material) {
+      display.set_land_material();
+    }
+  });
+
+  config.set_if_null("geography.snowline", 10.0);
+  config.set_callback("geography.snowline", (key: string, value: any) => {
+    if (display && display.land_material) {
+      display.set_land_material();
+    }
+  });
+
+  config.set_if_null("geography.rockLikelyhood", 1.0);
+  config.set_callback("geography.rockLikelyhood", (key: string, value: any) => {
+    if (display && display.land_material) {
+      display.set_land_material();
+    }
+  });
+
   function generate_seed_points() {
     seabed = time("seed_points", () => {
       return seed_points(config, config.get("enviroment.tile_count"));

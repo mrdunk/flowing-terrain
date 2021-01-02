@@ -61,7 +61,11 @@ export class LandMaterial extends BABYLON.PushMaterial {
     private _noiseWeightLow: number;
     private _noiseWeightMid: number;
     private _noiseWeightHigh: number;
-    public shoreline: number = 0.5;
+    public shoreline: number = 0.05;
+    public sealevel: number = 0.5;
+    public snowline: number = 10.0;
+    public rockLikelyhood: number = 1.0;
+    public drainage: BABYLON.RawTexture;
 
     constructor(name: string, public scale: number, scene: BABYLON.Scene) {
         super(name, scene);
@@ -211,9 +215,15 @@ export class LandMaterial extends BABYLON.PushMaterial {
                 "noiseWeightMid",
                 "noiseWeightHigh",
                 "shoreline",
+                "sealevel",
+                "snowline",
+                "rockLikelyhood",
                 "scale"
             ];
-            var samplers = ["diffuseSampler"];
+            var samplers = [
+                "diffuseSampler",
+                "drainage"
+            ];
             var uniformBuffers = new Array<string>();
 
             BABYLON.MaterialHelper.PrepareUniformsAndSamplersList(
@@ -322,6 +332,10 @@ export class LandMaterial extends BABYLON.PushMaterial {
         this._activeEffect.setFloat("noiseWeightHigh", this._noiseWeightHigh);
         this._activeEffect.setFloat("scale", this.scale);
         this._activeEffect.setFloat("shoreline", this.shoreline);
+        this._activeEffect.setFloat("sealevel", this.sealevel);
+        this._activeEffect.setFloat("snowline", this.snowline);
+        this._activeEffect.setFloat("rockLikelyhood", this.rockLikelyhood);
+        this._activeEffect.setTexture("drainage", this.drainage);
 
         this._afterBind(mesh, this._activeEffect);
     }
@@ -386,6 +400,22 @@ export class LandMaterial extends BABYLON.PushMaterial {
 
     public setShoreline(height: number): void {
         this.shoreline = height;
+    }
+
+    public setSealevel(height: number): void {
+        this.sealevel = height;
+    }
+
+    public setSnowline(height: number): void {
+        this.snowline = height;
+    }
+
+    public setRockLikelyhood(value: number): void {
+        this.rockLikelyhood = value;
+    }
+
+    public setDrainage(data: BABYLON.RawTexture): void {
+        this.drainage = data;
     }
 
     public setNoise(

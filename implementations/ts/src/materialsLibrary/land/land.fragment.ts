@@ -11,6 +11,10 @@ uniform float noiseWeightMid;
 uniform float noiseWeightHigh;
 uniform float scale;
 uniform float shoreline;
+uniform float sealevel;
+uniform float snowline;
+uniform float rockLikelyhood;
+uniform highp usampler2D drainage;
 
 varying vec3 vPositionW;
 #ifdef NORMAL
@@ -62,12 +66,12 @@ float get_noise(float x, float y) {
           get_octave_value(noiseCoeficientHigh, noiseWeightHigh, x, y)) / 3.0;
 }
 
+const vec3 river = vec3(0., 0.10, 0.82);
 const vec3 snow = vec3(0.66, 0.78, 0.82);
 const vec3 grass = vec3(0.24, 0.5, 0.16);
 const vec3 scrub = vec3(0.24, 0.2, 0.16);
 const vec3 rock = vec3(0.25, 0.3, 0.3);
 const vec3 sand = vec3(0.78, 0.78, 0.27);
-const float snowline = 10.0;
 
 void main(void) {
     #include<clipPlaneFragment>
@@ -82,21 +86,28 @@ void main(void) {
 
     float noiseVal = get_noise(x, z);
     float clampedNoiseVal = clamp(noiseVal, 0.001, 10.0);
+
+    vec2 key = vec2((x + scale / 2.) / 200., (z + scale / 2.) / 200.);
+    uint dampness = texture2D(drainage, key)[2];
+
+    if (dampness > uint(10) && y / scale > sealevel) {
+      diffuseColor.rgb = river;
+    } else 
     if (y / scale >= snowline - (snowline * clampedNoiseVal / 2.0)) {
       // Snow
       diffuseColor.rgb = snow;
-    } else if (y / scale >= shoreline + clampedNoiseVal / 4.0) {
+    } else if (y / scale >= shoreline + noiseVal / 4.0 &&
+               y / scale > sealevel) {
       // Land
-      if (pow(clampedNoiseVal, 5.) * y > 2.) {
+      if (pow(clampedNoiseVal, 5.) * y > rockLikelyhood) {
         diffuseColor.rgb = rock;
       } else {
-        //diffuseColor.rgb = vec3(0.24, 0.24 + 0.23 / y - (noiseVal / 255.0), 0.16);
-        diffuseColor.rgb = mix(grass, scrub, (y / snowline + noiseVal) / 2.0);
+        diffuseColor.rgb = mix(scrub, grass, max(0.0, 1.0 / max(1.0, y) - clampedNoiseVal / 2.0));
       }
     } else {
       // Below shoreline
       float multiplier = clamp(y / scale / shoreline, 0.0, 1.0);
-      if (clampedNoiseVal > 0.1) {
+      if (clampedNoiseVal > rockLikelyhood / 10.) {
         diffuseColor.rgb = rock * multiplier;
       } else {
         diffuseColor.rgb = sand * multiplier;

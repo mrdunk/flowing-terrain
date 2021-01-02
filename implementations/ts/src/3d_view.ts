@@ -300,6 +300,7 @@ export class Display3d extends DisplayBase {
   }
 
   set_land_material(): void {
+    console.log("set_land_material");
     if (this.land_material) {
       this.land_material.dispose();
     }
@@ -315,12 +316,62 @@ export class Display3d extends DisplayBase {
       this.config.get(`noise.mid_octave_weight`),
       this.config.get(`noise.high_octave_weight`));
 
-    this.land_material.setShoreline(this.config.get("geography.sealevel") + 0.05);
+    this.land_material.setShoreline(
+      this.config.get("geography.sealevel") + this.config.get("geography.shoreline"));
+    this.land_material.setSealevel(this.config.get("geography.sealevel"));
+    this.land_material.setSnowline(this.config.get("geography.snowline"));
+    this.land_material.setRockLikelyhood(this.config.get("geography.rockLikelyhood"));
+    this.land_material.setDrainage(this.summarise_drainage());
 
     if(this.land_mesh) {
       this.land_mesh.material = this.land_material;
     }
   }
+  
+  summarise_drainage(): BABYLON.RawTexture {
+    const data = new Uint8Array(this.tile_count * this.tile_count * 4);
+    let iterator = 0;
+    for(let y = 0; y < this.tile_count; y++) {
+      for(let x = 0; x < this.tile_count; x++) {
+        const tile = this.geography.get_tile({x, y});
+        //let lowest_neighbour = 0;
+
+        // Create a bitmaps of neighbours draining into this one and out of this one.
+        // TODO: Would it be cheaper to calculate drain_from when we are calculating drainage?
+        let drain_from = 0;
+        let drain_to = 0;
+        this.geography.get_neighbours(tile).forEach((neighbour, index) => {
+          if (neighbour === null) {
+            return;
+          }
+          if (neighbour.lowest_neighbour === tile) {
+            drain_from &= (1 << index);
+          }
+          if (tile.lowest_neighbour === neighbour) {
+            drain_to = (1 << index);
+          }
+        });
+
+        data[iterator] = drain_from;
+        data[iterator + 1] =  drain_to;
+        data[iterator + 2] = tile.dampness;
+        data[iterator + 3] = 0;
+        iterator += 4;
+      }
+    }
+
+    return new BABYLON.RawTexture(
+      data,
+      this.tile_count,
+      this.tile_count,
+      BABYLON.Engine.TEXTUREFORMAT_RGBA_INTEGER,
+      this.scene,
+      false,
+      false,
+      BABYLON.Engine.TEXTURE_NEAREST_SAMPLINGMODE,
+      BABYLON.Engine.TEXTURETYPE_UNSIGNED_INT);
+  }
+
 
   // Move camera to selected view.
   set_view(direction: string): void {
