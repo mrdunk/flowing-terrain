@@ -217,9 +217,10 @@ export class Geography {
           }
         }
       });
-      console.assert(lowest_neighbours.length !== 0 );
-      tile.lowest_neighbour = lowest_neighbours[
-        Math.floor(Math.random() * lowest_neighbours.length)];
+      console.assert(lowest_neighbours.length !== 0);
+      //tile.lowest_neighbour = lowest_neighbours[
+      //  Math.floor(Math.random() * lowest_neighbours.length)];
+      tile.lowest_neighbour = lowest_neighbours[lowest_neighbours.length -1];
       tile.lowest_neighbour.dampness += tile.dampness;
 
       if(tile.lowest_neighbour.dampness > this.enviroment.dampest &&

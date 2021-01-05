@@ -329,7 +329,7 @@ export class Display3d extends DisplayBase {
   }
   
   summarise_drainage(): BABYLON.RawTexture {
-    const data = new Uint8Array(this.tile_count * this.tile_count * 4);
+    const data = new Uint32Array(this.tile_count * this.tile_count * 4);
     let iterator = 0;
     for(let y = 0; y < this.tile_count; y++) {
       for(let x = 0; x < this.tile_count; x++) {
@@ -340,20 +340,20 @@ export class Display3d extends DisplayBase {
         // TODO: Would it be cheaper to calculate drain_from when we are calculating drainage?
         let drain_from = 0;
         let drain_to = 0;
-        this.geography.get_neighbours(tile).forEach((neighbour, index) => {
+        this.geography.get_neighbours(tile, false).forEach((neighbour, index) => {
           if (neighbour === null) {
             return;
           }
           if (neighbour.lowest_neighbour === tile) {
-            drain_from &= (1 << index);
+            drain_from |= (1 << index);
           }
           if (tile.lowest_neighbour === neighbour) {
-            drain_to = (1 << index);
+            drain_to |= (1 << index);
           }
         });
 
         data[iterator] = drain_from;
-        data[iterator + 1] =  drain_to;
+        data[iterator + 1] = drain_to;
         data[iterator + 2] = tile.dampness;
         data[iterator + 3] = 0;
         iterator += 4;
@@ -369,7 +369,8 @@ export class Display3d extends DisplayBase {
       false,
       false,
       BABYLON.Engine.TEXTURE_NEAREST_SAMPLINGMODE,
-      BABYLON.Engine.TEXTURETYPE_UNSIGNED_INT);
+      BABYLON.Engine.TEXTURETYPE_UNSIGNED_INTEGER
+    );
   }
 
 
@@ -683,7 +684,7 @@ export class Display3d extends DisplayBase {
   schedule_update_rivers(): void {
     if(this.update_rivers_timer === 0) {
       this.update_rivers_timer = setTimeout(() => {
-        this.update_rivers();
+        //this.update_rivers();
       }, 100);
     }
   }
