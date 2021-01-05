@@ -217,9 +217,10 @@ export class Geography {
           }
         }
       });
-      console.assert(lowest_neighbours.length !== 0 );
-      tile.lowest_neighbour = lowest_neighbours[
-        Math.floor(Math.random() * lowest_neighbours.length)];
+      console.assert(lowest_neighbours.length !== 0);
+      //tile.lowest_neighbour = lowest_neighbours[
+      //  Math.floor(Math.random() * lowest_neighbours.length)];
+      tile.lowest_neighbour = lowest_neighbours[lowest_neighbours.length -1];
       tile.lowest_neighbour.dampness += tile.dampness;
 
       if(tile.lowest_neighbour.dampness > this.enviroment.dampest &&
@@ -240,7 +241,7 @@ export class Geography {
     return this.tiles[coordinate.x][coordinate.y];
   }
 
-  get_neighbours(tile: Tile): Tile[] {
+  get_neighbours(tile: Tile, filter: Boolean=true): Tile[] {
     const neighbours = [
       this.get_tile({x: tile.pos.x - 1, y: tile.pos.y - 1}),
       this.get_tile({x: tile.pos.x - 1, y: tile.pos.y}),
@@ -252,7 +253,10 @@ export class Geography {
       this.get_tile({x: tile.pos.x + 1, y: tile.pos.y + 1}),
     ];
 
-    return neighbours.filter((neighbour) => neighbour !== null);
+    if (filter) {
+      return neighbours.filter((neighbour) => neighbour !== null);
+    }
+    return neighbours;
   }
 }
 
