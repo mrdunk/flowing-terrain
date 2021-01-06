@@ -55,16 +55,18 @@ export class LandMaterial extends BABYLON.PushMaterial {
     @BABYLON.expandToProperty("_markAllSubMeshesAsLightsDirty")
     public maxSimultaneousLights: number;
 
-    private _noiseCoeficientLowToSend: number[];
-    private _noiseCoeficientMidToSend: number[];
-    private _noiseCoeficientHighToSend: number[];
+    private _noiseCoeficientLowToSend: Float32Array;
+    private _noiseCoeficientMidToSend: Float32Array;
+    private _noiseCoeficientHighToSend: Float32Array;
     private _noiseWeightLow: number;
     private _noiseWeightMid: number;
     private _noiseWeightHigh: number;
     public shoreline: number = 0.05;
     public sealevel: number = 0.5;
     public snowline: number = 10.0;
-    public rockLikelyhood: number = 1.0;
+    public rockLikelihood: number = 1.0;
+    public riverWidth: number = 20.0;
+    public riverLikelihood: number = 25.0;
     public drainage: BABYLON.RawTexture;
 
     constructor(name: string, public scale: number, scene: BABYLON.Scene) {
@@ -217,7 +219,9 @@ export class LandMaterial extends BABYLON.PushMaterial {
                 "shoreline",
                 "sealevel",
                 "snowline",
-                "rockLikelyhood",
+                "rockLikelihood",
+                "riverWidth",
+                "riverLikelihood",
                 "scale"
             ];
             var samplers = [
@@ -334,7 +338,9 @@ export class LandMaterial extends BABYLON.PushMaterial {
         this._activeEffect.setFloat("shoreline", this.shoreline);
         this._activeEffect.setFloat("sealevel", this.sealevel);
         this._activeEffect.setFloat("snowline", this.snowline);
-        this._activeEffect.setFloat("rockLikelyhood", this.rockLikelyhood);
+        this._activeEffect.setFloat("rockLikelihood", this.rockLikelihood);
+        this._activeEffect.setFloat("riverWidth", this.riverWidth);
+        this._activeEffect.setFloat("riverLikelihood", this.riverLikelihood);
         this._activeEffect.setTexture("drainage", this.drainage);
 
         this._afterBind(mesh, this._activeEffect);
@@ -410,8 +416,16 @@ export class LandMaterial extends BABYLON.PushMaterial {
         this.snowline = height;
     }
 
-    public setRockLikelyhood(value: number): void {
-        this.rockLikelyhood = value;
+    public setRockLikelihood(value: number): void {
+        this.rockLikelihood = value;
+    }
+
+    public setRiverWidth(value: number): void {
+        this.riverWidth = value;
+    }
+
+    public setRiverLikelihood(value: number): void {
+        this.riverLikelihood = value;
     }
 
     public setDrainage(data: BABYLON.RawTexture): void {
@@ -431,32 +445,35 @@ export class LandMaterial extends BABYLON.PushMaterial {
         noiseCoeficientMid = noiseCoeficientMid.slice(0, this.NOISE_DETAIL);
         noiseCoeficientHigh = noiseCoeficientHigh.slice(0, this.NOISE_DETAIL);
 
-        this._noiseCoeficientLowToSend = [];
-        this._noiseCoeficientMidToSend = [];
-        this._noiseCoeficientHighToSend = [];
+        const noiseCoeficientLowToSend: number[] = [];
+        const noiseCoeficientMidToSend: number[] = [];
+        const noiseCoeficientHighToSend: number[] = [];
         for (let i=0; i < this.NOISE_DETAIL; i++) {
             if (i < noiseCoeficientLow.length) {
-                this._noiseCoeficientLowToSend.push(noiseCoeficientLow[i][0]);
-                this._noiseCoeficientLowToSend.push(noiseCoeficientLow[i][1]);
+                noiseCoeficientLowToSend.push(noiseCoeficientLow[i][0]);
+                noiseCoeficientLowToSend.push(noiseCoeficientLow[i][1]);
             } else {
-                this._noiseCoeficientLowToSend.push(0);
-                this._noiseCoeficientLowToSend.push(0);
+                noiseCoeficientLowToSend.push(0);
+                noiseCoeficientLowToSend.push(0);
             }
             if (i < noiseCoeficientMid.length) {
-                this._noiseCoeficientMidToSend.push(noiseCoeficientMid[i][0]);
-                this._noiseCoeficientMidToSend.push(noiseCoeficientMid[i][1]);
+                noiseCoeficientMidToSend.push(noiseCoeficientMid[i][0]);
+                noiseCoeficientMidToSend.push(noiseCoeficientMid[i][1]);
             } else {
-                this._noiseCoeficientMidToSend.push(0);
-                this._noiseCoeficientMidToSend.push(0);
+                noiseCoeficientMidToSend.push(0);
+                noiseCoeficientMidToSend.push(0);
             }
             if (i < noiseCoeficientHigh.length) {
-                this._noiseCoeficientHighToSend.push(noiseCoeficientHigh[i][0]);
-                this._noiseCoeficientHighToSend.push(noiseCoeficientHigh[i][1]);
+                noiseCoeficientHighToSend.push(noiseCoeficientHigh[i][0]);
+                noiseCoeficientHighToSend.push(noiseCoeficientHigh[i][1]);
             } else {
-                this._noiseCoeficientHighToSend.push(0);
-                this._noiseCoeficientHighToSend.push(0);
+                noiseCoeficientHighToSend.push(0);
+                noiseCoeficientHighToSend.push(0);
             }
         }
+        this._noiseCoeficientLowToSend = new Float32Array(noiseCoeficientLowToSend);
+        this._noiseCoeficientMidToSend = new Float32Array(noiseCoeficientMidToSend);
+        this._noiseCoeficientHighToSend = new Float32Array(noiseCoeficientHighToSend);
         this._noiseWeightLow = noiseWeightLow;
         this._noiseWeightMid = noiseWeightMid;
         this._noiseWeightHigh = noiseWeightHigh;
