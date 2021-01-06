@@ -112,8 +112,13 @@ window.onload = () => {
   config.set_if_null("terrain.noise_gradient_polarize", 1.0);
   config.set_callback("terrain.noise_gradient_polarize", terrain_callback);
 
-  config.set_if_null("display.river_threshold", 10);
-  config.set_callback("display.river_threshold", (key: string, value: any) => {
+  config.set_if_null("geography.riverWidth", 20);
+  config.set_callback("geography.riverWidth", (key: string, value: any) => {
+    display.set_rivers(value);
+  });
+
+  config.set_if_null("geography.riverLikelihood", 5);
+  config.set_callback("geography.riverLikelihood", (key: string, value: any) => {
     display.set_rivers(value);
   });
 
@@ -148,8 +153,8 @@ window.onload = () => {
     }
   });
 
-  config.set_if_null("geography.rockLikelyhood", 1.0);
-  config.set_callback("geography.rockLikelyhood", (key: string, value: any) => {
+  config.set_if_null("geography.rockLikelihood", 1.0);
+  config.set_callback("geography.rockLikelihood", (key: string, value: any) => {
     if (display && display.land_material) {
       display.set_land_material();
     }

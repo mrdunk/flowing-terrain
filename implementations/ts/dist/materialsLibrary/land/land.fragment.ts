@@ -3,7 +3,6 @@ let shader = `precision highp float;
 precision highp int;
 precision highp usampler2D;
 
-const uint minDampness = uint(10);
 // Colors for terrain.
 const vec3 river = vec3(0., 0.10, 0.82);
 const vec3 snow = vec3(0.66, 0.78, 0.82);
@@ -24,7 +23,9 @@ uniform float scale;
 uniform float shoreline;
 uniform float sealevel;
 uniform float snowline;
-uniform float rockLikelyhood;
+uniform float rockLikelihood;
+uniform float riverWidth;
+uniform float riverLikelihood;
 uniform usampler2D drainage;
 
 varying vec3 vPositionW;
@@ -160,7 +161,7 @@ bool drawRiver(float x_, float z_) {
         uvec4 drainageSummary = getDrainageSummary(x, z);
 
         uint dampness = drainageSummary[2];
-        if (dampness <= minDampness) {
+        if (dampness <= uint(riverLikelihood)) {
             continue;
         }
 
@@ -173,7 +174,7 @@ bool drawRiver(float x_, float z_) {
         p0 = vec2(ix, iz) + toNext / 2.;
         p1 = vec2(ix, iz) + toNext / 4.;
 
-        if (isColinear(p0, p1, vec2(x, z), float(dampness) / 5000.)) {
+        if (isColinear(p0, p1, vec2(x, z), sqrt(float(dampness)) * riverWidth / 5000.)) {
             // Cut corer on the way to the next tile.
             return true;
         }
@@ -186,13 +187,14 @@ bool drawRiver(float x_, float z_) {
             uvec4 drainageSummaryFrom = getDrainageSummary(x + fromPrev[0], z + fromPrev[1]);
             dampness = drainageSummaryFrom[2];
 
-            if (drainageSummaryFrom[2] > minDampness) {
-                if (isColinear(p1, p2, vec2(x, z), float(dampness) / 5000.)) {
+            if (drainageSummaryFrom[2] > uint(riverLikelihood)) {
+                float dampModified = sqrt(float(dampness)) * riverWidth / 5000.;
+                if (isColinear(p1, p2, vec2(x, z), dampModified)) {
                     // Follow ideal drainage path.
                     return true;
                 }
         
-                if (isColinear(p2, p3, vec2(x, z), float(dampness) / 5000.)) {
+                if (isColinear(p2, p3, vec2(x, z), dampModified)) {
                     // Cut corner on the way to the next tile.
                     return true;
                 }
@@ -226,7 +228,7 @@ void main(void) {
     } else if (y / scale >= shoreline + noiseVal / 4.0 &&
                y / scale > sealevel) {
       // Land
-      if (pow(clampedNoiseVal, 5.) * y > rockLikelyhood) {
+      if (pow(clampedNoiseVal, 5.) * y > rockLikelihood) {
         diffuseColor.rgb = rock;
       } else {
         diffuseColor.rgb = mix(scrub, grass, max(0.0, 1.0 / max(1.0, y) - clampedNoiseVal / 2.0));
@@ -234,7 +236,7 @@ void main(void) {
     } else {
       // Below shoreline
       float multiplier = clamp(y / scale / shoreline, 0.0, 1.0);
-      if (clampedNoiseVal > rockLikelyhood / 10.) {
+      if (clampedNoiseVal > rockLikelihood / 10.) {
         diffuseColor.rgb = rock * multiplier;
       } else {
         diffuseColor.rgb = sand * multiplier;

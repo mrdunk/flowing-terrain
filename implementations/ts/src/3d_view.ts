@@ -36,17 +36,13 @@ import {LandMaterial} from './materialsLibrary/land/landMaterial';
 export class Display3d extends DisplayBase {
   config: Config = null;
   readonly tile_size: number = 2;
-  readonly texture_resolution: number = 8;
   mapsize: number;
   positions: number[] = [];
   indices: number[] = [];
   uvs: number[] = [];
   normals: number[] = [];
-  rivers: [BABYLON.Vector3, BABYLON.Vector3][] = [];
   land_mesh: BABYLON.Mesh;
   sea_mesh: BABYLON.Mesh;
-  rivers_mesh: BABYLON.Mesh;
-  update_rivers_timer: ReturnType<typeof setTimeout> = 0;
 
   vegetation: Noise;
   treesPine: TreePine;
@@ -146,6 +142,14 @@ export class Display3d extends DisplayBase {
     this.draw();
 
     this.camera.setTarget(new BABYLON.Vector3(this.mapsize / 2, 0, this.mapsize / 2));
+
+    // Skybox
+    //var envTexture = new BABYLON.CubeTexture("assets/TropicalSunnyDay", this.scene);
+    //let skybox = this.scene.createDefaultSkybox(envTexture, false, this.mapsize * 4);
+    //skybox.applyFog = false
+
+    //this.scene.fogMode = BABYLON.Scene.FOGMODE_EXP;
+    //this.scene.fogDensity = 0.01;
 
     // FPS meter.
     //const instrumentation = new BABYLON.EngineInstrumentation(this.engine);
@@ -320,7 +324,10 @@ export class Display3d extends DisplayBase {
       this.config.get("geography.sealevel") + this.config.get("geography.shoreline"));
     this.land_material.setSealevel(this.config.get("geography.sealevel"));
     this.land_material.setSnowline(this.config.get("geography.snowline"));
-    this.land_material.setRockLikelyhood(this.config.get("geography.rockLikelyhood"));
+    this.land_material.setRockLikelihood(this.config.get("geography.rockLikelihood"));
+    this.land_material.setRiverWidth(this.config.get("geography.riverWidth"));
+    const riverLikelihood = this.config.get("geography.riverLikelihood");
+    this.land_material.setRiverLikelihood(riverLikelihood * riverLikelihood);
     this.land_material.setDrainage(this.summarise_drainage());
 
     if(this.land_mesh) {
@@ -472,7 +479,6 @@ export class Display3d extends DisplayBase {
 
     this.positions = [];
     this.indices = [];
-    this.rivers = [];
 
     for(let y = 0; y < this.tile_count; y++) {
       for(let x = 0; x < this.tile_count; x++) {
@@ -563,52 +569,6 @@ export class Display3d extends DisplayBase {
     }
   }
 
-  // Calculate river section start and end points.
-  calculate_river(highest: Tile, lowest: Tile, sealevel: number, threshold: number): void {
-    if(highest === null || lowest === null) {
-      return;
-    }
-    if(highest.height < sealevel) {
-      return;
-    }
-    if(highest.dampness <= threshold) {
-      return;
-    }
-
-    // Offset to prevent height fighting during render.
-    // Make rivers slightly above land.
-    const offset = 0.01;
-
-    console.assert( highest.height >= lowest.height, {errormessage: "river flows uphill"});
-
-    // River section from highest to mid-point.
-    const highest_point = new BABYLON.Vector3(
-      highest.pos.x * this.tile_size,
-      (highest.height + offset) * this.tile_size,
-      highest.pos.y * this.tile_size);
-    let lowest_point: BABYLON.Vector3;
-    if(lowest.height >= sealevel) {
-      lowest_point = new BABYLON.Vector3(
-        lowest.pos.x * this.tile_size,
-        (lowest.height + offset) * this.tile_size,
-        lowest.pos.y * this.tile_size);
-    } else {
-      // Stop at shoreline.
-      const ratio_x = (highest.pos.x - lowest.pos.x) /
-                      (highest.height - lowest.height);
-      const ratio_y = (highest.pos.y - lowest.pos.y) /
-                      (highest.height - lowest.height);
-      const x = highest.pos.x - ((highest.height - sealevel) * ratio_x);
-      const y = highest.pos.y - ((highest.height - sealevel) * ratio_y);
-      lowest_point = new BABYLON.Vector3(
-        x * this.tile_size,
-        (sealevel + offset) * this.tile_size,
-        y * this.tile_size);
-    }
-
-    this.rivers.push([highest_point, lowest_point]);
-  }
-
   // Called as the last stage of the render.
   draw_end(): void {
     // Finish computing land.
@@ -633,12 +593,9 @@ export class Display3d extends DisplayBase {
 
     //this.land_mesh.freezeWorldMatrix();
 
-    // Rivers
-    this.schedule_update_rivers();
-
     // Generate seabed.
     const seabed = BABYLON.MeshBuilder.CreateGround(
-      "seabed", {width: this.mapsize * 2, height: this.mapsize * 2});
+      "seabed", {width: this.mapsize * 8, height: this.mapsize * 8});
     seabed.position = new BABYLON.Vector3(
       this.mapsize / 2, -0.01, this.mapsize / 2);
     seabed.material = this.seabed_material;
@@ -647,7 +604,7 @@ export class Display3d extends DisplayBase {
     // Generate sea.
     this.sea_mesh = BABYLON.MeshBuilder.CreateGround(
       "sea",
-      {width: this.mapsize * 2, height: this.mapsize * 2}
+      {width: this.mapsize * 8, height: this.mapsize * 8}
     );
     this.sea_mesh.material = this.sea_material;
     this.sea_mesh.checkCollisions = false;
@@ -664,61 +621,14 @@ export class Display3d extends DisplayBase {
     this.sea_mesh.position = new BABYLON.Vector3(
       this.mapsize / 2, (sealevel + 0.02) * this.tile_size, this.mapsize / 2);
 
-    // Now recalculate the rivers as they now meet the sea at a different height
-    // so length will be different.
-    this.schedule_update_rivers();
-
     // Re-texture everything so beaches are at the right height.
     this.set_land_material();
   }
 
   // Set what Tile.dampness value to display rivers at and schedule a re-draw.
   set_rivers(value: number): void {
-    console.log("set_rivers", value, this.geography.enviroment.dampest);
-    this.schedule_update_rivers();
-  }
-
-  // Since the `update_rivers()` method is quite CPU intensive, let's not
-  // run it for every small update.
-  // Every ~100ms will be good enough.
-  schedule_update_rivers(): void {
-    if(this.update_rivers_timer === 0) {
-      this.update_rivers_timer = setTimeout(() => {
-        //this.update_rivers();
-      }, 100);
-    }
-  }
-
-  // Delete existing rivers mesh and replace with one up to date for the current
-  // river_threshold and sealevel values.
-  update_rivers(): void {
-    this.update_rivers_timer = 0;
-    if(this.rivers.length > 0) {
-      this.rivers = [];
-    }
-    if(this.rivers_mesh !== undefined) {
-      this.rivers_mesh.dispose();
-    }
-
-    const sealevel = this.config.get("geography.sealevel");
-    const threshold = this.config.get("display.river_threshold");
-    for(let y = 0; y < this.tile_count; y++) {
-      for(let x = 0; x < this.tile_count; x++) {
-        const tile = this.geography.get_tile({x, y});
-        this.calculate_river(tile, tile.lowest_neighbour, sealevel, threshold);
-      }
-    }
-    if(this.rivers.length > 0) {
-      this.rivers_mesh = BABYLON.MeshBuilder.CreateLineSystem(
-        "rivers",
-        {
-          lines: this.rivers,
-          useVertexAlpha: false
-        },
-        this.scene);
-      (<any>this.rivers_mesh).color = new BABYLON.Color3(0.3, 0.3, 1);
-    }
-    this.rivers_mesh.freezeWorldMatrix();
+    console.log("set_rivers", value);
+    this.set_land_material();
   }
 
   /* Given a vector populated with the x and z coordinates, calculate the
