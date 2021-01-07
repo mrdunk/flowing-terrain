@@ -19005,6 +19005,7 @@ var flowing_terrain_1 = require("./flowing_terrain");
 var freeCameraPointersInput_1 = require("./freeCameraPointersInput");
 var Planting_1 = require("./Planting");
 var landMaterial_1 = require("./materialsLibrary/land/landMaterial");
+var seaMaterial_1 = require("./materialsLibrary/sea/seaMaterial");
 
 var Display3d = function (_flowing_terrain_1$Di) {
     _inherits(Display3d, _flowing_terrain_1$Di);
@@ -19027,6 +19028,7 @@ var Display3d = function (_flowing_terrain_1$Di) {
         _this.canvas = document.getElementById("renderCanvas");
         _this.engine = new BABYLON.Engine(_this.canvas, true);
         _this.scene = new BABYLON.Scene(_this.engine);
+        _this.scene.clearColor = new BABYLON.Color4(0.65, 0.77, 0.9, 1.0);
         _this.camera = new BABYLON.UniversalCamera("UniversalCamera", new BABYLON.Vector3(0, 0, 0), _this.scene);
         _this.camera.inputs.addMouseWheel();
         _this.camera.inputs.attached['mousewheel'].wheelYMoveScene = BABYLON.Coordinate.Y;
@@ -19060,19 +19062,24 @@ var Display3d = function (_flowing_terrain_1$Di) {
         _this.seabed_material = new BABYLON.StandardMaterial("seabed_material", _this.scene);
         _this.seabed_material.diffuseColor = new BABYLON.Color3(0, 0, 0);
         _this.seabed_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
-        // this.seabed_material.backFaceCulling = false;
         //this.seabed_material.freeze();
-        //this.sea_material = new BABYLON.StandardMaterial("sea_material", this.scene);
-        //this.sea_material.diffuseColor = new BABYLON.Color3(0.1, 0.2, 1.0);
-        //this.sea_material.specularColor = new BABYLON.Color3(0.5, 0.5, 0.5);
-        //this.sea_material.backFaceCulling = false;
-        //this.sea_material.freeze();
-        _this.set_sea_material();
+        //this.set_sea_material();
+        _this.sea_material = new seaMaterial_1.SeaMaterial("sea_material", _this.mapsize * 4, _this.mapsize, _this.scene);
+        _this.sea_material.alpha = config.get("display.sea_transparency");
+        _this.sea_material.diffuseColor.r = _this.scene.clearColor.r;
+        _this.sea_material.diffuseColor.g = _this.scene.clearColor.g;
+        _this.sea_material.diffuseColor.b = _this.scene.clearColor.b;
+        var time = 0.0;
+        var that = _this;
+        _this.scene.registerBeforeRender(function () {
+            time += 0.003;
+            that.sea_material.time = time;
+        });
         _this.draw();
         _this.camera.setTarget(new BABYLON.Vector3(_this.mapsize / 2, 0, _this.mapsize / 2));
         // Skybox
-        //var envTexture = new BABYLON.CubeTexture("assets/TropicalSunnyDay", this.scene);
-        //let skybox = this.scene.createDefaultSkybox(envTexture, false, this.mapsize * 4);
+        //var envTexture = new BABYLON.CubeTexture("assets/skybox/bluecloud", this.scene);
+        //let skybox = this.scene.createDefaultSkybox(envTexture, false, this.mapsize * 10);
         //skybox.applyFog = false
         //this.scene.fogMode = BABYLON.Scene.FOGMODE_EXP;
         //this.scene.fogDensity = 0.01;
@@ -19173,30 +19180,46 @@ var Display3d = function (_flowing_terrain_1$Di) {
             result.optimizations.push(new ShadowMapOptimization(priority, this, 4096));
             return result;
         }
-    }, {
-        key: "set_sea_material",
-        value: function set_sea_material() {
-            if (this.sea_material) {
-                this.sea_material.dispose();
-            }
-            this.sea_material = new BABYLON.ShaderMaterial("sea_material", this.scene, "./seaTexture", {
-                attributes: ["position", "normal", "uv"],
-                uniforms: ["world", "worldView", "worldViewProjection", "view", "projection", "direction", "time", "offset", "alpha"],
-                needAlphaBlending: true
-            });
-            this.sea_material.setFloat("offset", this.mapsize);
-            this.sea_material.setFloat("alpha", this.config.get("display.sea_transparency"));
-            var that = this;
-            var time = 0.0;
-            this.scene.registerBeforeRender(function () {
-                time += 0.003;
-                that.sea_material.setFloat("time", time);
-            });
-            this.sea_material.backFaceCulling = false;
-            if (this.sea_mesh) {
-                this.sea_mesh.material = this.sea_material;
-            }
+        /*set_sea_material(): void {
+        if (this.sea_material) {
+          this.sea_material.dispose();
         }
+         this.sea_material = new BABYLON.ShaderMaterial(
+          "sea_material",
+          this.scene,
+          "./seaTexture",
+          {
+            attributes: [
+              "position",
+              "normal",
+              "uv"],
+            uniforms: [
+              "world",
+              "worldView",
+              "worldViewProjection",
+              "view",
+              "projection",
+              "direction",
+              "time",
+              "offset",
+              "alpha"
+            ],
+            needAlphaBlending: true
+          });
+         this.sea_material.setFloat("offset", this.mapsize);
+        this.sea_material.setFloat("alpha", this.config.get("display.sea_transparency"));
+        const that = this;
+        let time = 0.0;
+        this.scene.registerBeforeRender(() => {
+          time += 0.003;
+          that.sea_material.setFloat("time", time);
+        });
+         this.sea_material.backFaceCulling = false;
+         if(this.sea_mesh) {
+          this.sea_mesh.material = this.sea_material;
+        }
+        }*/
+
     }, {
         key: "set_land_material",
         value: function set_land_material() {
@@ -19207,14 +19230,14 @@ var Display3d = function (_flowing_terrain_1$Di) {
             this.land_material = new landMaterial_1.LandMaterial("land_material", this.tile_size, this.scene);
             this.land_material.diffuseColor = new BABYLON.Color3(0.3, 0.8, 0.1);
             this.land_material.setNoise(this.geography.noise.coefficients_low, this.geography.noise.coefficients_mid, this.geography.noise.coefficients_high, this.config.get("noise.low_octave_weight"), this.config.get("noise.mid_octave_weight"), this.config.get("noise.high_octave_weight"));
-            this.land_material.setShoreline(this.config.get("geography.sealevel") + this.config.get("geography.shoreline"));
-            this.land_material.setSealevel(this.config.get("geography.sealevel"));
-            this.land_material.setSnowline(this.config.get("geography.snowline"));
-            this.land_material.setRockLikelihood(this.config.get("geography.rockLikelihood"));
-            this.land_material.setRiverWidth(this.config.get("geography.riverWidth"));
+            this.land_material.shoreline = this.config.get("geography.sealevel") + this.config.get("geography.shoreline");
+            this.land_material.sealevel = this.config.get("geography.sealevel");
+            this.land_material.snowline = this.config.get("geography.snowline");
+            this.land_material.rockLikelihood = this.config.get("geography.rockLikelihood");
+            this.land_material.riverWidth = this.config.get("geography.riverWidth");
             var riverLikelihood = this.config.get("geography.riverLikelihood");
-            this.land_material.setRiverLikelihood(riverLikelihood * riverLikelihood);
-            this.land_material.setDrainage(this.summarise_drainage());
+            this.land_material.riverLikelihood = riverLikelihood * riverLikelihood;
+            this.land_material.drainage = this.summarise_drainage();
             if (this.land_mesh) {
                 this.land_mesh.material = this.land_material;
             }
@@ -19864,7 +19887,7 @@ var HardwareScalingOptimization = function (_BABYLON$SceneOptimiz2) {
     return HardwareScalingOptimization;
 }(BABYLON.SceneOptimization);
 
-},{"./Planting":18,"./flowing_terrain":21,"./freeCameraPointersInput":22,"./materialsLibrary/land/landMaterial":27,"babylonjs":2}],17:[function(require,module,exports){
+},{"./Planting":18,"./flowing_terrain":21,"./freeCameraPointersInput":22,"./materialsLibrary/land/landMaterial":28,"./materialsLibrary/sea/seaMaterial":31,"babylonjs":2}],17:[function(require,module,exports){
 "use strict";
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
@@ -21213,7 +21236,7 @@ var DisplayBase = function () {
 
 exports.DisplayBase = DisplayBase;
 
-},{"./ordered_set":28}],22:[function(require,module,exports){
+},{"./ordered_set":32}],22:[function(require,module,exports){
 "use strict";
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
@@ -21792,7 +21815,7 @@ var Noise = function () {
 
 exports.Noise = Noise;
 
-},{"./ordered_set":28,"seedrandom":7}],24:[function(require,module,exports){
+},{"./ordered_set":32,"seedrandom":7}],24:[function(require,module,exports){
 "use strict";
 /*
  * MIT License
@@ -21912,7 +21935,7 @@ window.onload = function () {
     config.set_if_null("display.sea_transparency", 0.9);
     config.set_callback("display.sea_transparency", function (key, value) {
         if (display && display.sea_material) {
-            display.sea_material.setFloat("alpha", config.get("display.sea_transparency"));
+            display.sea_material.alpha = config.get("display.sea_transparency");
         }
     });
     config.set_if_null("geography.shoreline", 0.05);
@@ -22315,28 +22338,6 @@ window.onload = function () {
 
 },{"./2d_view":15,"./3d_view":16,"./config":19,"./custom_html_elements":20,"./flowing_terrain":21,"./genesis":23,"@webcomponents/webcomponentsjs/custom-elements-es5-adapter.js":1,"bootstrap":3}],25:[function(require,module,exports){
 "use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.landPixelShader = void 0;
-var name = 'landPixelShader';
-var shader = "precision highp float;\nprecision highp int;\nprecision highp usampler2D;\n\n// Colors for terrain.\nconst vec3 river = vec3(0., 0.10, 0.82);\nconst vec3 snow = vec3(0.66, 0.78, 0.82);\nconst vec3 grass = vec3(0.24, 0.5, 0.16);\nconst vec3 scrub = vec3(0.24, 0.2, 0.16);\nconst vec3 rock = vec3(0.25, 0.3, 0.3);\nconst vec3 sand = vec3(0.78, 0.78, 0.27);\n\nuniform vec4 vEyePosition;\nuniform vec4 vDiffuseColor;\nuniform float[40] noiseCoeficientLow;\nuniform float[40] noiseCoeficientMid;\nuniform float[40] noiseCoeficientHigh;\nuniform float noiseWeightLow;\nuniform float noiseWeightMid;\nuniform float noiseWeightHigh;\nuniform float scale;\nuniform float shoreline;\nuniform float sealevel;\nuniform float snowline;\nuniform float rockLikelihood;\nuniform float riverWidth;\nuniform float riverLikelihood;\nuniform usampler2D drainage;\n\nvarying vec3 vPositionW;\n#ifdef NORMAL\nvarying vec3 vNormalW;\n#endif\n#ifdef VERTEXCOLOR\nvarying vec4 vColor;\n#endif\n\n#include<helperFunctions>\n\n#include<__decl__lightFragment>[0..maxSimultaneousLights]\n#include<lightsFragmentFunctions>\n#include<shadowsFragmentFunctions>\n\n#ifdef DIFFUSE\nvarying vec2 vDiffuseUV;\nuniform sampler2D diffuseSampler;\nuniform vec2 vDiffuseInfos;\n#endif\n#include<clipPlaneFragmentDeclaration>\n\n#include<fogFragmentDeclaration>\n\n// Helper function for repeatable noise value unique to a set of map coordinates.\nfloat get_octave_value(float[40] coefficients, float weight, float x, float y) {\n  int index = 0;\n  float count = 0.;\n  float returnVal = 0.0;\n  while(index < 20) {\n    if(coefficients[2 * index] > 0.0 || coefficients[2 * index + 1] > 0.0) {\n      returnVal += sin(coefficients[2 * index] * x / scale +\n                       coefficients[2 * index + 1] * y / scale);\n      count += 1.;\n    //} else {\n    //  break;;\n    }\n    index++;\n  }\n  if(count > 0.) {\n    returnVal /= sqrt(count);\n  }\n\n  return returnVal * weight;\n}\n\n// Return repeatable noise value unique to a set of map coordinates.\nfloat get_noise(float x, float y) {\n  return (get_octave_value(noiseCoeficientLow, noiseWeightLow, x, y) +\n          get_octave_value(noiseCoeficientMid, noiseWeightMid, x, y) +\n          get_octave_value(noiseCoeficientHigh, noiseWeightHigh, x, y)) / 3.0;\n}\n\n// Return one offset to a neighbouring tile from a bitmap.\n// The value is cleared from the passed bitmap.\nvec2 getOffset(inout uint bitmap) {\n    if ((bitmap & uint(2)) > uint(0)) {\n        bitmap &= ~uint(2);\n        return vec2(-1.0, 0.0);\n    } else if ((bitmap & uint(64)) > uint(0)) {\n        bitmap &= ~uint(64);\n        return vec2(1.0, 0.0);\n    } else if ((bitmap & uint(8)) > uint(0)) {\n        bitmap &= ~uint(8);\n        return vec2(0.0, -1.0);\n    } else if ((bitmap & uint(16)) > uint(0)) {\n        bitmap &= ~uint(16);\n        return vec2(0.0, 1.0);\n    } else if ((bitmap & uint(1)) > uint(0)) {\n        bitmap &= ~uint(1);\n        return vec2(-1.0, -1.0);\n    } else if ((bitmap & uint(4)) > uint(0)) {\n        bitmap &= ~uint(4);\n        return vec2(-1.0, 1.0);\n    } else if ((bitmap & uint(32)) > uint(0)) {\n        bitmap &= ~uint(32);\n        return vec2(1.0, -1.0);\n    } else if ((bitmap & uint(128)) > uint(0)) {\n        bitmap &= ~uint(128);\n        return vec2(1.0, 1.0);\n    }\n\n    return vec2(10000.0, 10000.0);\n}\n\n// Get summary of a point's drainage from the drainage texture.\nuvec4 getDrainageSummary(float x, float z) {\n    vec2 key = vec2(x / 100., z / 100.);\n    return texture2D(drainage, key);\n}\n\n// Get the distance of testPt from the line joining pt1-pt2.\nfloat distToLine(vec2 pt1, vec2 pt2, vec2 testPt)\n{\n  vec2 lineDir = pt2 - pt1;\n  vec2 perpDir = vec2(lineDir.y, -lineDir.x);\n  vec2 dirToPt1 = pt1 - testPt;\n  return abs(dot(normalize(perpDir), dirToPt1));\n}\n\n// Returns true if testPt is inside the river.\nbool isColinear(vec2 p1, vec2 p2, vec2 testPt, float tolerance) {\n    float dist = distToLine(p1, p2, testPt);\n\n    float len = distance(p1, p2);\n    return (abs(dist) < tolerance && distance((p1 + p2) / 2., testPt) <= len / 2.) ||\n            distance(p1, testPt) < tolerance || distance(p2, testPt) < tolerance ;\n}\n\nbool drawRiver(float x_, float z_) {\n    // Loop once for each corner of a tile.\n    for(int corner = 0; corner < 4; corner++) {\n        float x = x_ / scale;\n        float z = z_ / scale;\n\n        float ix = floor(x);\n        float iz = floor(z);\n        if(corner == 0) {\n        } else if(corner == 1) {\n            x += 1.;\n            ix = ceil(x);\n        } else if(corner == 2) {\n            z += 1.;\n            iz = ceil(z);\n        } else if(corner == 3) {\n            x += 1.;\n            ix = ceil(x);\n            z += 1.;\n            iz = ceil(z);\n        }\n\n        uvec4 drainageSummary = getDrainageSummary(x, z);\n\n        uint dampness = drainageSummary[2];\n        if (dampness <= uint(riverLikelihood)) {\n            continue;\n        }\n\n        vec2 p0;\n        vec2 p1;\n        vec2 p2;\n        vec2 p3;\n\n        vec2 toNext = getOffset(drainageSummary[1]);\n        p0 = vec2(ix, iz) + toNext / 2.;\n        p1 = vec2(ix, iz) + toNext / 4.;\n\n        if (isColinear(p0, p1, vec2(x, z), sqrt(float(dampness)) * riverWidth / 5000.)) {\n            // Cut corer on the way to the next tile.\n            return true;\n        }\n\n        while (drainageSummary[0] > uint(0)) {\n            vec2 fromPrev = getOffset(drainageSummary[0]);\n            p2 = vec2(ix, iz) + fromPrev / 4.;\n            p3 = vec2(ix, iz) + fromPrev / 2.;\n\n            uvec4 drainageSummaryFrom = getDrainageSummary(x + fromPrev[0], z + fromPrev[1]);\n            dampness = drainageSummaryFrom[2];\n\n            if (drainageSummaryFrom[2] > uint(riverLikelihood)) {\n                float dampModified = sqrt(float(dampness)) * riverWidth / 5000.;\n                if (isColinear(p1, p2, vec2(x, z), dampModified)) {\n                    // Follow ideal drainage path.\n                    return true;\n                }\n        \n                if (isColinear(p2, p3, vec2(x, z), dampModified)) {\n                    // Cut corner on the way to the next tile.\n                    return true;\n                }\n            }\n        }\n    }\n\n    return false;\n}\n\nvoid main(void) {\n    #include<clipPlaneFragment>\n    vec3 viewDirectionW = normalize(vEyePosition.xyz - vPositionW);\n\n    vec4 baseColor = vec4(1., 1., 1., 1.);\n    vec3 diffuseColor = vDiffuseColor.rgb;\n\n    float x = vPositionW.x;\n    float y = vPositionW.y;\n    float z = vPositionW.z;\n\n    float noiseVal = get_noise(x, z);\n    float clampedNoiseVal = clamp(noiseVal, 0.001, 10.0);\n\n    if (drawRiver(x, z) && y / scale > sealevel) {\n      diffuseColor.rgb = river;\n    } else \n    if (y / scale >= snowline - (snowline * clampedNoiseVal / 2.0)) {\n      // Snow\n      diffuseColor.rgb = snow;\n    } else if (y / scale >= shoreline + noiseVal / 4.0 &&\n               y / scale > sealevel) {\n      // Land\n      if (pow(clampedNoiseVal, 5.) * y > rockLikelihood) {\n        diffuseColor.rgb = rock;\n      } else {\n        diffuseColor.rgb = mix(scrub, grass, max(0.0, 1.0 / max(1.0, y) - clampedNoiseVal / 2.0));\n      }\n    } else {\n      // Below shoreline\n      float multiplier = clamp(y / scale / shoreline, 0.0, 1.0);\n      if (clampedNoiseVal > rockLikelihood / 10.) {\n        diffuseColor.rgb = rock * multiplier;\n      } else {\n        diffuseColor.rgb = sand * multiplier;\n      }\n    }\n\n    //diffuseColor.rgb = vec3(clampedNoiseVal, clampedNoiseVal, clampedNoiseVal);\n\n    float alpha = vDiffuseColor.a;\n    #ifdef DIFFUSE\n    baseColor = texture2D(diffuseSampler, vDiffuseUV);\n\n    #include<depthPrePass>\n    baseColor.rgb *= vDiffuseInfos.y;\n    #endif\n\n    #ifdef VERTEXCOLOR\n    baseColor.rgb *= vColor.rgb;\n    #endif\n\n    #ifdef NORMAL\n    vec3 normalW = normalize(vNormalW);\n    #else\n    vec3 normalW = vec3(1.0, 1.0, 1.0);\n    #endif\n\n    vec3 diffuseBase = vec3(0., 0., 0.);\n    lightingInfo info;\n    float shadow = 1.;\n    float glossiness = 0.;\n\n    #ifdef SPECULARTERM\n    vec3 specularBase = vec3(0., 0., 0.);\n    #endif\n\n    #include<lightFragment>[0..maxSimultaneousLights]\n\n    #ifdef VERTEXALPHA\n    alpha *= vColor.a;\n    #endif\n    \n    vec3 finalDiffuse = clamp(diffuseBase * diffuseColor, 0.0, 1.0) * baseColor.rgb;\n\n    vec4 color = vec4(finalDiffuse, alpha);\n    #include<fogFragment>\n    gl_FragColor = color;\n    #include<imageProcessingCompatibility>\n}";
-BABYLON.Effect.ShadersStore[name] = shader;
-/** @hidden */
-exports.landPixelShader = { name: name, shader: shader };
-
-},{}],26:[function(require,module,exports){
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.landVertexShader = void 0;
-var name = 'landVertexShader';
-var shader = "precision highp float;\n\nattribute vec3 position;\n#ifdef NORMAL\nattribute vec3 normal;\n#endif\n#ifdef UV1\nattribute vec2 uv;\n#endif\n#ifdef UV2\nattribute vec2 uv2;\n#endif\n#ifdef VERTEXCOLOR\nattribute vec4 color;\n#endif\n#include<bonesDeclaration>\n\n#include<instancesDeclaration>\nuniform mat4 view;\nuniform mat4 viewProjection;\n#ifdef DIFFUSE\nvarying vec2 vDiffuseUV;\nuniform mat4 diffuseMatrix;\nuniform vec2 vDiffuseInfos;\n#endif\n#ifdef POINTSIZE\nuniform float pointSize;\n#endif\n\nvarying vec3 vPositionW;\n#ifdef NORMAL\nvarying vec3 vNormalW;\n#endif\n#ifdef VERTEXCOLOR\nvarying vec4 vColor;\n#endif\n#include<clipPlaneVertexDeclaration>\n#include<fogVertexDeclaration>\n#include<__decl__lightFragment>[0..maxSimultaneousLights]\n\nvoid main(void) {\n    #include<instancesVertex>\n    #include<bonesVertex>\n    vec4 worldPos = finalWorld * vec4(position, 1.0);\n    gl_Position = viewProjection * worldPos;\n    vPositionW = vec3(worldPos);\n    #ifdef NORMAL\n    vNormalW = normalize(vec3(finalWorld * vec4(normal, 0.0)));\n    #endif\n\n    #ifndef UV1\n    vec2 uv = vec2(0., 0.);\n    #endif\n    #ifndef UV2\n    vec2 uv2 = vec2(0., 0.);\n    #endif\n    #ifdef DIFFUSE\n    if (vDiffuseInfos.x == 0.) {\n        vDiffuseUV=vec2(diffuseMatrix * vec4(uv,1.0,0.0));\n    } else {\n        vDiffuseUV=vec2(diffuseMatrix * vec4(uv2,1.0,0.0));\n    }\n    #endif\n\n    #include<clipPlaneVertex>\n\n    #include<fogVertex>\n    #include<shadowsVertex>[0..maxSimultaneousLights]\n\n    #ifdef VERTEXCOLOR\n    vColor = color;\n    #endif\n\n    #ifdef POINTSIZE\n    gl_PointSize = pointSize;\n    #endif\n}\n";
-BABYLON.Effect.ShadersStore[name] = shader;
-/** @hidden */
-exports.landVertexShader = { name: name, shader: shader };
-
-},{}],27:[function(require,module,exports){
-"use strict";
 /*
  * This file uses Babylon.js/materialsLibrary/src/simple/ as a template.
  * */
@@ -22362,18 +22363,16 @@ var __decorate = undefined && undefined.__decorate || function (decorators, targ
     }return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.LandMaterial = void 0;
+exports.BaseMaterial = void 0;
 var BABYLON = require("babylonjs");
-require("./land.fragment");
-require("./land.vertex");
 
-var LandMaterialDefines = function (_BABYLON$MaterialDefi) {
-    _inherits(LandMaterialDefines, _BABYLON$MaterialDefi);
+var BaseMaterialDefines = function (_BABYLON$MaterialDefi) {
+    _inherits(BaseMaterialDefines, _BABYLON$MaterialDefi);
 
-    function LandMaterialDefines() {
-        _classCallCheck(this, LandMaterialDefines);
+    function BaseMaterialDefines() {
+        _classCallCheck(this, BaseMaterialDefines);
 
-        var _this = _possibleConstructorReturn(this, (LandMaterialDefines.__proto__ || Object.getPrototypeOf(LandMaterialDefines)).call(this));
+        var _this = _possibleConstructorReturn(this, (BaseMaterialDefines.__proto__ || Object.getPrototypeOf(BaseMaterialDefines)).call(this));
 
         _this.DIFFUSE = false;
         _this.CLIPPLANE = false;
@@ -22399,32 +22398,26 @@ var LandMaterialDefines = function (_BABYLON$MaterialDefi) {
         return _this;
     }
 
-    return LandMaterialDefines;
+    return BaseMaterialDefines;
 }(BABYLON.MaterialDefines);
 
-var LandMaterial = function (_BABYLON$PushMaterial) {
-    _inherits(LandMaterial, _BABYLON$PushMaterial);
+var BaseMaterial = function (_BABYLON$PushMaterial) {
+    _inherits(BaseMaterial, _BABYLON$PushMaterial);
 
-    function LandMaterial(name, scale, scene) {
-        _classCallCheck(this, LandMaterial);
+    function BaseMaterial() {
+        _classCallCheck(this, BaseMaterial);
 
-        var _this2 = _possibleConstructorReturn(this, (LandMaterial.__proto__ || Object.getPrototypeOf(LandMaterial)).call(this, name, scene));
+        var _this2 = _possibleConstructorReturn(this, (BaseMaterial.__proto__ || Object.getPrototypeOf(BaseMaterial)).apply(this, arguments));
 
-        _this2.scale = scale;
-        _this2.NOISE_DETAIL = 20;
         _this2.diffuseColor = new BABYLON.Color3(1, 1, 1);
         _this2._disableLighting = false;
         _this2._maxSimultaneousLights = 4;
-        _this2.shoreline = 0.05;
-        _this2.sealevel = 0.5;
-        _this2.snowline = 10.0;
-        _this2.rockLikelihood = 1.0;
-        _this2.riverWidth = 20.0;
-        _this2.riverLikelihood = 25.0;
+        _this2.uniforms = ["world", "view", "viewProjection", "vEyePosition", "vLightsType", "vDiffuseColor", "vFogInfos", "vFogColor", "pointSize", "vDiffuseInfos", "mBones", "vClipPlane", "vClipPlane2", "vClipPlane3", "vClipPlane4", "vClipPlane5", "vClipPlane6", "diffuseMatrix"];
+        _this2.samplers = ["diffuseSampler"];
         return _this2;
     }
 
-    _createClass(LandMaterial, [{
+    _createClass(BaseMaterial, [{
         key: "needAlphaBlending",
         value: function needAlphaBlending() {
             return this.alpha < 1.0;
@@ -22450,7 +22443,7 @@ var LandMaterial = function (_BABYLON$PushMaterial) {
                 }
             }
             if (!subMesh._materialDefines) {
-                subMesh._materialDefines = new LandMaterialDefines();
+                subMesh._materialDefines = new BaseMaterialDefines();
             }
             var defines = subMesh._materialDefines;
             var scene = this.getScene();
@@ -22510,23 +22503,20 @@ var LandMaterial = function (_BABYLON$PushMaterial) {
                 }
                 BABYLON.MaterialHelper.PrepareAttributesForBones(attribs, mesh, defines, fallbacks);
                 BABYLON.MaterialHelper.PrepareAttributesForInstances(attribs, defines);
-                var shaderName = "land";
                 var join = defines.toString();
-                var uniforms = ["world", "view", "viewProjection", "vEyePosition", "vLightsType", "vDiffuseColor", "vFogInfos", "vFogColor", "pointSize", "vDiffuseInfos", "mBones", "vClipPlane", "vClipPlane2", "vClipPlane3", "vClipPlane4", "vClipPlane5", "vClipPlane6", "diffuseMatrix", "noiseCoeficientLow", "noiseCoeficientMid", "noiseCoeficientHigh", "noiseWeightLow", "noiseWeightMid", "noiseWeightHigh", "shoreline", "sealevel", "snowline", "rockLikelihood", "riverWidth", "riverLikelihood", "scale"];
-                var samplers = ["diffuseSampler", "drainage"];
                 var uniformBuffers = new Array();
                 BABYLON.MaterialHelper.PrepareUniformsAndSamplersList({
-                    uniformsNames: uniforms,
+                    uniformsNames: this.uniforms,
                     uniformBuffersNames: uniformBuffers,
-                    samplers: samplers,
+                    samplers: this.samplers,
                     defines: defines,
                     maxSimultaneousLights: this.maxSimultaneousLights
                 });
-                subMesh.setEffect(scene.getEngine().createEffect(shaderName, {
+                subMesh.setEffect(scene.getEngine().createEffect(this.shaderName, {
                     attributes: attribs,
-                    uniformsNames: uniforms,
+                    uniformsNames: this.uniforms,
                     uniformBuffersNames: uniformBuffers,
-                    samplers: samplers,
+                    samplers: this.samplers,
                     defines: join,
                     fallbacks: fallbacks,
                     onCompiled: this.onCompiled,
@@ -22585,6 +22575,173 @@ var LandMaterial = function (_BABYLON$PushMaterial) {
             }
             // Fog
             BABYLON.MaterialHelper.BindFogParameters(scene, mesh, this._activeEffect);
+            this._bindForSubMeshSubclassed();
+            this._afterBind(mesh, this._activeEffect);
+        }
+    }, {
+        key: "getAnimatables",
+        value: function getAnimatables() {
+            var results = [];
+            if (this._diffuseTexture && this._diffuseTexture.animations && this._diffuseTexture.animations.length > 0) {
+                results.push(this._diffuseTexture);
+            }
+            return results;
+        }
+    }, {
+        key: "getActiveTextures",
+        value: function getActiveTextures() {
+            var activeTextures = _get(BaseMaterial.prototype.__proto__ || Object.getPrototypeOf(BaseMaterial.prototype), "getActiveTextures", this).call(this);
+            if (this._diffuseTexture) {
+                activeTextures.push(this._diffuseTexture);
+            }
+            return activeTextures;
+        }
+    }, {
+        key: "hasTexture",
+        value: function hasTexture(texture) {
+            if (_get(BaseMaterial.prototype.__proto__ || Object.getPrototypeOf(BaseMaterial.prototype), "hasTexture", this).call(this, texture)) {
+                return true;
+            }
+            if (this.diffuseTexture === texture) {
+                return true;
+            }
+            return false;
+        }
+    }, {
+        key: "dispose",
+        value: function dispose(forceDisposeEffect) {
+            if (this._diffuseTexture) {
+                this._diffuseTexture.dispose();
+            }
+            _get(BaseMaterial.prototype.__proto__ || Object.getPrototypeOf(BaseMaterial.prototype), "dispose", this).call(this, forceDisposeEffect);
+        }
+    }, {
+        key: "serialize",
+        value: function serialize() {
+            var serializationObject = BABYLON.SerializationHelper.Serialize(this);
+            serializationObject.customType = "BABYLON.BaseMaterial";
+            return serializationObject;
+        }
+    }, {
+        key: "getClassName",
+        value: function getClassName() {
+            return "BaseMaterial";
+        }
+    }]);
+
+    return BaseMaterial;
+}(BABYLON.PushMaterial);
+
+__decorate([BABYLON.serializeAsTexture("diffuseTexture")], BaseMaterial.prototype, "_diffuseTexture", void 0);
+__decorate([BABYLON.expandToProperty("_markAllSubMeshesAsTexturesDirty")], BaseMaterial.prototype, "diffuseTexture", void 0);
+__decorate([BABYLON.serializeAsColor3("diffuse")], BaseMaterial.prototype, "diffuseColor", void 0);
+__decorate([BABYLON.serialize("disableLighting")], BaseMaterial.prototype, "_disableLighting", void 0);
+__decorate([BABYLON.expandToProperty("_markAllSubMeshesAsLightsDirty")], BaseMaterial.prototype, "disableLighting", void 0);
+__decorate([BABYLON.serialize("maxSimultaneousLights")], BaseMaterial.prototype, "_maxSimultaneousLights", void 0);
+__decorate([BABYLON.expandToProperty("_markAllSubMeshesAsLightsDirty")], BaseMaterial.prototype, "maxSimultaneousLights", void 0);
+exports.BaseMaterial = BaseMaterial;
+BABYLON._TypeStore.RegisteredTypes["BABYLON.BaseMaterial"] = BaseMaterial;
+
+},{"babylonjs":2}],26:[function(require,module,exports){
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.landPixelShader = void 0;
+var name = 'landPixelShader';
+var shader = "precision highp float;\nprecision highp int;\nprecision highp usampler2D;\n\n// Colors for terrain.\nconst vec3 river = vec3(0., 0.10, 0.82);\nconst vec3 snow = vec3(0.66, 0.78, 0.82);\nconst vec3 grass = vec3(0.24, 0.5, 0.16);\nconst vec3 scrub = vec3(0.24, 0.2, 0.16);\nconst vec3 rock = vec3(0.25, 0.3, 0.3);\nconst vec3 sand = vec3(0.78, 0.78, 0.27);\n\nuniform vec4 vEyePosition;\nuniform vec4 vDiffuseColor;\nuniform float[40] noiseCoeficientLow;\nuniform float[40] noiseCoeficientMid;\nuniform float[40] noiseCoeficientHigh;\nuniform float noiseWeightLow;\nuniform float noiseWeightMid;\nuniform float noiseWeightHigh;\nuniform float scale;\nuniform float shoreline;\nuniform float sealevel;\nuniform float snowline;\nuniform float rockLikelihood;\nuniform float riverWidth;\nuniform float riverLikelihood;\nuniform usampler2D drainage;\n\nvarying vec3 vPositionW;\n#ifdef NORMAL\nvarying vec3 vNormalW;\n#endif\n#ifdef VERTEXCOLOR\nvarying vec4 vColor;\n#endif\n\n#include<helperFunctions>\n\n#include<__decl__lightFragment>[0..maxSimultaneousLights]\n#include<lightsFragmentFunctions>\n#include<shadowsFragmentFunctions>\n\n#ifdef DIFFUSE\nvarying vec2 vDiffuseUV;\nuniform sampler2D diffuseSampler;\nuniform vec2 vDiffuseInfos;\n#endif\n#include<clipPlaneFragmentDeclaration>\n\n#include<fogFragmentDeclaration>\n\n// Helper function for repeatable noise value unique to a set of map coordinates.\nfloat get_octave_value(float[40] coefficients, float weight, float x, float y) {\n  int index = 0;\n  float count = 0.;\n  float returnVal = 0.0;\n  while(index < 20) {\n    if(coefficients[2 * index] > 0.0 || coefficients[2 * index + 1] > 0.0) {\n      returnVal += sin(coefficients[2 * index] * x / scale +\n                       coefficients[2 * index + 1] * y / scale);\n      count += 1.;\n    //} else {\n    //  break;;\n    }\n    index++;\n  }\n  if(count > 0.) {\n    returnVal /= sqrt(count);\n  }\n\n  return returnVal * weight;\n}\n\n// Return repeatable noise value unique to a set of map coordinates.\nfloat get_noise(float x, float y) {\n  return (get_octave_value(noiseCoeficientLow, noiseWeightLow, x, y) +\n          get_octave_value(noiseCoeficientMid, noiseWeightMid, x, y) +\n          get_octave_value(noiseCoeficientHigh, noiseWeightHigh, x, y)) / 3.0;\n}\n\n// Return one offset to a neighbouring tile from a bitmap.\n// The value is cleared from the passed bitmap.\nvec2 getOffset(inout uint bitmap) {\n    if ((bitmap & uint(2)) > uint(0)) {\n        bitmap &= ~uint(2);\n        return vec2(-1.0, 0.0);\n    } else if ((bitmap & uint(64)) > uint(0)) {\n        bitmap &= ~uint(64);\n        return vec2(1.0, 0.0);\n    } else if ((bitmap & uint(8)) > uint(0)) {\n        bitmap &= ~uint(8);\n        return vec2(0.0, -1.0);\n    } else if ((bitmap & uint(16)) > uint(0)) {\n        bitmap &= ~uint(16);\n        return vec2(0.0, 1.0);\n    } else if ((bitmap & uint(1)) > uint(0)) {\n        bitmap &= ~uint(1);\n        return vec2(-1.0, -1.0);\n    } else if ((bitmap & uint(4)) > uint(0)) {\n        bitmap &= ~uint(4);\n        return vec2(-1.0, 1.0);\n    } else if ((bitmap & uint(32)) > uint(0)) {\n        bitmap &= ~uint(32);\n        return vec2(1.0, -1.0);\n    } else if ((bitmap & uint(128)) > uint(0)) {\n        bitmap &= ~uint(128);\n        return vec2(1.0, 1.0);\n    }\n\n    // Should never get here.\n    return vec2(1000000.0, 1000000.0);\n}\n\n// Get summary of a point's drainage from the drainage texture.\nuvec4 getDrainageSummary(float x, float z) {\n    vec2 key = vec2(x / 100., z / 100.);\n    return texture2D(drainage, key);\n}\n\n// Get the distance of testPt from the line joining pt1-pt2.\nfloat distToLine(vec2 pt1, vec2 pt2, vec2 testPt)\n{\n  vec2 lineDir = pt2 - pt1;\n  vec2 perpDir = vec2(lineDir.y, -lineDir.x);\n  vec2 dirToPt1 = pt1 - testPt;\n  return abs(dot(normalize(perpDir), dirToPt1));\n}\n\n// Returns true if testPt is inside the river.\nbool isColinear(vec2 p1, vec2 p2, vec2 testPt, float tolerance) {\n    float dist = distToLine(p1, p2, testPt);\n\n    float len = distance(p1, p2);\n    return (abs(dist) < tolerance && distance((p1 + p2) / 2., testPt) <= len / 2.) ||\n            distance(p1, testPt) < tolerance || distance(p2, testPt) < tolerance ;\n}\n\nbool drawRiver(float x_, float z_) {\n    // Loop once for each corner of a tile.\n    for(int corner = 0; corner < 4; corner++) {\n        float x = x_ / scale;\n        float z = z_ / scale;\n\n        float ix = floor(x);\n        float iz = floor(z);\n        if(corner == 0) {\n        } else if(corner == 1) {\n            x += 1.;\n            ix = ceil(x);\n        } else if(corner == 2) {\n            z += 1.;\n            iz = ceil(z);\n        } else if(corner == 3) {\n            x += 1.;\n            ix = ceil(x);\n            z += 1.;\n            iz = ceil(z);\n        }\n\n        uvec4 drainageSummary = getDrainageSummary(x, z);\n\n        uint dampness = drainageSummary[2];\n        if (dampness <= uint(riverLikelihood)) {\n            continue;\n        }\n\n        vec2 p0;\n        vec2 p1;\n        vec2 p2;\n        vec2 p3;\n\n        vec2 toNext = getOffset(drainageSummary[1]);\n        p0 = vec2(ix, iz) + toNext / 2.;\n        p1 = vec2(ix, iz) + toNext / 4.;\n\n        if (isColinear(p0, p1, vec2(x, z), sqrt(float(dampness)) * riverWidth / 5000.)) {\n            // Cut corer on the way to the next tile.\n            return true;\n        }\n\n        while (drainageSummary[0] > uint(0)) {\n            vec2 fromPrev = getOffset(drainageSummary[0]);\n            p2 = vec2(ix, iz) + fromPrev / 4.;\n            p3 = vec2(ix, iz) + fromPrev / 2.;\n\n            uvec4 drainageSummaryFrom = getDrainageSummary(x + fromPrev[0], z + fromPrev[1]);\n            dampness = drainageSummaryFrom[2];\n\n            if (drainageSummaryFrom[2] > uint(riverLikelihood)) {\n                float dampModified = sqrt(float(dampness)) * riverWidth / 5000.;\n                if (isColinear(p1, p2, vec2(x, z), dampModified)) {\n                    // Follow ideal drainage path.\n                    return true;\n                }\n        \n                if (isColinear(p2, p3, vec2(x, z), dampModified)) {\n                    // Cut corner on the way to the next tile.\n                    return true;\n                }\n            }\n        }\n    }\n\n    return false;\n}\n\nvoid setColor(inout vec3 diffuseColor) {\n    float x = vPositionW.x;\n    float y = vPositionW.y;\n    float z = vPositionW.z;\n\n    float noiseVal = get_noise(x, z);\n    float clampedNoiseVal = clamp(noiseVal, 0.001, 10.0);\n\n    if (drawRiver(x, z) && y / scale > sealevel) {\n      diffuseColor.rgb = river;\n    } else \n    if (y / scale >= snowline - (snowline * clampedNoiseVal / 2.0)) {\n      // Snow\n      diffuseColor.rgb = snow;\n    } else if (y / scale >= shoreline + noiseVal / 4.0 &&\n               y / scale > sealevel) {\n      // Land\n      if (pow(clampedNoiseVal, 5.) * y > rockLikelihood) {\n        diffuseColor.rgb = rock;\n      } else {\n        diffuseColor.rgb = mix(scrub, grass, max(0.0, 1.0 / max(1.0, y) - clampedNoiseVal / 2.0));\n      }\n    } else {\n      // Below shoreline\n      float multiplier = clamp(y / scale / shoreline, 0.0, 1.0);\n      if (clampedNoiseVal > rockLikelihood / 10.) {\n        diffuseColor.rgb = rock * multiplier;\n      } else {\n        diffuseColor.rgb = sand * multiplier;\n      }\n    }\n\n    //diffuseColor.rgb = vec3(clampedNoiseVal, clampedNoiseVal, clampedNoiseVal);\n}\n\nvoid main(void) {\n    #include<clipPlaneFragment>\n    vec3 viewDirectionW = normalize(vEyePosition.xyz - vPositionW);\n\n    vec4 baseColor = vec4(1., 1., 1., 1.);\n    vec3 diffuseColor = vDiffuseColor.rgb;\n    float alpha = vDiffuseColor.a;\n    setColor(diffuseColor);\n\n    #ifdef DIFFUSE\n    baseColor = texture2D(diffuseSampler, vDiffuseUV);\n\n    #include<depthPrePass>\n    baseColor.rgb *= vDiffuseInfos.y;\n    #endif\n\n    #ifdef VERTEXCOLOR\n    baseColor.rgb *= vColor.rgb;\n    #endif\n\n    #ifdef NORMAL\n    vec3 normalW = normalize(vNormalW);\n    #else\n    vec3 normalW = vec3(1.0, 1.0, 1.0);\n    #endif\n\n    vec3 diffuseBase = vec3(0., 0., 0.);\n    lightingInfo info;\n    float shadow = 1.;\n    float glossiness = 0.;\n\n    #ifdef SPECULARTERM\n    vec3 specularBase = vec3(0., 0., 0.);\n    #endif\n\n    #include<lightFragment>[0..maxSimultaneousLights]\n\n    #ifdef VERTEXALPHA\n    alpha *= vColor.a;\n    #endif\n    \n    vec3 finalDiffuse = clamp(diffuseBase * diffuseColor, 0.0, 1.0) * baseColor.rgb;\n\n    vec4 color = vec4(finalDiffuse, alpha);\n    #include<fogFragment>\n    gl_FragColor = color;\n    #include<imageProcessingCompatibility>\n}";
+BABYLON.Effect.ShadersStore[name] = shader;
+/** @hidden */
+exports.landPixelShader = { name: name, shader: shader };
+
+},{}],27:[function(require,module,exports){
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.landVertexShader = void 0;
+var name = 'landVertexShader';
+var shader = "precision highp float;\n\nattribute vec3 position;\n#ifdef NORMAL\nattribute vec3 normal;\n#endif\n#ifdef UV1\nattribute vec2 uv;\n#endif\n#ifdef UV2\nattribute vec2 uv2;\n#endif\n#ifdef VERTEXCOLOR\nattribute vec4 color;\n#endif\n#include<bonesDeclaration>\n\n#include<instancesDeclaration>\nuniform mat4 view;\nuniform mat4 viewProjection;\n#ifdef DIFFUSE\nvarying vec2 vDiffuseUV;\nuniform mat4 diffuseMatrix;\nuniform vec2 vDiffuseInfos;\n#endif\n#ifdef POINTSIZE\nuniform float pointSize;\n#endif\n\nvarying vec3 vPositionW;\n#ifdef NORMAL\nvarying vec3 vNormalW;\n#endif\n#ifdef VERTEXCOLOR\nvarying vec4 vColor;\n#endif\n#include<clipPlaneVertexDeclaration>\n#include<fogVertexDeclaration>\n#include<__decl__lightFragment>[0..maxSimultaneousLights]\n\nvoid main(void) {\n    #include<instancesVertex>\n    #include<bonesVertex>\n    vec4 worldPos = finalWorld * vec4(position, 1.0);\n    gl_Position = viewProjection * worldPos;\n    vPositionW = vec3(worldPos);\n    #ifdef NORMAL\n    vNormalW = normalize(vec3(finalWorld * vec4(normal, 0.0)));\n    #endif\n\n    #ifndef UV1\n    vec2 uv = vec2(0., 0.);\n    #endif\n    #ifndef UV2\n    vec2 uv2 = vec2(0., 0.);\n    #endif\n    #ifdef DIFFUSE\n    if (vDiffuseInfos.x == 0.) {\n        vDiffuseUV=vec2(diffuseMatrix * vec4(uv,1.0,0.0));\n    } else {\n        vDiffuseUV=vec2(diffuseMatrix * vec4(uv2,1.0,0.0));\n    }\n    #endif\n\n    #include<clipPlaneVertex>\n\n    #include<fogVertex>\n    #include<shadowsVertex>[0..maxSimultaneousLights]\n\n    #ifdef VERTEXCOLOR\n    vColor = color;\n    #endif\n\n    #ifdef POINTSIZE\n    gl_PointSize = pointSize;\n    #endif\n}\n";
+BABYLON.Effect.ShadersStore[name] = shader;
+/** @hidden */
+exports.landVertexShader = { name: name, shader: shader };
+
+},{}],28:[function(require,module,exports){
+"use strict";
+/*
+ * MIT License
+ *
+ * Copyright (c) 2020 duncan law
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.LandMaterial = void 0;
+var BABYLON = require("babylonjs");
+var baseMaterial_1 = require("../baseMaterial");
+require("./land.fragment");
+require("./land.vertex");
+
+var LandMaterial = function (_baseMaterial_1$BaseM) {
+    _inherits(LandMaterial, _baseMaterial_1$BaseM);
+
+    // Methods
+    function LandMaterial(name, scale, scene) {
+        _classCallCheck(this, LandMaterial);
+
+        var _this = _possibleConstructorReturn(this, (LandMaterial.__proto__ || Object.getPrototypeOf(LandMaterial)).call(this, name, scene));
+
+        _this.scale = scale;
+        _this.NOISE_DETAIL = 20;
+        _this.shoreline = 0.05;
+        _this.sealevel = 0.5;
+        _this.snowline = 10.0;
+        _this.rockLikelihood = 1.0;
+        _this.riverWidth = 20.0;
+        _this.riverLikelihood = 25.0;
+        _this.shaderName = "land";
+        _this.uniforms = _this.uniforms.concat(["noiseCoeficientLow", "noiseCoeficientMid", "noiseCoeficientHigh", "noiseWeightLow", "noiseWeightMid", "noiseWeightHigh", "shoreline", "sealevel", "snowline", "rockLikelihood", "riverWidth", "riverLikelihood", "scale"]);
+        _this.samplers = _this.samplers.concat(["drainage"]);
+        return _this;
+    }
+
+    _createClass(LandMaterial, [{
+        key: "clone",
+        value: function clone(name) {
+            var _this2 = this;
+
+            return BABYLON.SerializationHelper.Clone(function () {
+                return new LandMaterial(name, _this2.scale, _this2.getScene());
+            }, this);
+        }
+        // Statics
+
+    }, {
+        key: "_bindForSubMeshSubclassed",
+        value: function _bindForSubMeshSubclassed() {
             // Define terrain noise.
             this._activeEffect.setFloatArray("noiseCoeficientLow", this._noiseCoeficientLowToSend);
             this._activeEffect.setFloatArray("noiseCoeficientMid", this._noiseCoeficientMidToSend);
@@ -22600,100 +22757,11 @@ var LandMaterial = function (_BABYLON$PushMaterial) {
             this._activeEffect.setFloat("riverWidth", this.riverWidth);
             this._activeEffect.setFloat("riverLikelihood", this.riverLikelihood);
             this._activeEffect.setTexture("drainage", this.drainage);
-            this._afterBind(mesh, this._activeEffect);
-        }
-    }, {
-        key: "getAnimatables",
-        value: function getAnimatables() {
-            var results = [];
-            if (this._diffuseTexture && this._diffuseTexture.animations && this._diffuseTexture.animations.length > 0) {
-                results.push(this._diffuseTexture);
-            }
-            return results;
-        }
-    }, {
-        key: "getActiveTextures",
-        value: function getActiveTextures() {
-            var activeTextures = _get(LandMaterial.prototype.__proto__ || Object.getPrototypeOf(LandMaterial.prototype), "getActiveTextures", this).call(this);
-            if (this._diffuseTexture) {
-                activeTextures.push(this._diffuseTexture);
-            }
-            return activeTextures;
-        }
-    }, {
-        key: "hasTexture",
-        value: function hasTexture(texture) {
-            if (_get(LandMaterial.prototype.__proto__ || Object.getPrototypeOf(LandMaterial.prototype), "hasTexture", this).call(this, texture)) {
-                return true;
-            }
-            if (this.diffuseTexture === texture) {
-                return true;
-            }
-            return false;
-        }
-    }, {
-        key: "dispose",
-        value: function dispose(forceDisposeEffect) {
-            if (this._diffuseTexture) {
-                this._diffuseTexture.dispose();
-            }
-            _get(LandMaterial.prototype.__proto__ || Object.getPrototypeOf(LandMaterial.prototype), "dispose", this).call(this, forceDisposeEffect);
-        }
-    }, {
-        key: "clone",
-        value: function clone(name) {
-            var _this3 = this;
-
-            return BABYLON.SerializationHelper.Clone(function () {
-                return new LandMaterial(name, _this3.scale, _this3.getScene());
-            }, this);
-        }
-    }, {
-        key: "serialize",
-        value: function serialize() {
-            var serializationObject = BABYLON.SerializationHelper.Serialize(this);
-            serializationObject.customType = "BABYLON.LandMaterial";
-            return serializationObject;
         }
     }, {
         key: "getClassName",
         value: function getClassName() {
             return "LandMaterial";
-        }
-    }, {
-        key: "setShoreline",
-        value: function setShoreline(height) {
-            this.shoreline = height;
-        }
-    }, {
-        key: "setSealevel",
-        value: function setSealevel(height) {
-            this.sealevel = height;
-        }
-    }, {
-        key: "setSnowline",
-        value: function setSnowline(height) {
-            this.snowline = height;
-        }
-    }, {
-        key: "setRockLikelihood",
-        value: function setRockLikelihood(value) {
-            this.rockLikelihood = value;
-        }
-    }, {
-        key: "setRiverWidth",
-        value: function setRiverWidth(value) {
-            this.riverWidth = value;
-        }
-    }, {
-        key: "setRiverLikelihood",
-        value: function setRiverLikelihood(value) {
-            this.riverLikelihood = value;
-        }
-    }, {
-        key: "setDrainage",
-        value: function setDrainage(data) {
-            this.drainage = data;
         }
     }, {
         key: "setNoise",
@@ -22735,8 +22803,6 @@ var LandMaterial = function (_BABYLON$PushMaterial) {
             this._noiseWeightMid = noiseWeightMid;
             this._noiseWeightHigh = noiseWeightHigh;
         }
-        // Statics
-
     }], [{
         key: "Parse",
         value: function Parse(source, scene, rootUrl) {
@@ -22747,19 +22813,131 @@ var LandMaterial = function (_BABYLON$PushMaterial) {
     }]);
 
     return LandMaterial;
-}(BABYLON.PushMaterial);
+}(baseMaterial_1.BaseMaterial);
 
-__decorate([BABYLON.serializeAsTexture("diffuseTexture")], LandMaterial.prototype, "_diffuseTexture", void 0);
-__decorate([BABYLON.expandToProperty("_markAllSubMeshesAsTexturesDirty")], LandMaterial.prototype, "diffuseTexture", void 0);
-__decorate([BABYLON.serializeAsColor3("diffuse")], LandMaterial.prototype, "diffuseColor", void 0);
-__decorate([BABYLON.serialize("disableLighting")], LandMaterial.prototype, "_disableLighting", void 0);
-__decorate([BABYLON.expandToProperty("_markAllSubMeshesAsLightsDirty")], LandMaterial.prototype, "disableLighting", void 0);
-__decorate([BABYLON.serialize("maxSimultaneousLights")], LandMaterial.prototype, "_maxSimultaneousLights", void 0);
-__decorate([BABYLON.expandToProperty("_markAllSubMeshesAsLightsDirty")], LandMaterial.prototype, "maxSimultaneousLights", void 0);
 exports.LandMaterial = LandMaterial;
 BABYLON._TypeStore.RegisteredTypes["BABYLON.LandMaterial"] = LandMaterial;
 
-},{"./land.fragment":25,"./land.vertex":26,"babylonjs":2}],28:[function(require,module,exports){
+},{"../baseMaterial":25,"./land.fragment":26,"./land.vertex":27,"babylonjs":2}],29:[function(require,module,exports){
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.seaPixelShader = void 0;
+var name = 'seaPixelShader';
+var shader = "precision highp float;\nprecision highp int;\n\nuniform vec4 vEyePosition;\nuniform vec4 vDiffuseColor;\nuniform float size;\nuniform float offset;\nuniform float time;\n\nvarying vec3 vPositionW;\n#ifdef NORMAL\nvarying vec3 vNormalW;\n#endif\n#ifdef VERTEXCOLOR\nvarying vec4 vColor;\n#endif\n\n#include<helperFunctions>\n\n#include<__decl__lightFragment>[0..maxSimultaneousLights]\n#include<lightsFragmentFunctions>\n#include<shadowsFragmentFunctions>\n\n#ifdef DIFFUSE\nvarying vec2 vDiffuseUV;\nuniform sampler2D diffuseSampler;\nuniform vec2 vDiffuseInfos;\n#endif\n#include<clipPlaneFragmentDeclaration>\n\n#include<fogFragmentDeclaration>\n\nvoid setColor(inout vec3 diffuseColor) {\n    float x = vPositionW.x - offset / 2. + time;\n    float z = vPositionW.z - offset / 2. + time;\n\n    float jitter = 0.0;\n    jitter += 0.2 * sin(1.0 * z) * sin(0.75 * x + 0.65 * z);\n    jitter += 2.0 * sin(0.09 * z + 0.015 * z) * sin(0.07 * x + 0.07 * z);\n    jitter += 20.0 * sin(0.0015 * z + 0.009 * z) * sin(0.0071 * x + 0.0069 * z);\n\n    x += jitter;\n    z += jitter;\n\n    float val = 0.0;\n\n    val += sin(30. * x + 30. * z);\n    val += sin(20. * x + 7. * z);\n\n    val *= 1.0 + 0.3 * sin(17.1 * x + 23.4 * z);\n    val *= 1.0 + 0.3 * sin(33.4 * x + 16.1 * z);\n\n    val *= 1.0 + 0.3 * sin(7.2 * x + 6.8 * z);\n    val *= 1.0 + 0.3 * sin(10.0 * x + 6.3 * z);\n\n    val *= 1.0 + 0.25 * sin(1.0 * z);\n    val *= 1.0 + 0.25 * sin(0.7 * x + 0.7 * z);\n\n    val *= 1.0 + 0.5 * sin(0.1 * x);\n    val *= 1.0 + 0.5 * sin(0.07 * x + 0.07 * z);\n\n    val /= 50.0;\n\n    diffuseColor = vec3(0.1, 0.5 + val / 2.0, 0.9 + val);\n}\n\nbool checkHorizon() {\n    float x = vPositionW.x - offset / 2. + time;\n    float z = vPositionW.z - offset / 2. + time;\n\n    return (x * x + z * z < size * size);\n}\n\nvoid main(void) {\n    #include<clipPlaneFragment>\n    if (!checkHorizon()) {\n      gl_FragColor = vec4(vDiffuseColor.rgb, 1.0);\n    } else {\n      vec3 viewDirectionW = normalize(vEyePosition.xyz - vPositionW);\n\n      vec4 baseColor = vec4(1., 1., 1., 1.);\n      vec3 diffuseColor = vDiffuseColor.rgb;\n      float alpha = vDiffuseColor.a;\n      setColor(diffuseColor);\n\n      #ifdef DIFFUSE\n      baseColor = texture2D(diffuseSampler, vDiffuseUV);\n\n      #include<depthPrePass>\n      baseColor.rgb *= vDiffuseInfos.y;\n      #endif\n\n      #ifdef VERTEXCOLOR\n      baseColor.rgb *= vColor.rgb;\n      #endif\n\n      #ifdef NORMAL\n      vec3 normalW = normalize(vNormalW);\n      #else\n      vec3 normalW = vec3(1.0, 1.0, 1.0);\n      #endif\n\n      vec3 diffuseBase = vec3(0., 0., 0.);\n      lightingInfo info;\n      float shadow = 1.;\n      float glossiness = 0.;\n\n      #ifdef SPECULARTERM\n      vec3 specularBase = vec3(0., 0., 0.);\n      #endif\n\n      #include<lightFragment>[0..maxSimultaneousLights]\n\n      #ifdef VERTEXALPHA\n      alpha *= vColor.a;\n      #endif\n      \n      vec3 finalDiffuse = clamp(diffuseBase * diffuseColor, 0.0, 1.0) * baseColor.rgb;\n\n      vec4 color = vec4(finalDiffuse, alpha);\n      #include<fogFragment>\n      gl_FragColor = color;\n      #include<imageProcessingCompatibility>\n    }\n}";
+BABYLON.Effect.ShadersStore[name] = shader;
+/** @hidden */
+exports.seaPixelShader = { name: name, shader: shader };
+
+},{}],30:[function(require,module,exports){
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.seaVertexShader = void 0;
+var name = 'seaVertexShader';
+var shader = "precision highp float;\n\nattribute vec3 position;\n#ifdef NORMAL\nattribute vec3 normal;\n#endif\n#ifdef UV1\nattribute vec2 uv;\n#endif\n#ifdef UV2\nattribute vec2 uv2;\n#endif\n#ifdef VERTEXCOLOR\nattribute vec4 color;\n#endif\n#include<bonesDeclaration>\n\n#include<instancesDeclaration>\nuniform mat4 view;\nuniform mat4 viewProjection;\n#ifdef DIFFUSE\nvarying vec2 vDiffuseUV;\nuniform mat4 diffuseMatrix;\nuniform vec2 vDiffuseInfos;\n#endif\n#ifdef POINTSIZE\nuniform float pointSize;\n#endif\n\nvarying vec3 vPositionW;\n#ifdef NORMAL\nvarying vec3 vNormalW;\n#endif\n#ifdef VERTEXCOLOR\nvarying vec4 vColor;\n#endif\n#include<clipPlaneVertexDeclaration>\n#include<fogVertexDeclaration>\n#include<__decl__lightFragment>[0..maxSimultaneousLights]\n\nvoid main(void) {\n    #include<instancesVertex>\n    #include<bonesVertex>\n    vec4 worldPos = finalWorld * vec4(position, 1.0);\n    gl_Position = viewProjection * worldPos;\n    vPositionW = vec3(worldPos);\n    #ifdef NORMAL\n    vNormalW = normalize(vec3(finalWorld * vec4(normal, 0.0)));\n    #endif\n\n    #ifndef UV1\n    vec2 uv = vec2(0., 0.);\n    #endif\n    #ifndef UV2\n    vec2 uv2 = vec2(0., 0.);\n    #endif\n    #ifdef DIFFUSE\n    if (vDiffuseInfos.x == 0.) {\n        vDiffuseUV=vec2(diffuseMatrix * vec4(uv,1.0,0.0));\n    } else {\n        vDiffuseUV=vec2(diffuseMatrix * vec4(uv2,1.0,0.0));\n    }\n    #endif\n\n    #include<clipPlaneVertex>\n\n    #include<fogVertex>\n    #include<shadowsVertex>[0..maxSimultaneousLights]\n\n    #ifdef VERTEXCOLOR\n    vColor = color;\n    #endif\n\n    #ifdef POINTSIZE\n    gl_PointSize = pointSize;\n    #endif\n}\n";
+BABYLON.Effect.ShadersStore[name] = shader;
+/** @hidden */
+exports.seaVertexShader = { name: name, shader: shader };
+
+},{}],31:[function(require,module,exports){
+"use strict";
+/*
+ * MIT License
+ *
+ * Copyright (c) 2020 duncan law
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.SeaMaterial = void 0;
+var BABYLON = require("babylonjs");
+var baseMaterial_1 = require("../baseMaterial");
+require("./sea.fragment");
+require("./sea.vertex");
+
+var SeaMaterial = function (_baseMaterial_1$BaseM) {
+    _inherits(SeaMaterial, _baseMaterial_1$BaseM);
+
+    // Methods
+    function SeaMaterial(name, size, offset, scene) {
+        _classCallCheck(this, SeaMaterial);
+
+        var _this = _possibleConstructorReturn(this, (SeaMaterial.__proto__ || Object.getPrototypeOf(SeaMaterial)).call(this, name, scene));
+
+        _this.size = size;
+        _this.offset = offset;
+        _this.time = 0;
+        _this.shaderName = "sea";
+        _this.uniforms = _this.uniforms.concat(["size", "offset", "time" // Wave movement.
+        ]);
+        return _this;
+    }
+
+    _createClass(SeaMaterial, [{
+        key: "clone",
+        value: function clone(name) {
+            var _this2 = this;
+
+            return BABYLON.SerializationHelper.Clone(function () {
+                return new SeaMaterial(name, _this2.size, _this2.offset, _this2.getScene());
+            }, this);
+        }
+        // Statics
+
+    }, {
+        key: "_bindForSubMeshSubclassed",
+        value: function _bindForSubMeshSubclassed() {
+            this._activeEffect.setFloat("size", this.size);
+            this._activeEffect.setFloat("offset", this.offset);
+            this._activeEffect.setFloat("time", this.time);
+        }
+    }, {
+        key: "getClassName",
+        value: function getClassName() {
+            return "SeaMaterial";
+        }
+    }], [{
+        key: "Parse",
+        value: function Parse(source, scene, rootUrl) {
+            return BABYLON.SerializationHelper.Parse(function () {
+                return new SeaMaterial(source.name, source.size, source.offset, scene);
+            }, source, scene, rootUrl);
+        }
+    }]);
+
+    return SeaMaterial;
+}(baseMaterial_1.BaseMaterial);
+
+exports.SeaMaterial = SeaMaterial;
+BABYLON._TypeStore.RegisteredTypes["BABYLON.SeaMaterial"] = SeaMaterial;
+
+},{"../baseMaterial":25,"./sea.fragment":29,"./sea.vertex":30,"babylonjs":2}],32:[function(require,module,exports){
 "use strict";
 /*
 # MIT License

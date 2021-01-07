@@ -134,7 +134,7 @@ window.onload = () => {
   config.set_if_null("display.sea_transparency", 0.9);
   config.set_callback("display.sea_transparency", (key: string, value: any) => {
     if (display && display.sea_material) {
-      display.sea_material.setFloat("alpha", config.get("display.sea_transparency"));
+      display.sea_material.alpha = config.get("display.sea_transparency");
     }
   });
 

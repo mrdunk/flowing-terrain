@@ -32,6 +32,7 @@ import {Config} from "./config";
 import {FreeCameraPointersInput} from './freeCameraPointersInput';
 import {Planting, PlantType} from './Planting';
 import {LandMaterial} from './materialsLibrary/land/landMaterial';
+import {SeaMaterial} from './materialsLibrary/sea/seaMaterial';
 
 export class Display3d extends DisplayBase {
   config: Config = null;
@@ -56,7 +57,8 @@ export class Display3d extends DisplayBase {
   camera: BABYLON.UniversalCamera;
 
   land_material: LandMaterial;
-  sea_material: BABYLON.ShaderMaterial;
+  //sea_material: BABYLON.ShaderMaterial;
+  sea_material: SeaMaterial;
   seabed_material: BABYLON.StandardMaterial;
 
   light_1:BABYLON.DirectionalLight;
@@ -74,6 +76,7 @@ export class Display3d extends DisplayBase {
     this.canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
     this.engine = new BABYLON.Engine(this.canvas, true);
     this.scene = new BABYLON.Scene(this.engine);
+    this.scene.clearColor = new BABYLON.Color4(0.65, 0.77, 0.9, 1.0);
 
     this.camera = new BABYLON.UniversalCamera(
       "UniversalCamera",
@@ -129,23 +132,31 @@ export class Display3d extends DisplayBase {
     this.seabed_material = new BABYLON.StandardMaterial("seabed_material", this.scene);
     this.seabed_material.diffuseColor = new BABYLON.Color3(0, 0, 0);
     this.seabed_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
-    // this.seabed_material.backFaceCulling = false;
     //this.seabed_material.freeze();
 
-    //this.sea_material = new BABYLON.StandardMaterial("sea_material", this.scene);
-    //this.sea_material.diffuseColor = new BABYLON.Color3(0.1, 0.2, 1.0);
-    //this.sea_material.specularColor = new BABYLON.Color3(0.5, 0.5, 0.5);
-    //this.sea_material.backFaceCulling = false;
-    //this.sea_material.freeze();
-    this.set_sea_material();
+    //this.set_sea_material();
+    this.sea_material = new SeaMaterial(
+      "sea_material", this.mapsize * 4, this.mapsize, this.scene);
+    this.sea_material.alpha = config.get("display.sea_transparency");
+
+    this.sea_material.diffuseColor.r = this.scene.clearColor.r;
+    this.sea_material.diffuseColor.g = this.scene.clearColor.g;
+    this.sea_material.diffuseColor.b = this.scene.clearColor.b;
+    
+    let time = 0.0;
+    const that = this;
+    this.scene.registerBeforeRender(() => {
+      time += 0.003;
+      that.sea_material.time = time;
+    });
 
     this.draw();
 
     this.camera.setTarget(new BABYLON.Vector3(this.mapsize / 2, 0, this.mapsize / 2));
 
     // Skybox
-    //var envTexture = new BABYLON.CubeTexture("assets/TropicalSunnyDay", this.scene);
-    //let skybox = this.scene.createDefaultSkybox(envTexture, false, this.mapsize * 4);
+    //var envTexture = new BABYLON.CubeTexture("assets/skybox/bluecloud", this.scene);
+    //let skybox = this.scene.createDefaultSkybox(envTexture, false, this.mapsize * 10);
     //skybox.applyFog = false
 
     //this.scene.fogMode = BABYLON.Scene.FOGMODE_EXP;
@@ -259,7 +270,7 @@ export class Display3d extends DisplayBase {
     return result;
   }
 
-  set_sea_material(): void {
+    /*set_sea_material(): void {
     if (this.sea_material) {
       this.sea_material.dispose();
     }
@@ -301,7 +312,7 @@ export class Display3d extends DisplayBase {
     if(this.sea_mesh) {
       this.sea_mesh.material = this.sea_material;
     }
-  }
+  }*/
 
   set_land_material(): void {
     console.log("set_land_material");
@@ -320,15 +331,15 @@ export class Display3d extends DisplayBase {
       this.config.get(`noise.mid_octave_weight`),
       this.config.get(`noise.high_octave_weight`));
 
-    this.land_material.setShoreline(
-      this.config.get("geography.sealevel") + this.config.get("geography.shoreline"));
-    this.land_material.setSealevel(this.config.get("geography.sealevel"));
-    this.land_material.setSnowline(this.config.get("geography.snowline"));
-    this.land_material.setRockLikelihood(this.config.get("geography.rockLikelihood"));
-    this.land_material.setRiverWidth(this.config.get("geography.riverWidth"));
+    this.land_material.shoreline = 
+      this.config.get("geography.sealevel") + this.config.get("geography.shoreline");
+    this.land_material.sealevel = this.config.get("geography.sealevel");
+    this.land_material.snowline = this.config.get("geography.snowline");
+    this.land_material.rockLikelihood = this.config.get("geography.rockLikelihood");
+    this.land_material.riverWidth = this.config.get("geography.riverWidth");
     const riverLikelihood = this.config.get("geography.riverLikelihood");
-    this.land_material.setRiverLikelihood(riverLikelihood * riverLikelihood);
-    this.land_material.setDrainage(this.summarise_drainage());
+    this.land_material.riverLikelihood = riverLikelihood * riverLikelihood;
+    this.land_material.drainage = this.summarise_drainage();
 
     if(this.land_mesh) {
       this.land_mesh.material = this.land_material;
