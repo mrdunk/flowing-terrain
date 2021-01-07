@@ -65,7 +65,10 @@ export class Planting {
   countByType: number[];
   count: number;
   sealevel: number;
+  shoreline: number;
   tileCount: number;
+  noise_effect: number;
+  dampness_effect: number;
 
   constructor(geography: Geography,
               config: Config,
@@ -76,7 +79,10 @@ export class Planting {
     this.countByType = [0, 0, 0, 0];
     this.locations = new Map();
     this.sealevel = this.config.get("geography.sealevel");
+    this.shoreline = this.config.get("geography.shoreline");
     this.tileCount = this.config.get("enviroment.tile_count");
+    this.noise_effect = this.config.get("vegetation.noise_effect");
+    this.dampness_effect = this.config.get("vegetation.dampness_effect");
 
     this.populate();
   }
@@ -146,15 +152,19 @@ export class Planting {
 
     // No trees under water.
     if(
-        tile00.height < this.sealevel ||
-        tile10.height < this.sealevel ||
-        tile01.height < this.sealevel ||
-        tile11.height < this.sealevel) {
+        tile00.height < this.sealevel + this.shoreline ||
+        tile10.height < this.sealevel + this.shoreline ||
+        tile01.height < this.sealevel + this.shoreline ||
+        tile11.height < this.sealevel + this.shoreline) {
       return null;
     }
 
-    const noiseVal = this.noise.get_value(keyX, keyY);
-    if (noiseVal < 0.1) {
+    // Have both noise-map and drainage affect likelihood of trees growing.
+    const noiseVal = (this.noise.get_value(keyX, keyY) * this.noise_effect * 5) +
+    (Math.sqrt(Math.sqrt(
+      tile00.dampness * tile01.dampness * tile10.dampness * tile11.dampness)) *
+      this.dampness_effect / 10);
+    if (noiseVal < 1) {
       return null;
     }
 
@@ -162,6 +172,10 @@ export class Planting {
     const plant = new Plant(new BABYLON.Vector3(keyX, tile00.height, keyY), random);
     this.countByType[plant.type_]++;
     this.count++;
+
+    if(this.geography.distance_to_river({x: plant.position.x, y: plant.position.z}, 10) < 0.1) {
+      return null;
+    }
 
     return plant;
   }

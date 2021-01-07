@@ -66,10 +66,10 @@ void setColor(inout vec3 diffuseColor) {
 }
 
 bool checkHorizon() {
-    float x = vPositionW.x - offset / 2. + time;
-    float z = vPositionW.z - offset / 2. + time;
+    float x = vPositionW.x - offset / 2.;
+    float z = vPositionW.z - offset / 2.;
 
-    return (x * x + z * z < size * size);
+    return (x * x + z * z < size * size / 4.);
 }
 
 void main(void) {

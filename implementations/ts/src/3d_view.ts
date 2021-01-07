@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-/* A sample frontend for the algorithm described at
+/* A web frontend for the algorithm described at
  * https://github.com/mrdunk/flowing-terrain */
 
 import * as BABYLON from 'babylonjs';
@@ -35,8 +35,10 @@ import {LandMaterial} from './materialsLibrary/land/landMaterial';
 import {SeaMaterial} from './materialsLibrary/sea/seaMaterial';
 
 export class Display3d extends DisplayBase {
-  config: Config = null;
   readonly tile_size: number = 2;
+  readonly horizon_ratio: number = 16;
+  config: Config = null;
+
   mapsize: number;
   positions: number[] = [];
   indices: number[] = [];
@@ -57,7 +59,6 @@ export class Display3d extends DisplayBase {
   camera: BABYLON.UniversalCamera;
 
   land_material: LandMaterial;
-  //sea_material: BABYLON.ShaderMaterial;
   sea_material: SeaMaterial;
   seabed_material: BABYLON.StandardMaterial;
 
@@ -136,7 +137,7 @@ export class Display3d extends DisplayBase {
 
     //this.set_sea_material();
     this.sea_material = new SeaMaterial(
-      "sea_material", this.mapsize * 4, this.mapsize, this.scene);
+      "sea_material", this.mapsize * this.horizon_ratio, this.mapsize, this.scene);
     this.sea_material.alpha = config.get("display.sea_transparency");
 
     this.sea_material.diffuseColor.r = this.scene.clearColor.r;
@@ -269,50 +270,6 @@ export class Display3d extends DisplayBase {
 
     return result;
   }
-
-    /*set_sea_material(): void {
-    if (this.sea_material) {
-      this.sea_material.dispose();
-    }
-
-    this.sea_material = new BABYLON.ShaderMaterial(
-      "sea_material",
-      this.scene,
-      "./seaTexture",
-      {
-        attributes: [
-          "position",
-          "normal",
-          "uv"],
-        uniforms: [
-          "world",
-          "worldView",
-          "worldViewProjection",
-          "view",
-          "projection",
-          "direction",
-          "time",
-          "offset",
-          "alpha"
-        ],
-        needAlphaBlending: true
-      });
-
-    this.sea_material.setFloat("offset", this.mapsize);
-    this.sea_material.setFloat("alpha", this.config.get("display.sea_transparency"));
-    const that = this;
-    let time = 0.0;
-    this.scene.registerBeforeRender(() => {
-      time += 0.003;
-      that.sea_material.setFloat("time", time);
-    });
-
-    this.sea_material.backFaceCulling = false;
-
-    if(this.sea_mesh) {
-      this.sea_mesh.material = this.sea_material;
-    }
-  }*/
 
   set_land_material(): void {
     console.log("set_land_material");
@@ -606,7 +563,10 @@ export class Display3d extends DisplayBase {
 
     // Generate seabed.
     const seabed = BABYLON.MeshBuilder.CreateGround(
-      "seabed", {width: this.mapsize * 8, height: this.mapsize * 8});
+      "seabed",
+      {width: this.mapsize * this.horizon_ratio,
+       height: this.mapsize * this.horizon_ratio}
+    );
     seabed.position = new BABYLON.Vector3(
       this.mapsize / 2, -0.01, this.mapsize / 2);
     seabed.material = this.seabed_material;
@@ -615,7 +575,8 @@ export class Display3d extends DisplayBase {
     // Generate sea.
     this.sea_mesh = BABYLON.MeshBuilder.CreateGround(
       "sea",
-      {width: this.mapsize * 8, height: this.mapsize * 8}
+      {width: this.mapsize * this.horizon_ratio,
+       height: this.mapsize * this.horizon_ratio}
     );
     this.sea_mesh.material = this.sea_material;
     this.sea_mesh.checkCollisions = false;

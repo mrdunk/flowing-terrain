@@ -18998,7 +18998,7 @@ function _inherits(subClass, superClass) { if (typeof superClass !== "function" 
 
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Display3d = void 0;
-/* A sample frontend for the algorithm described at
+/* A web frontend for the algorithm described at
  * https://github.com/mrdunk/flowing-terrain */
 var BABYLON = require("babylonjs");
 var flowing_terrain_1 = require("./flowing_terrain");
@@ -19015,8 +19015,9 @@ var Display3d = function (_flowing_terrain_1$Di) {
 
         var _this = _possibleConstructorReturn(this, (Display3d.__proto__ || Object.getPrototypeOf(Display3d)).call(this, geography));
 
-        _this.config = null;
         _this.tile_size = 2;
+        _this.horizon_ratio = 16;
+        _this.config = null;
         _this.positions = [];
         _this.indices = [];
         _this.uvs = [];
@@ -19064,7 +19065,7 @@ var Display3d = function (_flowing_terrain_1$Di) {
         _this.seabed_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
         //this.seabed_material.freeze();
         //this.set_sea_material();
-        _this.sea_material = new seaMaterial_1.SeaMaterial("sea_material", _this.mapsize * 4, _this.mapsize, _this.scene);
+        _this.sea_material = new seaMaterial_1.SeaMaterial("sea_material", _this.mapsize * _this.horizon_ratio, _this.mapsize, _this.scene);
         _this.sea_material.alpha = config.get("display.sea_transparency");
         _this.sea_material.diffuseColor.r = _this.scene.clearColor.r;
         _this.sea_material.diffuseColor.g = _this.scene.clearColor.g;
@@ -19180,46 +19181,6 @@ var Display3d = function (_flowing_terrain_1$Di) {
             result.optimizations.push(new ShadowMapOptimization(priority, this, 4096));
             return result;
         }
-        /*set_sea_material(): void {
-        if (this.sea_material) {
-          this.sea_material.dispose();
-        }
-         this.sea_material = new BABYLON.ShaderMaterial(
-          "sea_material",
-          this.scene,
-          "./seaTexture",
-          {
-            attributes: [
-              "position",
-              "normal",
-              "uv"],
-            uniforms: [
-              "world",
-              "worldView",
-              "worldViewProjection",
-              "view",
-              "projection",
-              "direction",
-              "time",
-              "offset",
-              "alpha"
-            ],
-            needAlphaBlending: true
-          });
-         this.sea_material.setFloat("offset", this.mapsize);
-        this.sea_material.setFloat("alpha", this.config.get("display.sea_transparency"));
-        const that = this;
-        let time = 0.0;
-        this.scene.registerBeforeRender(() => {
-          time += 0.003;
-          that.sea_material.setFloat("time", time);
-        });
-         this.sea_material.backFaceCulling = false;
-         if(this.sea_mesh) {
-          this.sea_mesh.material = this.sea_material;
-        }
-        }*/
-
     }, {
         key: "set_land_material",
         value: function set_land_material() {
@@ -19477,12 +19438,14 @@ var Display3d = function (_flowing_terrain_1$Di) {
             this.land_mesh.edgesColor = new BABYLON.Color4(1, 1, 1, 1);*/
             //this.land_mesh.freezeWorldMatrix();
             // Generate seabed.
-            var seabed = BABYLON.MeshBuilder.CreateGround("seabed", { width: this.mapsize * 8, height: this.mapsize * 8 });
+            var seabed = BABYLON.MeshBuilder.CreateGround("seabed", { width: this.mapsize * this.horizon_ratio,
+                height: this.mapsize * this.horizon_ratio });
             seabed.position = new BABYLON.Vector3(this.mapsize / 2, -0.01, this.mapsize / 2);
             seabed.material = this.seabed_material;
             seabed.checkCollisions = true;
             // Generate sea.
-            this.sea_mesh = BABYLON.MeshBuilder.CreateGround("sea", { width: this.mapsize * 8, height: this.mapsize * 8 });
+            this.sea_mesh = BABYLON.MeshBuilder.CreateGround("sea", { width: this.mapsize * this.horizon_ratio,
+                height: this.mapsize * this.horizon_ratio });
             this.sea_mesh.material = this.sea_material;
             this.sea_mesh.checkCollisions = false;
             this.set_sealevel(this.config.get("geography.sealevel"));
@@ -20243,7 +20206,10 @@ var Planting = function () {
         this.countByType = [0, 0, 0, 0];
         this.locations = new Map();
         this.sealevel = this.config.get("geography.sealevel");
+        this.shoreline = this.config.get("geography.shoreline");
         this.tileCount = this.config.get("enviroment.tile_count");
+        this.noise_effect = this.config.get("vegetation.noise_effect");
+        this.dampness_effect = this.config.get("vegetation.dampness_effect");
         this.populate();
     }
 
@@ -20309,17 +20275,21 @@ var Planting = function () {
             var tile01 = this.geography.tiles[keyX][keyY + 1];
             var tile11 = this.geography.tiles[keyX + 1][keyY + 1];
             // No trees under water.
-            if (tile00.height < this.sealevel || tile10.height < this.sealevel || tile01.height < this.sealevel || tile11.height < this.sealevel) {
+            if (tile00.height < this.sealevel + this.shoreline || tile10.height < this.sealevel + this.shoreline || tile01.height < this.sealevel + this.shoreline || tile11.height < this.sealevel + this.shoreline) {
                 return null;
             }
-            var noiseVal = this.noise.get_value(keyX, keyY);
-            if (noiseVal < 0.1) {
+            // Have both noise-map and drainage affect likelihood of trees growing.
+            var noiseVal = this.noise.get_value(keyX, keyY) * this.noise_effect * 5 + Math.sqrt(Math.sqrt(tile00.dampness * tile01.dampness * tile10.dampness * tile11.dampness)) * this.dampness_effect / 10;
+            if (noiseVal < 1) {
                 return null;
             }
             var random = seedrandom(noiseVal + " " + this.count);
             var plant = new Plant(new BABYLON.Vector3(keyX, tile00.height, keyY), random);
             this.countByType[plant.type_]++;
             this.count++;
+            if (this.geography.distance_to_river({ x: plant.position.x, y: plant.position.z }, 10) < 0.1) {
+                return null;
+            }
             return plant;
         }
     }]);
@@ -21176,6 +21146,56 @@ var Geography = function () {
             }
             return neighbours;
         }
+    }, {
+        key: "distance_to_river",
+        value: function distance_to_river(coordinate, min_dampness) {
+            var c00 = { x: Math.floor(coordinate.x), y: Math.floor(coordinate.y) };
+            var p00 = this.get_tile(c00);
+            var p01 = this.get_tile({ x: c00.x, y: c00.y + 1 });
+            var p10 = this.get_tile({ x: c00.x + 1, y: c00.y });
+            var p11 = this.get_tile({ x: c00.x + 1, y: c00.y + 1 });
+            var closest = void 0;
+            function dist_squared(c1, c2) {
+                var dx = c1.x - c2.x;
+                var dy = c1.y - c2.y;
+                return dx * dx + dy * dy;
+            }
+            function dist_to_line_squared(c1, c2, ctest) {
+                var c1c2 = dist_squared(c1, c2);
+                if (c1c2 === 0) {
+                    console.log(c1, c2, ctest, c1c2, "!");
+                    return dist_squared(c2, ctest);
+                }
+                var dx1 = c2.x - c1.x;
+                var dy1 = c2.y - c1.y;
+                var dx2 = ctest.x - c1.x;
+                var dy2 = ctest.y - c1.y;
+                var dot = dx1 * dx2 + dy1 * dy2;
+                var t = dot / c1c2;
+                var projectionx = c1.x + t * dx1;
+                var projectiony = c1.y + t * dy1;
+                var val = dist_squared(ctest, { x: projectionx, y: projectiony });
+                // console.log(c1, c2, ctest, val);
+                return val;
+            }
+            var points = [p00, p01, p10, p11];
+            points.forEach(function (point) {
+                if (point.dampness < min_dampness) {
+                    return;
+                }
+                var d_sq = dist_squared(coordinate, point.pos);
+                if (closest === undefined || d_sq < closest) {
+                    closest = d_sq;
+                }
+                if (points.includes(point.lowest_neighbour)) {
+                    d_sq = dist_to_line_squared(point.pos, point.lowest_neighbour.pos, coordinate);
+                    if (closest === undefined || d_sq < closest) {
+                        closest = d_sq;
+                    }
+                }
+            });
+            return Math.sqrt(closest);
+        }
     }]);
 
     return Geography;
@@ -21895,6 +21915,10 @@ window.onload = function () {
     config.set_callback("vegetation.enabled", vegetation_enabled);
     config.set_if_null("vegetation.shadow_enabled", 1);
     config.set_callback("vegetation.shadow_enabled", vegetation_enabled);
+    config.set_if_null("vegetation.noise_effect", 1);
+    config.set_callback("vegetation.noise_effect", vegetation_octaves_callback);
+    config.set_if_null("vegetation.dampness_effect", 2);
+    config.set_callback("vegetation.dampness_effect", vegetation_octaves_callback);
     config.set_if_null("vegetation.low_octave", 3);
     config.set_callback("vegetation.low_octave", vegetation_octaves_callback);
     config.set_if_null("vegetation.mid_octave", 5);
@@ -21943,6 +21967,7 @@ window.onload = function () {
         console.log("geography.shoreline");
         if (display && display.land_material) {
             display.set_land_material();
+            vegetation_octaves_callback(null, null);
         }
     });
     config.set_if_null("geography.snowline", 10.0);
@@ -22824,7 +22849,7 @@ BABYLON._TypeStore.RegisteredTypes["BABYLON.LandMaterial"] = LandMaterial;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.seaPixelShader = void 0;
 var name = 'seaPixelShader';
-var shader = "precision highp float;\nprecision highp int;\n\nuniform vec4 vEyePosition;\nuniform vec4 vDiffuseColor;\nuniform float size;\nuniform float offset;\nuniform float time;\n\nvarying vec3 vPositionW;\n#ifdef NORMAL\nvarying vec3 vNormalW;\n#endif\n#ifdef VERTEXCOLOR\nvarying vec4 vColor;\n#endif\n\n#include<helperFunctions>\n\n#include<__decl__lightFragment>[0..maxSimultaneousLights]\n#include<lightsFragmentFunctions>\n#include<shadowsFragmentFunctions>\n\n#ifdef DIFFUSE\nvarying vec2 vDiffuseUV;\nuniform sampler2D diffuseSampler;\nuniform vec2 vDiffuseInfos;\n#endif\n#include<clipPlaneFragmentDeclaration>\n\n#include<fogFragmentDeclaration>\n\nvoid setColor(inout vec3 diffuseColor) {\n    float x = vPositionW.x - offset / 2. + time;\n    float z = vPositionW.z - offset / 2. + time;\n\n    float jitter = 0.0;\n    jitter += 0.2 * sin(1.0 * z) * sin(0.75 * x + 0.65 * z);\n    jitter += 2.0 * sin(0.09 * z + 0.015 * z) * sin(0.07 * x + 0.07 * z);\n    jitter += 20.0 * sin(0.0015 * z + 0.009 * z) * sin(0.0071 * x + 0.0069 * z);\n\n    x += jitter;\n    z += jitter;\n\n    float val = 0.0;\n\n    val += sin(30. * x + 30. * z);\n    val += sin(20. * x + 7. * z);\n\n    val *= 1.0 + 0.3 * sin(17.1 * x + 23.4 * z);\n    val *= 1.0 + 0.3 * sin(33.4 * x + 16.1 * z);\n\n    val *= 1.0 + 0.3 * sin(7.2 * x + 6.8 * z);\n    val *= 1.0 + 0.3 * sin(10.0 * x + 6.3 * z);\n\n    val *= 1.0 + 0.25 * sin(1.0 * z);\n    val *= 1.0 + 0.25 * sin(0.7 * x + 0.7 * z);\n\n    val *= 1.0 + 0.5 * sin(0.1 * x);\n    val *= 1.0 + 0.5 * sin(0.07 * x + 0.07 * z);\n\n    val /= 50.0;\n\n    diffuseColor = vec3(0.1, 0.5 + val / 2.0, 0.9 + val);\n}\n\nbool checkHorizon() {\n    float x = vPositionW.x - offset / 2. + time;\n    float z = vPositionW.z - offset / 2. + time;\n\n    return (x * x + z * z < size * size);\n}\n\nvoid main(void) {\n    #include<clipPlaneFragment>\n    if (!checkHorizon()) {\n      gl_FragColor = vec4(vDiffuseColor.rgb, 1.0);\n    } else {\n      vec3 viewDirectionW = normalize(vEyePosition.xyz - vPositionW);\n\n      vec4 baseColor = vec4(1., 1., 1., 1.);\n      vec3 diffuseColor = vDiffuseColor.rgb;\n      float alpha = vDiffuseColor.a;\n      setColor(diffuseColor);\n\n      #ifdef DIFFUSE\n      baseColor = texture2D(diffuseSampler, vDiffuseUV);\n\n      #include<depthPrePass>\n      baseColor.rgb *= vDiffuseInfos.y;\n      #endif\n\n      #ifdef VERTEXCOLOR\n      baseColor.rgb *= vColor.rgb;\n      #endif\n\n      #ifdef NORMAL\n      vec3 normalW = normalize(vNormalW);\n      #else\n      vec3 normalW = vec3(1.0, 1.0, 1.0);\n      #endif\n\n      vec3 diffuseBase = vec3(0., 0., 0.);\n      lightingInfo info;\n      float shadow = 1.;\n      float glossiness = 0.;\n\n      #ifdef SPECULARTERM\n      vec3 specularBase = vec3(0., 0., 0.);\n      #endif\n\n      #include<lightFragment>[0..maxSimultaneousLights]\n\n      #ifdef VERTEXALPHA\n      alpha *= vColor.a;\n      #endif\n      \n      vec3 finalDiffuse = clamp(diffuseBase * diffuseColor, 0.0, 1.0) * baseColor.rgb;\n\n      vec4 color = vec4(finalDiffuse, alpha);\n      #include<fogFragment>\n      gl_FragColor = color;\n      #include<imageProcessingCompatibility>\n    }\n}";
+var shader = "precision highp float;\nprecision highp int;\n\nuniform vec4 vEyePosition;\nuniform vec4 vDiffuseColor;\nuniform float size;\nuniform float offset;\nuniform float time;\n\nvarying vec3 vPositionW;\n#ifdef NORMAL\nvarying vec3 vNormalW;\n#endif\n#ifdef VERTEXCOLOR\nvarying vec4 vColor;\n#endif\n\n#include<helperFunctions>\n\n#include<__decl__lightFragment>[0..maxSimultaneousLights]\n#include<lightsFragmentFunctions>\n#include<shadowsFragmentFunctions>\n\n#ifdef DIFFUSE\nvarying vec2 vDiffuseUV;\nuniform sampler2D diffuseSampler;\nuniform vec2 vDiffuseInfos;\n#endif\n#include<clipPlaneFragmentDeclaration>\n\n#include<fogFragmentDeclaration>\n\nvoid setColor(inout vec3 diffuseColor) {\n    float x = vPositionW.x - offset / 2. + time;\n    float z = vPositionW.z - offset / 2. + time;\n\n    float jitter = 0.0;\n    jitter += 0.2 * sin(1.0 * z) * sin(0.75 * x + 0.65 * z);\n    jitter += 2.0 * sin(0.09 * z + 0.015 * z) * sin(0.07 * x + 0.07 * z);\n    jitter += 20.0 * sin(0.0015 * z + 0.009 * z) * sin(0.0071 * x + 0.0069 * z);\n\n    x += jitter;\n    z += jitter;\n\n    float val = 0.0;\n\n    val += sin(30. * x + 30. * z);\n    val += sin(20. * x + 7. * z);\n\n    val *= 1.0 + 0.3 * sin(17.1 * x + 23.4 * z);\n    val *= 1.0 + 0.3 * sin(33.4 * x + 16.1 * z);\n\n    val *= 1.0 + 0.3 * sin(7.2 * x + 6.8 * z);\n    val *= 1.0 + 0.3 * sin(10.0 * x + 6.3 * z);\n\n    val *= 1.0 + 0.25 * sin(1.0 * z);\n    val *= 1.0 + 0.25 * sin(0.7 * x + 0.7 * z);\n\n    val *= 1.0 + 0.5 * sin(0.1 * x);\n    val *= 1.0 + 0.5 * sin(0.07 * x + 0.07 * z);\n\n    val /= 50.0;\n\n    diffuseColor = vec3(0.1, 0.5 + val / 2.0, 0.9 + val);\n}\n\nbool checkHorizon() {\n    float x = vPositionW.x - offset / 2.;\n    float z = vPositionW.z - offset / 2.;\n\n    return (x * x + z * z < size * size / 4.);\n}\n\nvoid main(void) {\n    #include<clipPlaneFragment>\n    if (!checkHorizon()) {\n      gl_FragColor = vec4(vDiffuseColor.rgb, 1.0);\n    } else {\n      vec3 viewDirectionW = normalize(vEyePosition.xyz - vPositionW);\n\n      vec4 baseColor = vec4(1., 1., 1., 1.);\n      vec3 diffuseColor = vDiffuseColor.rgb;\n      float alpha = vDiffuseColor.a;\n      setColor(diffuseColor);\n\n      #ifdef DIFFUSE\n      baseColor = texture2D(diffuseSampler, vDiffuseUV);\n\n      #include<depthPrePass>\n      baseColor.rgb *= vDiffuseInfos.y;\n      #endif\n\n      #ifdef VERTEXCOLOR\n      baseColor.rgb *= vColor.rgb;\n      #endif\n\n      #ifdef NORMAL\n      vec3 normalW = normalize(vNormalW);\n      #else\n      vec3 normalW = vec3(1.0, 1.0, 1.0);\n      #endif\n\n      vec3 diffuseBase = vec3(0., 0., 0.);\n      lightingInfo info;\n      float shadow = 1.;\n      float glossiness = 0.;\n\n      #ifdef SPECULARTERM\n      vec3 specularBase = vec3(0., 0., 0.);\n      #endif\n\n      #include<lightFragment>[0..maxSimultaneousLights]\n\n      #ifdef VERTEXALPHA\n      alpha *= vColor.a;\n      #endif\n      \n      vec3 finalDiffuse = clamp(diffuseBase * diffuseColor, 0.0, 1.0) * baseColor.rgb;\n\n      vec4 color = vec4(finalDiffuse, alpha);\n      #include<fogFragment>\n      gl_FragColor = color;\n      #include<imageProcessingCompatibility>\n    }\n}";
 BABYLON.Effect.ShadersStore[name] = shader;
 /** @hidden */
 exports.seaPixelShader = { name: name, shader: shader };

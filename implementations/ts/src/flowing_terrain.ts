@@ -258,6 +258,66 @@ export class Geography {
     }
     return neighbours;
   }
+
+  distance_to_river(coordinate: Coordinate, min_dampness: number): number {
+    const c00: Coordinate = {x: Math.floor(coordinate.x), y: Math.floor(coordinate.y)};
+    const p00 = this.get_tile(c00);
+    const p01 = this.get_tile({x: c00.x, y: c00.y + 1});
+    const p10 = this.get_tile({x: c00.x + 1, y: c00.y});
+    const p11 = this.get_tile({x: c00.x + 1, y: c00.y + 1});
+
+    let closest: number;
+
+    function dist_squared(c1: Coordinate, c2: Coordinate) {
+      const dx = (c1.x - c2.x);
+      const dy = (c1.y - c2.y);
+      return dx * dx + dy * dy;
+    }
+
+    function dist_to_line_squared(c1: Coordinate, c2: Coordinate, ctest: Coordinate): number {
+      const c1c2 = dist_squared(c1, c2);
+      if (c1c2 === 0) {
+        console.log(c1, c2, ctest, c1c2, "!");
+        return dist_squared(c2, ctest);
+      }
+      
+      const dx1 = (c2.x - c1.x);
+      const dy1 = (c2.y - c1.y);
+      const dx2 = (ctest.x - c1.x);
+      const dy2 = (ctest.y - c1.y);
+
+      const dot = dx1 * dx2 + dy1 * dy2;
+      const t = dot / c1c2;
+
+      const projectionx = c1.x + t * dx1; 
+      const projectiony = c1.y + t * dy1; 
+
+      const val = dist_squared(ctest, {x: projectionx, y: projectiony});
+      // console.log(c1, c2, ctest, val);
+      return val;
+    }
+
+    const points = [p00, p01, p10, p11];
+    points.forEach((point) => {
+      if (point.dampness < min_dampness) {
+        return;
+      }
+
+      let d_sq = dist_squared(coordinate, point.pos);
+      if (closest === undefined || d_sq < closest) {
+        closest = d_sq;
+      }
+
+      if (points.includes(point.lowest_neighbour)) {
+        d_sq = dist_to_line_squared(point.pos, point.lowest_neighbour.pos, coordinate);
+        if (closest === undefined || d_sq < closest) {
+          closest = d_sq;
+        }
+      }
+    });
+
+    return Math.sqrt(closest);
+  }
 }
 
 // Example to iterate over a Geography object.

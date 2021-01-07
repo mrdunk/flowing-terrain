@@ -88,6 +88,10 @@ window.onload = () => {
   config.set_callback("vegetation.enabled", vegetation_enabled);
   config.set_if_null("vegetation.shadow_enabled", 1);
   config.set_callback("vegetation.shadow_enabled", vegetation_enabled);
+  config.set_if_null("vegetation.noise_effect", 1);
+  config.set_callback("vegetation.noise_effect", vegetation_octaves_callback);
+  config.set_if_null("vegetation.dampness_effect", 2);
+  config.set_callback("vegetation.dampness_effect", vegetation_octaves_callback);
   config.set_if_null("vegetation.low_octave", 3);
   config.set_callback("vegetation.low_octave", vegetation_octaves_callback);
   config.set_if_null("vegetation.mid_octave", 5);
@@ -143,6 +147,7 @@ window.onload = () => {
     console.log("geography.shoreline");
     if (display && display.land_material) {
       display.set_land_material();
+      vegetation_octaves_callback(null, null);
     }
   });
 
