@@ -109,7 +109,8 @@ vec2 getOffset(inout uint bitmap) {
         return vec2(1.0, 1.0);
     }
 
-    return vec2(10000.0, 10000.0);
+    // Should never get here.
+    return vec2(1000000.0, 1000000.0);
 }
 
 // Get summary of a point's drainage from the drainage texture.
@@ -205,13 +206,7 @@ bool drawRiver(float x_, float z_) {
     return false;
 }
 
-void main(void) {
-    #include<clipPlaneFragment>
-    vec3 viewDirectionW = normalize(vEyePosition.xyz - vPositionW);
-
-    vec4 baseColor = vec4(1., 1., 1., 1.);
-    vec3 diffuseColor = vDiffuseColor.rgb;
-
+void setColor(inout vec3 diffuseColor) {
     float x = vPositionW.x;
     float y = vPositionW.y;
     float z = vPositionW.z;
@@ -244,8 +239,17 @@ void main(void) {
     }
 
     //diffuseColor.rgb = vec3(clampedNoiseVal, clampedNoiseVal, clampedNoiseVal);
+}
 
+void main(void) {
+    #include<clipPlaneFragment>
+    vec3 viewDirectionW = normalize(vEyePosition.xyz - vPositionW);
+
+    vec4 baseColor = vec4(1., 1., 1., 1.);
+    vec3 diffuseColor = vDiffuseColor.rgb;
     float alpha = vDiffuseColor.a;
+    setColor(diffuseColor);
+
     #ifdef DIFFUSE
     baseColor = texture2D(diffuseSampler, vDiffuseUV);
 

@@ -7,20 +7,12 @@ var buffer = require("vinyl-buffer");
 var paths = {
   html: ["src/*.html", "src/*.css"],
   shaders: ["src/*.fx"],
-  materials:["src/materialsLibrary/land/*"],
-  assets: ["src/assets/*"]
+  materials:["src/materialsLibrary/**/*"],
+  assets: ["src/assets/**/*"]
 };
 
 gulp.task("copy-html", function() {
   return gulp.src(paths.html).pipe(gulp.dest("dist"));
-});
-
-gulp.task("copy-shaders", function() {
-  return gulp.src(paths.shaders).pipe(gulp.dest("dist"));
-});
-
-gulp.task("copy-materials", function() {
-  return gulp.src(paths.materials).pipe(gulp.dest("dist/materialsLibrary/land/"));
 });
 
 gulp.task("copy-assets", function() {
@@ -32,8 +24,6 @@ gulp.task(
   gulp.series(
     gulp.parallel("copy-html"),
     gulp.parallel("copy-assets"),
-    gulp.parallel("copy-shaders"),
-    gulp.parallel("copy-materials"),
     function ts() {
       return browserify({
         basedir: ".",
