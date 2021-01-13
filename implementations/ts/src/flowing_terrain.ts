@@ -260,46 +260,34 @@ export class Geography {
   }
 
   // Distance from the center of a river.
+  // This method presumes rivers do not strictly follow the correct lowest path
+  // across the terrain but instead cut corners. Although this means they may
+  // run uphill slightly where they cut a corner, the visual effect overall is
+  // looks more realistic.
   distance_to_river(
     coordinate: Coordinate,
     river_width_mod: number,
     min_dampness: number
   ): number {
-    function dist_squared(c1: Coordinate, c2: Coordinate) {
-      const dx = (c1.x - c2.x);
-      const dy = (c1.y - c2.y);
-      return dx * dx + dy * dy;
-    }
-
-    function dist(c1: Coordinate, c2: Coordinate) {
-      return Math.sqrt(dist_squared(c1, c2));
+    function dist(a: Coordinate, b: Coordinate) {
+      const dx = (a.x - b.x);
+      const dy = (a.y - b.y);
+      return Math.sqrt(dx * dx + dy * dy);
     }
     
-    function dot(c1: Coordinate, c2: Coordinate): number {
-      return c1.x * c2.x + c1.y * c2.y;
+    function dot(a: Coordinate, b: Coordinate): number {
+      return a.x * b.x + a.y * b.y;
     }
 
-    function dist_to_line(c1: Coordinate, c2: Coordinate, ctest: Coordinate): number {
-      const lineDir = {x: c2.x - c1.x, y: c2.y - c1.y};
-      const lineLen = dist(c1, c2);
-      const perpDir = {x: lineDir.y, y: -lineDir.x};
-      const perpDirNormal = {x: (perpDir.x / lineLen), y: (perpDir.y / lineLen)};
-      const dirToC1 = {x: c1.x - ctest.x, y: c1.y - ctest.y};
-
-      const result = Math.abs(dot(perpDirNormal, dirToC1));
-
-      const midPoint = {x: (c1.x + c2.x) / 2, y: (c1.y + c2.y) / 2};
-      const distFromMid = dist(midPoint, ctest);
-
-      //return Math.min(result, Math.min(dist(c1, ctest), dist(c2, ctest)));
-
-      if (distFromMid >= lineLen / 2) {
-        // Outside ends of line so return distance from one of the ends.
-        const d1 = dist(c1, ctest);
-        const d2 = dist(c2, ctest);
-        return Math.min(d1, d2);
-      }
-      return result;
+    // For explanation of distance from line segment:
+    // https://www.youtube.com/watch?v=PMltMdi1Wzg
+    function dist_to_line(a: Coordinate, b: Coordinate, p: Coordinate): number {
+      const len = dist(b, a);
+      const pa = {x: p.x - a.x, y: p.y - a.y};
+      const ba = {x: b.x - a.x, y: b.y - a.y};
+      const h = Math.min(1, Math.max(0, dot(pa, ba) / (len * len)));
+      return dist({x: 0, y: 0},
+                  {x: pa.x - h * ba.x, y: pa.y - h * ba.y});
     }
 
     const c: Coordinate = {x: Math.floor(coordinate.x), y: Math.floor(coordinate.y)};
@@ -326,7 +314,6 @@ export class Geography {
       const p1: Coordinate = {x: corner.pos.x * 0.75 + corner.lowest_neighbour.pos.x * 0.25,
         y: corner.pos.y * 0.75 + corner.lowest_neighbour.pos.y * 0.25};
 
-      //let d_sq = dist_to_line_squared(p0, p1, coordinate);
       let d_sq = dist_to_line(p0, p1, coordinate);
       if (d_sq < closest) {
         closest = d_sq;
@@ -345,7 +332,6 @@ export class Geography {
           y: corner.pos.y * 0.75 + higher_neighbour.pos.y * 0.25};
         const p3: Coordinate = {x: corner.pos.x * 0.25 + higher_neighbour.pos.x * 0.75,
           y: corner.pos.y * 0.25 + higher_neighbour.pos.y * 0.75};
-        //d_sq = dist_to_line_squared(p2, p3, coordinate);
         d_sq = dist_to_line(p1, p2, coordinate);
         if (d_sq < closest) {
           closest = d_sq;

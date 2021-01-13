@@ -37,8 +37,8 @@ void setColor(inout vec3 diffuseColor) {
 
     float jitter = 0.0;
     jitter += 0.2 * sin(1.0 * z) * sin(0.75 * x + 0.65 * z);
-    jitter += 2.0 * sin(0.09 * z + 0.015 * z) * sin(0.07 * x + 0.07 * z);
-    jitter += 20.0 * sin(0.0015 * z + 0.009 * z) * sin(0.0071 * x + 0.0069 * z);
+    jitter += 2.0 * sin(0.015 * z) * sin(0.07 * x + 0.07 * z);
+    jitter += 20.0 * sin(0.01 * x + 0.009 * z) * sin(0.0071 * x + 0.0069 * z);
 
     x += jitter;
     z += jitter;

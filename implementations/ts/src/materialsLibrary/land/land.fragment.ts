@@ -119,25 +119,13 @@ uvec4 getDrainageSummary(float x, float z) {
     return texture2D(drainage, key);
 }
 
-// Get the distance of testPt from the line joining pt1-pt2.
-float distToLine(vec2 pt1, vec2 pt2, vec2 testPt)
-{
-  vec2 lineDir = pt2 - pt1;
-  vec2 perpDir = vec2(lineDir.y, -lineDir.x);
-  vec2 dirToPt1 = pt1 - testPt;
-  return abs(dot(normalize(perpDir), dirToPt1));
-}
-
-// Returns true if testPt is inside the river.
-bool isColinear(vec2 p1, vec2 p2, vec2 testPt, float tolerance) {
-    float dist = distToLine(p1, p2, testPt);
-
-    float len = distance(p1, p2);
-    float midToPoint = distance((p1 + p2) / 2., testPt);
-
-    return (dist < tolerance && midToPoint <= len / 2.) ||
-           distance(p1, testPt) < tolerance ||
-           distance(p2, testPt) < tolerance;
+// Returns true if pTest is inside the river.
+// For explanation of distance from line segment:
+// https://www.youtube.com/watch?v=PMltMdi1Wzg
+bool isColinear(vec2 a, vec2 b, vec2 p, float tolerance) {
+    float len = distance(b, a);
+    float h = min(1., max(0., dot(p - a, b - a) / (len * len)));
+    return length(p - a - h * (b - a)) < tolerance;
 }
 
 bool drawRiver(float x_, float z_) {
