@@ -19451,7 +19451,7 @@ var Display3d = function (_flowing_terrain_1$Di) {
             this.set_sealevel(this.config.get("geography.sealevel"));
             //this.sea_mesh.freezeWorldMatrix();
             // Plant trees.
-            this.planting();
+            //this.planting();
         }
         // Move the height of the sea mesh on the Z axis.
 
@@ -20200,6 +20200,7 @@ var Planting = function () {
         _classCallCheck(this, Planting);
 
         this.treesPerTile = 10;
+        console.log("new Planting");
         this.geography = geography;
         this.config = config;
         this.noise = noise;
@@ -20216,12 +20217,18 @@ var Planting = function () {
     _createClass(Planting, [{
         key: "populate",
         value: function populate() {
+            var river_width_mod = this.config.get("geography.riverWidth");
+            var river_likelihood = this.config.get("geography.riverLikelihood");
+            console.log("Planting.populate", river_width_mod, river_likelihood);
             this.countByType = [0, 0, 0, 0];
             this.count = 0;
             for (var x = 0; x < this.noise.length; x++) {
                 for (var y = 0; y < this.noise.length; y++) {
                     for (var i = 0; i < this.treesPerTile; i++) {
-                        this.set(x, y, this.createPlant(x, y));
+                        var plant = this.createPlant(x, y, river_width_mod, river_likelihood);
+                        if (plant) {
+                            this.set(x, y, plant);
+                        }
                     }
                 }
             }
@@ -20266,7 +20273,7 @@ var Planting = function () {
         }
     }, {
         key: "createPlant",
-        value: function createPlant(keyX, keyY) {
+        value: function createPlant(keyX, keyY, river_width_mod, river_likelihood) {
             if (keyX >= this.tileCount - 1 || keyY >= this.tileCount - 1) {
                 return null;
             }
@@ -20287,7 +20294,8 @@ var Planting = function () {
             var plant = new Plant(new BABYLON.Vector3(keyX, tile00.height, keyY), random);
             this.countByType[plant.type_]++;
             this.count++;
-            if (this.geography.distance_to_river({ x: plant.position.x, y: plant.position.z }, 10) < 0.1) {
+            var d = this.geography.distance_to_river({ x: plant.position.x, y: plant.position.z }, river_width_mod, river_likelihood);
+            if (d <= 0.0) {
                 return null;
             }
             return plant;
@@ -21146,55 +21154,95 @@ var Geography = function () {
             }
             return neighbours;
         }
+        // Distance from the center of a river.
+
     }, {
         key: "distance_to_river",
-        value: function distance_to_river(coordinate, min_dampness) {
-            var c00 = { x: Math.floor(coordinate.x), y: Math.floor(coordinate.y) };
-            var p00 = this.get_tile(c00);
-            var p01 = this.get_tile({ x: c00.x, y: c00.y + 1 });
-            var p10 = this.get_tile({ x: c00.x + 1, y: c00.y });
-            var p11 = this.get_tile({ x: c00.x + 1, y: c00.y + 1 });
-            var closest = void 0;
+        value: function distance_to_river(coordinate, river_width_mod, min_dampness) {
+            var _this3 = this;
+
             function dist_squared(c1, c2) {
                 var dx = c1.x - c2.x;
                 var dy = c1.y - c2.y;
                 return dx * dx + dy * dy;
             }
-            function dist_to_line_squared(c1, c2, ctest) {
-                var c1c2 = dist_squared(c1, c2);
-                if (c1c2 === 0) {
-                    console.log(c1, c2, ctest, c1c2, "!");
-                    return dist_squared(c2, ctest);
-                }
-                var dx1 = c2.x - c1.x;
-                var dy1 = c2.y - c1.y;
-                var dx2 = ctest.x - c1.x;
-                var dy2 = ctest.y - c1.y;
-                var dot = dx1 * dx2 + dy1 * dy2;
-                var t = dot / c1c2;
-                var projectionx = c1.x + t * dx1;
-                var projectiony = c1.y + t * dy1;
-                var val = dist_squared(ctest, { x: projectionx, y: projectiony });
-                // console.log(c1, c2, ctest, val);
-                return val;
+            function dist(c1, c2) {
+                return Math.sqrt(dist_squared(c1, c2));
             }
-            var points = [p00, p01, p10, p11];
-            points.forEach(function (point) {
-                if (point.dampness < min_dampness) {
+            function dot(c1, c2) {
+                return c1.x * c2.x + c1.y * c2.y;
+            }
+            function dist_to_line(c1, c2, ctest) {
+                var lineDir = { x: c2.x - c1.x, y: c2.y - c1.y };
+                var lineLen = dist(c1, c2);
+                var perpDir = { x: lineDir.y, y: -lineDir.x };
+                var perpDirNormal = { x: perpDir.x / lineLen, y: perpDir.y / lineLen };
+                var dirToC1 = { x: c1.x - ctest.x, y: c1.y - ctest.y };
+                var result = Math.abs(dot(perpDirNormal, dirToC1));
+                var midPoint = { x: (c1.x + c2.x) / 2, y: (c1.y + c2.y) / 2 };
+                var distFromMid = dist(midPoint, ctest);
+                //return Math.min(result, Math.min(dist(c1, ctest), dist(c2, ctest)));
+                if (distFromMid >= lineLen / 2) {
+                    // Outside ends of line so return distance from one of the ends.
+                    var d1 = dist(c1, ctest);
+                    var d2 = dist(c2, ctest);
+                    return Math.min(d1, d2);
+                }
+                return result;
+            }
+            var c = { x: Math.floor(coordinate.x), y: Math.floor(coordinate.y) };
+            var c00 = this.get_tile(c);
+            var c01 = this.get_tile({ x: c.x, y: c.y + 1 });
+            var c10 = this.get_tile({ x: c.x + 1, y: c.y });
+            var c11 = this.get_tile({ x: c.x + 1, y: c.y + 1 });
+            var closest = 10000;
+            var dampness = 0;
+            var corners = [c00, c01, c10, c11];
+            corners.forEach(function (corner) {
+                if (corner.dampness <= min_dampness) {
                     return;
                 }
-                var d_sq = dist_squared(coordinate, point.pos);
-                if (closest === undefined || d_sq < closest) {
+                if (corner.lowest_neighbour === null) {
+                    return;
+                }
+                var p0 = { x: corner.pos.x * 0.25 + corner.lowest_neighbour.pos.x * 0.75,
+                    y: corner.pos.y * 0.25 + corner.lowest_neighbour.pos.y * 0.75 };
+                var p1 = { x: corner.pos.x * 0.75 + corner.lowest_neighbour.pos.x * 0.25,
+                    y: corner.pos.y * 0.75 + corner.lowest_neighbour.pos.y * 0.25 };
+                //let d_sq = dist_to_line_squared(p0, p1, coordinate);
+                var d_sq = dist_to_line(p0, p1, coordinate);
+                if (d_sq < closest) {
                     closest = d_sq;
+                    dampness = corner.dampness;
                 }
-                if (points.includes(point.lowest_neighbour)) {
-                    d_sq = dist_to_line_squared(point.pos, point.lowest_neighbour.pos, coordinate);
-                    if (closest === undefined || d_sq < closest) {
-                        closest = d_sq;
+                _this3.get_neighbours(corner).forEach(function (higher_neighbour) {
+                    if (higher_neighbour.lowest_neighbour !== corner) {
+                        return;
                     }
-                }
+                    if (higher_neighbour.dampness <= min_dampness) {
+                        return;
+                    }
+                    var p2 = { x: corner.pos.x * 0.75 + higher_neighbour.pos.x * 0.25,
+                        y: corner.pos.y * 0.75 + higher_neighbour.pos.y * 0.25 };
+                    var p3 = { x: corner.pos.x * 0.25 + higher_neighbour.pos.x * 0.75,
+                        y: corner.pos.y * 0.25 + higher_neighbour.pos.y * 0.75 };
+                    //d_sq = dist_to_line_squared(p2, p3, coordinate);
+                    d_sq = dist_to_line(p1, p2, coordinate);
+                    if (d_sq < closest) {
+                        closest = d_sq;
+                        dampness = higher_neighbour.dampness;
+                    }
+                    d_sq = dist_to_line(p2, p3, coordinate);
+                    if (d_sq < closest) {
+                        closest = d_sq;
+                        dampness = higher_neighbour.dampness;
+                    }
+                });
             });
-            return Math.sqrt(closest);
+            // "5000" is the same constant we use in land.fragment.ts.
+            var river_width = Math.sqrt(dampness) * river_width_mod / 5000;
+            //return Math.sqrt(closest) - river_width;
+            return closest - river_width;
         }
     }]);
 
@@ -21944,10 +21992,12 @@ window.onload = function () {
     config.set_if_null("geography.riverWidth", 20);
     config.set_callback("geography.riverWidth", function (key, value) {
         display.set_rivers(value);
+        vegetation_octaves_callback(null, null);
     });
     config.set_if_null("geography.riverLikelihood", 5);
     config.set_callback("geography.riverLikelihood", function (key, value) {
         display.set_rivers(value);
+        vegetation_octaves_callback(null, null);
     });
     config.set_if_null("display.target_fps", 30);
     config.set_callback("display.target_fps", reoptimize_3d);
@@ -22673,7 +22723,7 @@ BABYLON._TypeStore.RegisteredTypes["BABYLON.BaseMaterial"] = BaseMaterial;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.landPixelShader = void 0;
 var name = 'landPixelShader';
-var shader = "precision highp float;\nprecision highp int;\nprecision highp usampler2D;\n\n// Colors for terrain.\nconst vec3 river = vec3(0., 0.10, 0.82);\nconst vec3 snow = vec3(0.66, 0.78, 0.82);\nconst vec3 grass = vec3(0.24, 0.5, 0.16);\nconst vec3 scrub = vec3(0.24, 0.2, 0.16);\nconst vec3 rock = vec3(0.25, 0.3, 0.3);\nconst vec3 sand = vec3(0.78, 0.78, 0.27);\n\nuniform vec4 vEyePosition;\nuniform vec4 vDiffuseColor;\nuniform float[40] noiseCoeficientLow;\nuniform float[40] noiseCoeficientMid;\nuniform float[40] noiseCoeficientHigh;\nuniform float noiseWeightLow;\nuniform float noiseWeightMid;\nuniform float noiseWeightHigh;\nuniform float scale;\nuniform float shoreline;\nuniform float sealevel;\nuniform float snowline;\nuniform float rockLikelihood;\nuniform float riverWidth;\nuniform float riverLikelihood;\nuniform usampler2D drainage;\n\nvarying vec3 vPositionW;\n#ifdef NORMAL\nvarying vec3 vNormalW;\n#endif\n#ifdef VERTEXCOLOR\nvarying vec4 vColor;\n#endif\n\n#include<helperFunctions>\n\n#include<__decl__lightFragment>[0..maxSimultaneousLights]\n#include<lightsFragmentFunctions>\n#include<shadowsFragmentFunctions>\n\n#ifdef DIFFUSE\nvarying vec2 vDiffuseUV;\nuniform sampler2D diffuseSampler;\nuniform vec2 vDiffuseInfos;\n#endif\n#include<clipPlaneFragmentDeclaration>\n\n#include<fogFragmentDeclaration>\n\n// Helper function for repeatable noise value unique to a set of map coordinates.\nfloat get_octave_value(float[40] coefficients, float weight, float x, float y) {\n  int index = 0;\n  float count = 0.;\n  float returnVal = 0.0;\n  while(index < 20) {\n    if(coefficients[2 * index] > 0.0 || coefficients[2 * index + 1] > 0.0) {\n      returnVal += sin(coefficients[2 * index] * x / scale +\n                       coefficients[2 * index + 1] * y / scale);\n      count += 1.;\n    //} else {\n    //  break;;\n    }\n    index++;\n  }\n  if(count > 0.) {\n    returnVal /= sqrt(count);\n  }\n\n  return returnVal * weight;\n}\n\n// Return repeatable noise value unique to a set of map coordinates.\nfloat get_noise(float x, float y) {\n  return (get_octave_value(noiseCoeficientLow, noiseWeightLow, x, y) +\n          get_octave_value(noiseCoeficientMid, noiseWeightMid, x, y) +\n          get_octave_value(noiseCoeficientHigh, noiseWeightHigh, x, y)) / 3.0;\n}\n\n// Return one offset to a neighbouring tile from a bitmap.\n// The value is cleared from the passed bitmap.\nvec2 getOffset(inout uint bitmap) {\n    if ((bitmap & uint(2)) > uint(0)) {\n        bitmap &= ~uint(2);\n        return vec2(-1.0, 0.0);\n    } else if ((bitmap & uint(64)) > uint(0)) {\n        bitmap &= ~uint(64);\n        return vec2(1.0, 0.0);\n    } else if ((bitmap & uint(8)) > uint(0)) {\n        bitmap &= ~uint(8);\n        return vec2(0.0, -1.0);\n    } else if ((bitmap & uint(16)) > uint(0)) {\n        bitmap &= ~uint(16);\n        return vec2(0.0, 1.0);\n    } else if ((bitmap & uint(1)) > uint(0)) {\n        bitmap &= ~uint(1);\n        return vec2(-1.0, -1.0);\n    } else if ((bitmap & uint(4)) > uint(0)) {\n        bitmap &= ~uint(4);\n        return vec2(-1.0, 1.0);\n    } else if ((bitmap & uint(32)) > uint(0)) {\n        bitmap &= ~uint(32);\n        return vec2(1.0, -1.0);\n    } else if ((bitmap & uint(128)) > uint(0)) {\n        bitmap &= ~uint(128);\n        return vec2(1.0, 1.0);\n    }\n\n    // Should never get here.\n    return vec2(1000000.0, 1000000.0);\n}\n\n// Get summary of a point's drainage from the drainage texture.\nuvec4 getDrainageSummary(float x, float z) {\n    vec2 key = vec2(x / 100., z / 100.);\n    return texture2D(drainage, key);\n}\n\n// Get the distance of testPt from the line joining pt1-pt2.\nfloat distToLine(vec2 pt1, vec2 pt2, vec2 testPt)\n{\n  vec2 lineDir = pt2 - pt1;\n  vec2 perpDir = vec2(lineDir.y, -lineDir.x);\n  vec2 dirToPt1 = pt1 - testPt;\n  return abs(dot(normalize(perpDir), dirToPt1));\n}\n\n// Returns true if testPt is inside the river.\nbool isColinear(vec2 p1, vec2 p2, vec2 testPt, float tolerance) {\n    float dist = distToLine(p1, p2, testPt);\n\n    float len = distance(p1, p2);\n    return (abs(dist) < tolerance && distance((p1 + p2) / 2., testPt) <= len / 2.) ||\n            distance(p1, testPt) < tolerance || distance(p2, testPt) < tolerance ;\n}\n\nbool drawRiver(float x_, float z_) {\n    // Loop once for each corner of a tile.\n    for(int corner = 0; corner < 4; corner++) {\n        float x = x_ / scale;\n        float z = z_ / scale;\n\n        float ix = floor(x);\n        float iz = floor(z);\n        if(corner == 0) {\n        } else if(corner == 1) {\n            x += 1.;\n            ix = ceil(x);\n        } else if(corner == 2) {\n            z += 1.;\n            iz = ceil(z);\n        } else if(corner == 3) {\n            x += 1.;\n            ix = ceil(x);\n            z += 1.;\n            iz = ceil(z);\n        }\n\n        uvec4 drainageSummary = getDrainageSummary(x, z);\n\n        uint dampness = drainageSummary[2];\n        if (dampness <= uint(riverLikelihood)) {\n            continue;\n        }\n\n        vec2 p0;\n        vec2 p1;\n        vec2 p2;\n        vec2 p3;\n\n        vec2 toNext = getOffset(drainageSummary[1]);\n        p0 = vec2(ix, iz) + toNext / 2.;\n        p1 = vec2(ix, iz) + toNext / 4.;\n\n        if (isColinear(p0, p1, vec2(x, z), sqrt(float(dampness)) * riverWidth / 5000.)) {\n            // Cut corer on the way to the next tile.\n            return true;\n        }\n\n        while (drainageSummary[0] > uint(0)) {\n            vec2 fromPrev = getOffset(drainageSummary[0]);\n            p2 = vec2(ix, iz) + fromPrev / 4.;\n            p3 = vec2(ix, iz) + fromPrev / 2.;\n\n            uvec4 drainageSummaryFrom = getDrainageSummary(x + fromPrev[0], z + fromPrev[1]);\n            dampness = drainageSummaryFrom[2];\n\n            if (drainageSummaryFrom[2] > uint(riverLikelihood)) {\n                float dampModified = sqrt(float(dampness)) * riverWidth / 5000.;\n                if (isColinear(p1, p2, vec2(x, z), dampModified)) {\n                    // Follow ideal drainage path.\n                    return true;\n                }\n        \n                if (isColinear(p2, p3, vec2(x, z), dampModified)) {\n                    // Cut corner on the way to the next tile.\n                    return true;\n                }\n            }\n        }\n    }\n\n    return false;\n}\n\nvoid setColor(inout vec3 diffuseColor) {\n    float x = vPositionW.x;\n    float y = vPositionW.y;\n    float z = vPositionW.z;\n\n    float noiseVal = get_noise(x, z);\n    float clampedNoiseVal = clamp(noiseVal, 0.001, 10.0);\n\n    if (drawRiver(x, z) && y / scale > sealevel) {\n      diffuseColor.rgb = river;\n    } else \n    if (y / scale >= snowline - (snowline * clampedNoiseVal / 2.0)) {\n      // Snow\n      diffuseColor.rgb = snow;\n    } else if (y / scale >= shoreline + noiseVal / 4.0 &&\n               y / scale > sealevel) {\n      // Land\n      if (pow(clampedNoiseVal, 5.) * y > rockLikelihood) {\n        diffuseColor.rgb = rock;\n      } else {\n        diffuseColor.rgb = mix(scrub, grass, max(0.0, 1.0 / max(1.0, y) - clampedNoiseVal / 2.0));\n      }\n    } else {\n      // Below shoreline\n      float multiplier = clamp(y / scale / shoreline, 0.0, 1.0);\n      if (clampedNoiseVal > rockLikelihood / 10.) {\n        diffuseColor.rgb = rock * multiplier;\n      } else {\n        diffuseColor.rgb = sand * multiplier;\n      }\n    }\n\n    //diffuseColor.rgb = vec3(clampedNoiseVal, clampedNoiseVal, clampedNoiseVal);\n}\n\nvoid main(void) {\n    #include<clipPlaneFragment>\n    vec3 viewDirectionW = normalize(vEyePosition.xyz - vPositionW);\n\n    vec4 baseColor = vec4(1., 1., 1., 1.);\n    vec3 diffuseColor = vDiffuseColor.rgb;\n    float alpha = vDiffuseColor.a;\n    setColor(diffuseColor);\n\n    #ifdef DIFFUSE\n    baseColor = texture2D(diffuseSampler, vDiffuseUV);\n\n    #include<depthPrePass>\n    baseColor.rgb *= vDiffuseInfos.y;\n    #endif\n\n    #ifdef VERTEXCOLOR\n    baseColor.rgb *= vColor.rgb;\n    #endif\n\n    #ifdef NORMAL\n    vec3 normalW = normalize(vNormalW);\n    #else\n    vec3 normalW = vec3(1.0, 1.0, 1.0);\n    #endif\n\n    vec3 diffuseBase = vec3(0., 0., 0.);\n    lightingInfo info;\n    float shadow = 1.;\n    float glossiness = 0.;\n\n    #ifdef SPECULARTERM\n    vec3 specularBase = vec3(0., 0., 0.);\n    #endif\n\n    #include<lightFragment>[0..maxSimultaneousLights]\n\n    #ifdef VERTEXALPHA\n    alpha *= vColor.a;\n    #endif\n    \n    vec3 finalDiffuse = clamp(diffuseBase * diffuseColor, 0.0, 1.0) * baseColor.rgb;\n\n    vec4 color = vec4(finalDiffuse, alpha);\n    #include<fogFragment>\n    gl_FragColor = color;\n    #include<imageProcessingCompatibility>\n}";
+var shader = "precision highp float;\nprecision highp int;\nprecision highp usampler2D;\n\n// Colors for terrain.\nconst vec3 river = vec3(0., 0.10, 0.82);\nconst vec3 snow = vec3(0.66, 0.78, 0.82);\nconst vec3 grass = vec3(0.24, 0.5, 0.16);\nconst vec3 scrub = vec3(0.24, 0.2, 0.16);\nconst vec3 rock = vec3(0.25, 0.3, 0.3);\nconst vec3 sand = vec3(0.78, 0.78, 0.27);\n\nuniform vec4 vEyePosition;\nuniform vec4 vDiffuseColor;\nuniform float[40] noiseCoeficientLow;\nuniform float[40] noiseCoeficientMid;\nuniform float[40] noiseCoeficientHigh;\nuniform float noiseWeightLow;\nuniform float noiseWeightMid;\nuniform float noiseWeightHigh;\nuniform float scale;\nuniform float shoreline;\nuniform float sealevel;\nuniform float snowline;\nuniform float rockLikelihood;\nuniform float riverWidth;\nuniform float riverLikelihood;\nuniform usampler2D drainage;\n\nvarying vec3 vPositionW;\n#ifdef NORMAL\nvarying vec3 vNormalW;\n#endif\n#ifdef VERTEXCOLOR\nvarying vec4 vColor;\n#endif\n\n#include<helperFunctions>\n\n#include<__decl__lightFragment>[0..maxSimultaneousLights]\n#include<lightsFragmentFunctions>\n#include<shadowsFragmentFunctions>\n\n#ifdef DIFFUSE\nvarying vec2 vDiffuseUV;\nuniform sampler2D diffuseSampler;\nuniform vec2 vDiffuseInfos;\n#endif\n#include<clipPlaneFragmentDeclaration>\n\n#include<fogFragmentDeclaration>\n\n// Helper function for repeatable noise value unique to a set of map coordinates.\nfloat get_octave_value(float[40] coefficients, float weight, float x, float y) {\n  int index = 0;\n  float count = 0.;\n  float returnVal = 0.0;\n  while(index < 20) {\n    if(coefficients[2 * index] > 0.0 || coefficients[2 * index + 1] > 0.0) {\n      returnVal += sin(coefficients[2 * index] * x / scale +\n                       coefficients[2 * index + 1] * y / scale);\n      count += 1.;\n    //} else {\n    //  break;;\n    }\n    index++;\n  }\n  if(count > 0.) {\n    returnVal /= sqrt(count);\n  }\n\n  return returnVal * weight;\n}\n\n// Return repeatable noise value unique to a set of map coordinates.\nfloat get_noise(float x, float y) {\n  return (get_octave_value(noiseCoeficientLow, noiseWeightLow, x, y) +\n          get_octave_value(noiseCoeficientMid, noiseWeightMid, x, y) +\n          get_octave_value(noiseCoeficientHigh, noiseWeightHigh, x, y)) / 3.0;\n}\n\n// Return one offset to a neighbouring tile from a bitmap.\n// The value is cleared from the passed bitmap.\nvec2 getOffset(inout uint bitmap) {\n    if ((bitmap & uint(2)) > uint(0)) {\n        bitmap &= ~uint(2);\n        return vec2(-1.0, 0.0);\n    } else if ((bitmap & uint(64)) > uint(0)) {\n        bitmap &= ~uint(64);\n        return vec2(1.0, 0.0);\n    } else if ((bitmap & uint(8)) > uint(0)) {\n        bitmap &= ~uint(8);\n        return vec2(0.0, -1.0);\n    } else if ((bitmap & uint(16)) > uint(0)) {\n        bitmap &= ~uint(16);\n        return vec2(0.0, 1.0);\n    } else if ((bitmap & uint(1)) > uint(0)) {\n        bitmap &= ~uint(1);\n        return vec2(-1.0, -1.0);\n    } else if ((bitmap & uint(4)) > uint(0)) {\n        bitmap &= ~uint(4);\n        return vec2(-1.0, 1.0);\n    } else if ((bitmap & uint(32)) > uint(0)) {\n        bitmap &= ~uint(32);\n        return vec2(1.0, -1.0);\n    } else if ((bitmap & uint(128)) > uint(0)) {\n        bitmap &= ~uint(128);\n        return vec2(1.0, 1.0);\n    }\n\n    // Should never get here.\n    return vec2(1000000.0, 1000000.0);\n}\n\n// Get summary of a point's drainage from the drainage texture.\nuvec4 getDrainageSummary(float x, float z) {\n    vec2 key = vec2(x / 100., z / 100.);\n    return texture2D(drainage, key);\n}\n\n// Get the distance of testPt from the line joining pt1-pt2.\nfloat distToLine(vec2 pt1, vec2 pt2, vec2 testPt)\n{\n  vec2 lineDir = pt2 - pt1;\n  vec2 perpDir = vec2(lineDir.y, -lineDir.x);\n  vec2 dirToPt1 = pt1 - testPt;\n  return abs(dot(normalize(perpDir), dirToPt1));\n}\n\n// Returns true if testPt is inside the river.\nbool isColinear(vec2 p1, vec2 p2, vec2 testPt, float tolerance) {\n    float dist = distToLine(p1, p2, testPt);\n\n    float len = distance(p1, p2);\n    float midToPoint = distance((p1 + p2) / 2., testPt);\n\n    return (dist < tolerance && midToPoint <= len / 2.) ||\n           distance(p1, testPt) < tolerance ||\n           distance(p2, testPt) < tolerance;\n}\n\nbool drawRiver(float x_, float z_) {\n    // Loop once for each corner of a tile.\n    for(int corner = 0; corner < 4; corner++) {\n        float x = x_ / scale;\n        float z = z_ / scale;\n\n        float ix = floor(x);\n        float iz = floor(z);\n        if(corner == 0) {\n        } else if(corner == 1) {\n            ix += 2.;\n            x += 1.;\n        } else if(corner == 2) {\n            iz += 2.;\n            z += 1.;\n        } else if(corner == 3) {\n            ix += 2.;\n            iz += 2.;\n            x += 1.;\n            z += 1.;\n        }\n\n        uvec4 drainageSummary = getDrainageSummary(x, z);\n\n        uint dampness = drainageSummary[2];\n        if (dampness <= uint(riverLikelihood)) {\n            continue;\n        }\n\n        if (drainageSummary[1] == uint(0)) {\n          continue;\n        }\n\n        vec2 toLowNeigh = getOffset(drainageSummary[1]);\n\n        vec2 p0 = vec2(ix, iz) + toLowNeigh * .5;  // Stop at tile boundary.\n        vec2 p1 = vec2(ix, iz) + toLowNeigh * .25;\n\n        float riverWidthRel = sqrt(float(dampness)) * riverWidth / 5000.;\n\n        if (isColinear(p0, p1, vec2(x, z), riverWidthRel)) {\n            return true;\n        }\n\n        while (drainageSummary[0] > uint(0)) {\n            vec2 toHighNeigh = getOffset(drainageSummary[0]);\n            vec2 pHighNeigh = vec2(x, z) + toHighNeigh;\n\n            uvec4 drainageSummaryHigh = getDrainageSummary(pHighNeigh[0], pHighNeigh[1]);\n            dampness = drainageSummaryHigh[2];\n            if (dampness <= uint(riverLikelihood)) {\n                continue;\n            }\n\n            riverWidthRel = sqrt(float(dampness)) * riverWidth / 5000.;\n\n            vec2 p2 = vec2(ix, iz) + toHighNeigh * .25;\n            vec2 p3 = vec2(ix, iz) + toHighNeigh * .5;  // Stop at tile boundary.\n            if (isColinear(p1, p2, vec2(x, z), riverWidthRel)) {\n                return true;\n            }\n            if (isColinear(p2, p3, vec2(x, z), riverWidthRel)) {\n                return true;\n            }\n        }\n    }\n    return false;\n}\n\nvoid setColor(inout vec3 diffuseColor) {\n    float x = vPositionW.x;\n    float y = vPositionW.y;\n    float z = vPositionW.z;\n\n    float noiseVal = get_noise(x, z);\n    float clampedNoiseVal = clamp(noiseVal, 0.001, 10.0);\n\n    if (drawRiver(x, z) && y / scale > sealevel) {\n      diffuseColor.rgb = river;\n    } else \n    if (y / scale >= snowline - (snowline * clampedNoiseVal / 2.0)) {\n      // Snow\n      diffuseColor.rgb = snow;\n    } else if (y / scale >= shoreline + noiseVal / 4.0 &&\n               y / scale > sealevel) {\n      // Land\n      if (pow(clampedNoiseVal, 5.) * y > rockLikelihood) {\n        diffuseColor.rgb = rock;\n      } else {\n        diffuseColor.rgb = mix(scrub, grass, max(0.0, 1.0 / max(1.0, y) - clampedNoiseVal / 2.0));\n      }\n    } else {\n      // Below shoreline\n      float multiplier = clamp(y / scale / shoreline, 0.0, 1.0);\n      if (clampedNoiseVal > rockLikelihood / 10.) {\n        diffuseColor.rgb = rock * multiplier;\n      } else {\n        diffuseColor.rgb = sand * multiplier;\n      }\n    }\n\n    //diffuseColor.rgb = vec3(clampedNoiseVal, clampedNoiseVal, clampedNoiseVal);\n}\n\nvoid main(void) {\n    #include<clipPlaneFragment>\n    vec3 viewDirectionW = normalize(vEyePosition.xyz - vPositionW);\n\n    vec4 baseColor = vec4(1., 1., 1., 1.);\n    vec3 diffuseColor = vDiffuseColor.rgb;\n    float alpha = vDiffuseColor.a;\n    setColor(diffuseColor);\n\n    #ifdef DIFFUSE\n    baseColor = texture2D(diffuseSampler, vDiffuseUV);\n\n    #include<depthPrePass>\n    baseColor.rgb *= vDiffuseInfos.y;\n    #endif\n\n    #ifdef VERTEXCOLOR\n    baseColor.rgb *= vColor.rgb;\n    #endif\n\n    #ifdef NORMAL\n    vec3 normalW = normalize(vNormalW);\n    #else\n    vec3 normalW = vec3(1.0, 1.0, 1.0);\n    #endif\n\n    vec3 diffuseBase = vec3(0., 0., 0.);\n    lightingInfo info;\n    float shadow = 1.;\n    float glossiness = 0.;\n\n    #ifdef SPECULARTERM\n    vec3 specularBase = vec3(0., 0., 0.);\n    #endif\n\n    #include<lightFragment>[0..maxSimultaneousLights]\n\n    #ifdef VERTEXALPHA\n    alpha *= vColor.a;\n    #endif\n    \n    vec3 finalDiffuse = clamp(diffuseBase * diffuseColor, 0.0, 1.0) * baseColor.rgb;\n\n    vec4 color = vec4(finalDiffuse, alpha);\n    #include<fogFragment>\n    gl_FragColor = color;\n    #include<imageProcessingCompatibility>\n}";
 BABYLON.Effect.ShadersStore[name] = shader;
 /** @hidden */
 exports.landPixelShader = { name: name, shader: shader };

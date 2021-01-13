@@ -119,11 +119,13 @@ window.onload = () => {
   config.set_if_null("geography.riverWidth", 20);
   config.set_callback("geography.riverWidth", (key: string, value: any) => {
     display.set_rivers(value);
+    vegetation_octaves_callback(null, null);
   });
 
   config.set_if_null("geography.riverLikelihood", 5);
   config.set_callback("geography.riverLikelihood", (key: string, value: any) => {
     display.set_rivers(value);
+    vegetation_octaves_callback(null, null);
   });
 
   config.set_if_null("display.target_fps", 30);

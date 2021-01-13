@@ -72,7 +72,9 @@ export class Planting {
 
   constructor(geography: Geography,
               config: Config,
-              noise: Noise) {
+              noise: Noise
+  ) {
+    console.log("new Planting");
     this.geography = geography;
     this.config = config;
     this.noise = noise;
@@ -88,12 +90,19 @@ export class Planting {
   }
 
   populate(): void {
+    const river_width_mod = this.config.get("geography.riverWidth");
+    const river_likelihood = this.config.get("geography.riverLikelihood");
+    console.log("Planting.populate", river_width_mod, river_likelihood);
+
     this.countByType = [0, 0, 0, 0];
     this.count = 0;
     for(let x = 0; x < this.noise.length; x++) {
       for(let y = 0; y < this.noise.length; y++) {
         for(let i = 0; i < this.treesPerTile; i++) {
-          this.set(x, y, this.createPlant(x, y));
+          const plant = this.createPlant(x, y, river_width_mod, river_likelihood);
+          if (plant) {
+            this.set(x, y, plant);
+          }
         }
       }
     }
@@ -140,7 +149,10 @@ export class Planting {
     return row.get(keyY);
   }
 
-  createPlant(keyX: number, keyY: number): BABYLON.Nullable<Plant> {
+  createPlant(
+    keyX: number, keyY: number,
+    river_width_mod: number, river_likelihood: number
+  ): BABYLON.Nullable<Plant> {
     if(keyX >= this.tileCount - 1 || keyY >= this.tileCount - 1){
       return null;
     }
@@ -173,7 +185,9 @@ export class Planting {
     this.countByType[plant.type_]++;
     this.count++;
 
-    if(this.geography.distance_to_river({x: plant.position.x, y: plant.position.z}, 10) < 0.1) {
+    const d = this.geography.distance_to_river(
+      {x: plant.position.x, y: plant.position.z}, river_width_mod, river_likelihood);
+    if ( d <= 0.0) {
       return null;
     }
 

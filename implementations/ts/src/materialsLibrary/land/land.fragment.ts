@@ -133,8 +133,11 @@ bool isColinear(vec2 p1, vec2 p2, vec2 testPt, float tolerance) {
     float dist = distToLine(p1, p2, testPt);
 
     float len = distance(p1, p2);
-    return (abs(dist) < tolerance && distance((p1 + p2) / 2., testPt) <= len / 2.) ||
-            distance(p1, testPt) < tolerance || distance(p2, testPt) < tolerance ;
+    float midToPoint = distance((p1 + p2) / 2., testPt);
+
+    return (dist < tolerance && midToPoint <= len / 2.) ||
+           distance(p1, testPt) < tolerance ||
+           distance(p2, testPt) < tolerance;
 }
 
 bool drawRiver(float x_, float z_) {
@@ -147,16 +150,16 @@ bool drawRiver(float x_, float z_) {
         float iz = floor(z);
         if(corner == 0) {
         } else if(corner == 1) {
+            ix += 2.;
             x += 1.;
-            ix = ceil(x);
         } else if(corner == 2) {
+            iz += 2.;
             z += 1.;
-            iz = ceil(z);
         } else if(corner == 3) {
+            ix += 2.;
+            iz += 2.;
             x += 1.;
-            ix = ceil(x);
             z += 1.;
-            iz = ceil(z);
         }
 
         uvec4 drainageSummary = getDrainageSummary(x, z);
@@ -166,43 +169,43 @@ bool drawRiver(float x_, float z_) {
             continue;
         }
 
-        vec2 p0;
-        vec2 p1;
-        vec2 p2;
-        vec2 p3;
+        if (drainageSummary[1] == uint(0)) {
+          continue;
+        }
 
-        vec2 toNext = getOffset(drainageSummary[1]);
-        p0 = vec2(ix, iz) + toNext / 2.;
-        p1 = vec2(ix, iz) + toNext / 4.;
+        vec2 toLowNeigh = getOffset(drainageSummary[1]);
 
-        if (isColinear(p0, p1, vec2(x, z), sqrt(float(dampness)) * riverWidth / 5000.)) {
-            // Cut corer on the way to the next tile.
+        vec2 p0 = vec2(ix, iz) + toLowNeigh * .5;  // Stop at tile boundary.
+        vec2 p1 = vec2(ix, iz) + toLowNeigh * .25;
+
+        float riverWidthRel = sqrt(float(dampness)) * riverWidth / 5000.;
+
+        if (isColinear(p0, p1, vec2(x, z), riverWidthRel)) {
             return true;
         }
 
         while (drainageSummary[0] > uint(0)) {
-            vec2 fromPrev = getOffset(drainageSummary[0]);
-            p2 = vec2(ix, iz) + fromPrev / 4.;
-            p3 = vec2(ix, iz) + fromPrev / 2.;
+            vec2 toHighNeigh = getOffset(drainageSummary[0]);
+            vec2 pHighNeigh = vec2(x, z) + toHighNeigh;
 
-            uvec4 drainageSummaryFrom = getDrainageSummary(x + fromPrev[0], z + fromPrev[1]);
-            dampness = drainageSummaryFrom[2];
+            uvec4 drainageSummaryHigh = getDrainageSummary(pHighNeigh[0], pHighNeigh[1]);
+            dampness = drainageSummaryHigh[2];
+            if (dampness <= uint(riverLikelihood)) {
+                continue;
+            }
 
-            if (drainageSummaryFrom[2] > uint(riverLikelihood)) {
-                float dampModified = sqrt(float(dampness)) * riverWidth / 5000.;
-                if (isColinear(p1, p2, vec2(x, z), dampModified)) {
-                    // Follow ideal drainage path.
-                    return true;
-                }
-        
-                if (isColinear(p2, p3, vec2(x, z), dampModified)) {
-                    // Cut corner on the way to the next tile.
-                    return true;
-                }
+            riverWidthRel = sqrt(float(dampness)) * riverWidth / 5000.;
+
+            vec2 p2 = vec2(ix, iz) + toHighNeigh * .25;
+            vec2 p3 = vec2(ix, iz) + toHighNeigh * .5;  // Stop at tile boundary.
+            if (isColinear(p1, p2, vec2(x, z), riverWidthRel)) {
+                return true;
+            }
+            if (isColinear(p2, p3, vec2(x, z), riverWidthRel)) {
+                return true;
             }
         }
     }
-
     return false;
 }
 

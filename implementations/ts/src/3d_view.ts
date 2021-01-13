@@ -585,7 +585,7 @@ export class Display3d extends DisplayBase {
     //this.sea_mesh.freezeWorldMatrix();
 
     // Plant trees.
-    this.planting();
+    //this.planting();
   }
 
   // Move the height of the sea mesh on the Z axis.

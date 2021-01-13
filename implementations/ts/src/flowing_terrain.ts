@@ -259,64 +259,111 @@ export class Geography {
     return neighbours;
   }
 
-  distance_to_river(coordinate: Coordinate, min_dampness: number): number {
-    const c00: Coordinate = {x: Math.floor(coordinate.x), y: Math.floor(coordinate.y)};
-    const p00 = this.get_tile(c00);
-    const p01 = this.get_tile({x: c00.x, y: c00.y + 1});
-    const p10 = this.get_tile({x: c00.x + 1, y: c00.y});
-    const p11 = this.get_tile({x: c00.x + 1, y: c00.y + 1});
-
-    let closest: number;
-
+  // Distance from the center of a river.
+  distance_to_river(
+    coordinate: Coordinate,
+    river_width_mod: number,
+    min_dampness: number
+  ): number {
     function dist_squared(c1: Coordinate, c2: Coordinate) {
       const dx = (c1.x - c2.x);
       const dy = (c1.y - c2.y);
       return dx * dx + dy * dy;
     }
 
-    function dist_to_line_squared(c1: Coordinate, c2: Coordinate, ctest: Coordinate): number {
-      const c1c2 = dist_squared(c1, c2);
-      if (c1c2 === 0) {
-        console.log(c1, c2, ctest, c1c2, "!");
-        return dist_squared(c2, ctest);
-      }
-      
-      const dx1 = (c2.x - c1.x);
-      const dy1 = (c2.y - c1.y);
-      const dx2 = (ctest.x - c1.x);
-      const dy2 = (ctest.y - c1.y);
-
-      const dot = dx1 * dx2 + dy1 * dy2;
-      const t = dot / c1c2;
-
-      const projectionx = c1.x + t * dx1; 
-      const projectiony = c1.y + t * dy1; 
-
-      const val = dist_squared(ctest, {x: projectionx, y: projectiony});
-      // console.log(c1, c2, ctest, val);
-      return val;
+    function dist(c1: Coordinate, c2: Coordinate) {
+      return Math.sqrt(dist_squared(c1, c2));
+    }
+    
+    function dot(c1: Coordinate, c2: Coordinate): number {
+      return c1.x * c2.x + c1.y * c2.y;
     }
 
-    const points = [p00, p01, p10, p11];
-    points.forEach((point) => {
-      if (point.dampness < min_dampness) {
+    function dist_to_line(c1: Coordinate, c2: Coordinate, ctest: Coordinate): number {
+      const lineDir = {x: c2.x - c1.x, y: c2.y - c1.y};
+      const lineLen = dist(c1, c2);
+      const perpDir = {x: lineDir.y, y: -lineDir.x};
+      const perpDirNormal = {x: (perpDir.x / lineLen), y: (perpDir.y / lineLen)};
+      const dirToC1 = {x: c1.x - ctest.x, y: c1.y - ctest.y};
+
+      const result = Math.abs(dot(perpDirNormal, dirToC1));
+
+      const midPoint = {x: (c1.x + c2.x) / 2, y: (c1.y + c2.y) / 2};
+      const distFromMid = dist(midPoint, ctest);
+
+      //return Math.min(result, Math.min(dist(c1, ctest), dist(c2, ctest)));
+
+      if (distFromMid >= lineLen / 2) {
+        // Outside ends of line so return distance from one of the ends.
+        const d1 = dist(c1, ctest);
+        const d2 = dist(c2, ctest);
+        return Math.min(d1, d2);
+      }
+      return result;
+    }
+
+    const c: Coordinate = {x: Math.floor(coordinate.x), y: Math.floor(coordinate.y)};
+    const c00 = this.get_tile(c);
+    const c01 = this.get_tile({x: c.x, y: c.y + 1});
+    const c10 = this.get_tile({x: c.x + 1, y: c.y});
+    const c11 = this.get_tile({x: c.x + 1, y: c.y + 1});
+
+    let closest: number = 10000;
+    let dampness: number = 0;
+
+    const corners = [c00, c01, c10, c11];
+    corners.forEach((corner) => {
+      if (corner.dampness <= min_dampness) {
         return;
       }
 
-      let d_sq = dist_squared(coordinate, point.pos);
-      if (closest === undefined || d_sq < closest) {
-        closest = d_sq;
+      if (corner.lowest_neighbour === null) {
+        return;
       }
 
-      if (points.includes(point.lowest_neighbour)) {
-        d_sq = dist_to_line_squared(point.pos, point.lowest_neighbour.pos, coordinate);
-        if (closest === undefined || d_sq < closest) {
-          closest = d_sq;
-        }
+      const p0: Coordinate = {x: corner.pos.x * 0.25 + corner.lowest_neighbour.pos.x * 0.75,
+        y: corner.pos.y * 0.25 + corner.lowest_neighbour.pos.y * 0.75};
+      const p1: Coordinate = {x: corner.pos.x * 0.75 + corner.lowest_neighbour.pos.x * 0.25,
+        y: corner.pos.y * 0.75 + corner.lowest_neighbour.pos.y * 0.25};
+
+      //let d_sq = dist_to_line_squared(p0, p1, coordinate);
+      let d_sq = dist_to_line(p0, p1, coordinate);
+      if (d_sq < closest) {
+        closest = d_sq;
+        dampness = corner.dampness;
       }
+
+      this.get_neighbours(corner).forEach((higher_neighbour) => {
+        if (higher_neighbour.lowest_neighbour !== corner) {
+          return;
+        }
+        if (higher_neighbour.dampness <= min_dampness) {
+          return;
+        }
+
+        const p2: Coordinate = {x: corner.pos.x * 0.75 + higher_neighbour.pos.x * 0.25,
+          y: corner.pos.y * 0.75 + higher_neighbour.pos.y * 0.25};
+        const p3: Coordinate = {x: corner.pos.x * 0.25 + higher_neighbour.pos.x * 0.75,
+          y: corner.pos.y * 0.25 + higher_neighbour.pos.y * 0.75};
+        //d_sq = dist_to_line_squared(p2, p3, coordinate);
+        d_sq = dist_to_line(p1, p2, coordinate);
+        if (d_sq < closest) {
+          closest = d_sq;
+          dampness = higher_neighbour.dampness;
+        }
+        d_sq = dist_to_line(p2, p3, coordinate);
+        if (d_sq < closest) {
+          closest = d_sq;
+          dampness = higher_neighbour.dampness;
+        }
+      });
     });
 
-    return Math.sqrt(closest);
+    // "5000" is the same constant we use in land.fragment.ts.
+    const river_width = Math.sqrt(dampness) * river_width_mod / 5000;
+
+    //return Math.sqrt(closest) - river_width;
+    return closest - river_width;
   }
 }
 
