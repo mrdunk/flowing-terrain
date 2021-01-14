@@ -79,9 +79,11 @@ export class Geography {
               config: Config,
               seed_points: Set<string>,
               noise: Noise) {
+    console.time("Geography.constructor");
     this.config = config;
     this.tile_count = this.config.get("enviroment.tile_count");
     this.terraform(enviroment, seed_points, noise);
+    console.timeEnd("Geography.constructor");
   }
 
   // Calculate the terrain.
@@ -355,12 +357,10 @@ export class Geography {
 
 // Example to iterate over a Geography object.
 export class DisplayBase {
-  geography: Geography;
-  config: Config;
+  protected config: Config;
   tile_count: number;
 
-  constructor(geography: Geography) {
-    this.geography = geography;
+  constructor(protected geography: Geography) {
     this.config = this.geography.config;
     this.tile_count = this.config.get("enviroment.tile_count");
   }

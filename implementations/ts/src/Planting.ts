@@ -58,42 +58,48 @@ export class Plant {
 
 export class Planting {
   readonly treesPerTile: number = 10;
-  geography: Geography;
-  config: Config;
-  noise: Noise;
   locations: Map<number, Map<number, Plant[]>>;
-  countByType: number[];
+  countByType: [number, number, number, number];
   count: number;
   sealevel: number;
   shoreline: number;
   tileCount: number;
   noise_effect: number;
   dampness_effect: number;
+  noise: Noise;
 
-  constructor(geography: Geography,
-              config: Config,
-              noise: Noise
+  constructor(private geography: Geography,
+              private config: Config
   ) {
-    console.log("new Planting");
-    this.geography = geography;
-    this.config = config;
-    this.noise = noise;
-    this.countByType = [0, 0, 0, 0];
-    this.locations = new Map();
+    console.assert(this.geography !== null);
+    console.assert(this.config !== null);
+
+    this.noise_update(true);
+    this.update();
+  }
+
+  noise_update(regenerate: boolean = false): void {
+    console.time("Planting.noise_update");
+    if(this.noise === undefined) {
+      console.log("new Noise.");
+      this.noise = new Noise("vegetation", this.config);
+    } else {
+      this.noise.generate(regenerate);
+    }
+    console.timeEnd("Planting.noise_update");
+  }
+
+  update(): void {
+    console.time("Planting.update");
     this.sealevel = this.config.get("geography.sealevel");
     this.shoreline = this.config.get("geography.shoreline");
     this.tileCount = this.config.get("enviroment.tile_count");
     this.noise_effect = this.config.get("vegetation.noise_effect");
     this.dampness_effect = this.config.get("vegetation.dampness_effect");
-
-    this.populate();
-  }
-
-  populate(): void {
     const river_width_mod = this.config.get("geography.riverWidth");
     const river_likelihood = this.config.get("geography.riverLikelihood");
-    console.log("Planting.populate", river_width_mod, river_likelihood);
 
+    this.locations = new Map();
     this.countByType = [0, 0, 0, 0];
     this.count = 0;
     for(let x = 0; x < this.noise.length; x++) {
@@ -106,6 +112,7 @@ export class Planting {
         }
       }
     }
+    console.timeEnd("Planting.update");
   }
 
   set(keyX: number, keyY: number, value: BABYLON.Nullable<Plant>): void {
