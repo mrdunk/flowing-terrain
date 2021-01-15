@@ -204,15 +204,14 @@ void setColor(inout vec3 diffuseColor) {
 
     float noiseVal = get_noise(x, z);
     float clampedNoiseVal = clamp(noiseVal, 0.001, 10.0);
+    float shoreHeight = max(shoreline + sealevel + clampedNoiseVal / 4.0, sealevel);
 
-    if (drawRiver(x, z) && y / scale > sealevel) {
+    if (y / scale > sealevel && drawRiver(x, z)) {
       diffuseColor.rgb = river;
-    } else 
-    if (y / scale >= snowline - (snowline * clampedNoiseVal / 2.0)) {
+    } else if (y / scale >= snowline - (snowline * clampedNoiseVal / 2.0)) {
       // Snow
       diffuseColor.rgb = snow;
-    } else if (y / scale >= shoreline + noiseVal / 4.0 &&
-               y / scale > sealevel) {
+    } else if (y / scale > shoreHeight) {
       // Land
       if (pow(clampedNoiseVal, 5.) * y > rockLikelihood) {
         diffuseColor.rgb = rock;
@@ -221,8 +220,8 @@ void setColor(inout vec3 diffuseColor) {
       }
     } else {
       // Below shoreline
-      float multiplier = clamp(y / scale / shoreline, 0.0, 1.0);
-      if (clampedNoiseVal > rockLikelihood / 10.) {
+      float multiplier = clamp(y / scale / (sealevel + shoreline), 0.0, 1.0);
+      if (noiseVal > rockLikelihood - 1.) {
         diffuseColor.rgb = rock * multiplier;
       } else {
         diffuseColor.rgb = sand * multiplier;

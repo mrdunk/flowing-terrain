@@ -19192,7 +19192,7 @@ var Display3d = function (_flowing_terrain_1$Di) {
             this.land_material = new landMaterial_1.LandMaterial("land_material", this.tile_size, this.scene);
             this.land_material.diffuseColor = new BABYLON.Color3(0.3, 0.8, 0.1);
             this.land_material.setNoise(this.geography.noise.coefficients_low, this.geography.noise.coefficients_mid, this.geography.noise.coefficients_high, this.config.get("noise.low_octave_weight"), this.config.get("noise.mid_octave_weight"), this.config.get("noise.high_octave_weight"));
-            this.land_material.shoreline = this.config.get("geography.sealevel") + this.config.get("geography.shoreline");
+            this.land_material.shoreline = this.config.get("geography.shoreline");
             this.land_material.sealevel = this.config.get("geography.sealevel");
             this.land_material.snowline = this.config.get("geography.snowline");
             this.land_material.rockLikelihood = this.config.get("geography.rockLikelihood");
@@ -19534,7 +19534,6 @@ var Display3d = function (_flowing_terrain_1$Di) {
             if (this.treeShadowMapSize < 0) {
                 this.treeShadowMapSize = 2048;
             }
-            // const p = new Planting(this.geography, this.config);
             // Scrap any existing trees so we can regenerate.
             if (this.treesPine) {
                 try {
@@ -19597,6 +19596,14 @@ var Display3d = function (_flowing_terrain_1$Di) {
 
                                     var position = new BABYLON.Vector3(plant.position.x * this.tile_size, 0, plant.position.z * this.tile_size);
                                     this.setHeightToSurface(position);
+                                    // shore_height matches the calculation used in the land material shader in
+                                    // land.fragment.ts.
+                                    var clamped_noise_val = Math.max(0, this.geography.noise.get_value(plant.position.x, plant.position.z) / 4.0);
+                                    var shore_height = Math.max(this.land_material.shoreline + this.land_material.sealevel + clamped_noise_val, this.land_material.sealevel);
+                                    if (position.y / this.tile_size <= shore_height) {
+                                        // Don't draw a tree if it's on or below the beach.
+                                        continue;
+                                    }
                                     var matrix = BABYLON.Matrix.Compose(new BABYLON.Vector3(plant.height, plant.height, plant.height), BABYLON.Quaternion.Zero(), position);
                                     switch (plant.type_) {
                                         case 0 /* Pine */:
@@ -20180,6 +20187,8 @@ exports.BaseCameraPointersInput = BaseCameraPointersInput;
  * SOFTWARE.
  */
 
+var _slicedToArray = function () { function sliceIterator(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"]) _i["return"](); } finally { if (_d) throw _e; } } return _arr; } return function (arr, i) { if (Array.isArray(arr)) { return arr; } else if (Symbol.iterator in Object(arr)) { return sliceIterator(arr, i); } else { throw new TypeError("Invalid attempt to destructure non-iterable instance"); } }; }();
+
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
@@ -20195,12 +20204,12 @@ var Plant = function Plant(position, random) {
     this.heightMultiplier = 0.05;
     this.positionBase = position;
     this.height = (random() + 0.5) * this.heightMultiplier;
-    if (random() < 0.2) {
+    if (position.y / 5 + random() > 1) {
         this.type_ = 0 /* Pine */;
     } else {
         this.type_ = 1 /* Deciduous */;
     }
-    this.position = new BABYLON.Vector3(random() + this.positionBase.x, 0, random() + this.positionBase.z);
+    this.position = new BABYLON.Vector3(random() + position.x, 0, random() + position.z);
 };
 
 exports.Plant = Plant;
@@ -20233,6 +20242,25 @@ var Planting = function () {
             console.timeEnd("Planting.noise_update");
         }
     }, {
+        key: "average_tile",
+        value: function average_tile(x, y) {
+            var tile00 = this.geography.tiles[x][y];
+            var tile10 = this.geography.tiles[x + 1][y];
+            var tile01 = this.geography.tiles[x][y + 1];
+            var tile11 = this.geography.tiles[x + 1][y + 1];
+            // This shore height does not take noise into account.
+            // We will populate a few trees on or below the beach which will need culled
+            // when we do the 3d render.
+            // We wait until then because only the 3d render code knows the exact shape
+            // of the shoreline.
+            var shore_height = Math.max(this.shoreline + this.sealevel, this.sealevel);
+            // Whole tile below water.
+            var below_water = tile00.height < shore_height && tile10.height < shore_height && tile01.height < shore_height && tile11.height < shore_height;
+            var dampness = tile00.dampness + tile10.dampness + tile01.dampness + tile11.dampness;
+            var altitude = tile00.height;
+            return [below_water, dampness, altitude];
+        }
+    }, {
         key: "update",
         value: function update() {
             console.time("Planting.update");
@@ -20246,10 +20274,24 @@ var Planting = function () {
             this.locations = new Map();
             this.countByType = [0, 0, 0, 0];
             this.count = 0;
-            for (var x = 0; x < this.noise.length; x++) {
-                for (var y = 0; y < this.noise.length; y++) {
-                    for (var i = 0; i < this.treesPerTile; i++) {
-                        var plant = this.createPlant(x, y, river_width_mod, river_likelihood);
+            for (var x = 0; x < this.noise.length - 1; x++) {
+                for (var y = 0; y < this.noise.length - 1; y++) {
+                    var _average_tile = this.average_tile(x, y),
+                        _average_tile2 = _slicedToArray(_average_tile, 3),
+                        below_water = _average_tile2[0],
+                        dampness = _average_tile2[1],
+                        altitude = _average_tile2[2];
+
+                    if (below_water) {
+                        // Don't calculate the tree if the whole tile is below water.
+                        // This will add some trees lower than required which we cull when we
+                        // come to render the scene.
+                        continue;
+                    }
+                    // Have both noise-map and drainage affect likelihood of trees growing.
+                    var noiseVal = this.noise.get_value(x, y) * this.noise_effect + Math.max(0, Math.sqrt(dampness) * (this.dampness_effect + 1) / 100 - 0.2);
+                    for (var i = 0; i < Math.floor(this.treesPerTile * noiseVal); i++) {
+                        var plant = this.createPlant(x, y, altitude, river_width_mod, river_likelihood);
                         if (plant) {
                             this.set(x, y, plant);
                         }
@@ -20298,31 +20340,15 @@ var Planting = function () {
         }
     }, {
         key: "createPlant",
-        value: function createPlant(keyX, keyY, river_width_mod, river_likelihood) {
-            if (keyX >= this.tileCount - 1 || keyY >= this.tileCount - 1) {
-                return null;
-            }
-            var tile00 = this.geography.tiles[keyX][keyY];
-            var tile10 = this.geography.tiles[keyX + 1][keyY];
-            var tile01 = this.geography.tiles[keyX][keyY + 1];
-            var tile11 = this.geography.tiles[keyX + 1][keyY + 1];
-            // No trees under water.
-            if (tile00.height < this.sealevel + this.shoreline || tile10.height < this.sealevel + this.shoreline || tile01.height < this.sealevel + this.shoreline || tile11.height < this.sealevel + this.shoreline) {
-                return null;
-            }
-            // Have both noise-map and drainage affect likelihood of trees growing.
-            var noiseVal = this.noise.get_value(keyX, keyY) * this.noise_effect * 5 + Math.sqrt(Math.sqrt(tile00.dampness * tile01.dampness * tile10.dampness * tile11.dampness)) * this.dampness_effect / 10;
-            if (noiseVal < 1) {
-                return null;
-            }
-            var random = seedrandom(noiseVal + " " + this.count);
-            var plant = new Plant(new BABYLON.Vector3(keyX, tile00.height, keyY), random);
-            this.countByType[plant.type_]++;
-            this.count++;
+        value: function createPlant(x, y, altitude, river_width_mod, river_likelihood) {
+            var random = seedrandom(x + " " + y + " " + this.count);
+            var plant = new Plant(new BABYLON.Vector3(x, altitude, y), random);
             var d = this.geography.distance_to_river({ x: plant.position.x, y: plant.position.z }, river_width_mod, river_likelihood);
             if (d <= 0.0) {
                 return null;
             }
+            this.countByType[plant.type_]++;
+            this.count++;
             return plant;
         }
     }]);
@@ -21978,9 +22004,9 @@ window.onload = function () {
     config.set_callback("vegetation.enabled", vegetation_enabled);
     config.set_if_null("vegetation.shadow_enabled", 1);
     config.set_callback("vegetation.shadow_enabled", vegetation_enabled);
-    config.set_if_null("vegetation.noise_effect", 1);
+    config.set_if_null("vegetation.noise_effect", 5);
     config.set_callback("vegetation.noise_effect", vegetation_octaves_callback);
-    config.set_if_null("vegetation.dampness_effect", 2);
+    config.set_if_null("vegetation.dampness_effect", 5);
     config.set_callback("vegetation.dampness_effect", vegetation_octaves_callback);
     config.set_if_null("vegetation.low_octave", 3);
     config.set_callback("vegetation.low_octave", vegetation_octaves_callback);
@@ -22084,15 +22110,14 @@ window.onload = function () {
     function generate_vegetation() {
         if (vegetation === null) {
             vegetation = new Planting_1.Planting(geography, config);
-        } else {
-            if (vegetation_timer === 0) {
-                vegetation_timer = setTimeout(function () {
-                    vegetation_timer = 0;
-                    vegetation.update();
-                    draw_vegetation();
-                    draw_vegetation_2d_map();
-                }, 1000);
-            }
+        }
+        if (vegetation_timer === 0) {
+            vegetation_timer = setTimeout(function () {
+                vegetation_timer = 0;
+                vegetation.update();
+                draw_vegetation();
+                draw_vegetation_2d_map();
+            }, 1000);
         }
     }
     function draw_vegetation() {
@@ -22717,7 +22742,7 @@ BABYLON._TypeStore.RegisteredTypes["BABYLON.BaseMaterial"] = BaseMaterial;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.landPixelShader = void 0;
 var name = 'landPixelShader';
-var shader = "precision highp float;\nprecision highp int;\nprecision highp usampler2D;\n\n// Colors for terrain.\nconst vec3 river = vec3(0., 0.10, 0.82);\nconst vec3 snow = vec3(0.66, 0.78, 0.82);\nconst vec3 grass = vec3(0.24, 0.5, 0.16);\nconst vec3 scrub = vec3(0.24, 0.2, 0.16);\nconst vec3 rock = vec3(0.25, 0.3, 0.3);\nconst vec3 sand = vec3(0.78, 0.78, 0.27);\n\nuniform vec4 vEyePosition;\nuniform vec4 vDiffuseColor;\nuniform float[40] noiseCoeficientLow;\nuniform float[40] noiseCoeficientMid;\nuniform float[40] noiseCoeficientHigh;\nuniform float noiseWeightLow;\nuniform float noiseWeightMid;\nuniform float noiseWeightHigh;\nuniform float scale;\nuniform float shoreline;\nuniform float sealevel;\nuniform float snowline;\nuniform float rockLikelihood;\nuniform float riverWidth;\nuniform float riverLikelihood;\nuniform usampler2D drainage;\n\nvarying vec3 vPositionW;\n#ifdef NORMAL\nvarying vec3 vNormalW;\n#endif\n#ifdef VERTEXCOLOR\nvarying vec4 vColor;\n#endif\n\n#include<helperFunctions>\n\n#include<__decl__lightFragment>[0..maxSimultaneousLights]\n#include<lightsFragmentFunctions>\n#include<shadowsFragmentFunctions>\n\n#ifdef DIFFUSE\nvarying vec2 vDiffuseUV;\nuniform sampler2D diffuseSampler;\nuniform vec2 vDiffuseInfos;\n#endif\n#include<clipPlaneFragmentDeclaration>\n\n#include<fogFragmentDeclaration>\n\n// Helper function for repeatable noise value unique to a set of map coordinates.\nfloat get_octave_value(float[40] coefficients, float weight, float x, float y) {\n  int index = 0;\n  float count = 0.;\n  float returnVal = 0.0;\n  while(index < 20) {\n    if(coefficients[2 * index] > 0.0 || coefficients[2 * index + 1] > 0.0) {\n      returnVal += sin(coefficients[2 * index] * x / scale +\n                       coefficients[2 * index + 1] * y / scale);\n      count += 1.;\n    //} else {\n    //  break;;\n    }\n    index++;\n  }\n  if(count > 0.) {\n    returnVal /= sqrt(count);\n  }\n\n  return returnVal * weight;\n}\n\n// Return repeatable noise value unique to a set of map coordinates.\nfloat get_noise(float x, float y) {\n  return (get_octave_value(noiseCoeficientLow, noiseWeightLow, x, y) +\n          get_octave_value(noiseCoeficientMid, noiseWeightMid, x, y) +\n          get_octave_value(noiseCoeficientHigh, noiseWeightHigh, x, y)) / 3.0;\n}\n\n// Return one offset to a neighbouring tile from a bitmap.\n// The value is cleared from the passed bitmap.\nvec2 getOffset(inout uint bitmap) {\n    if ((bitmap & uint(2)) > uint(0)) {\n        bitmap &= ~uint(2);\n        return vec2(-1.0, 0.0);\n    } else if ((bitmap & uint(64)) > uint(0)) {\n        bitmap &= ~uint(64);\n        return vec2(1.0, 0.0);\n    } else if ((bitmap & uint(8)) > uint(0)) {\n        bitmap &= ~uint(8);\n        return vec2(0.0, -1.0);\n    } else if ((bitmap & uint(16)) > uint(0)) {\n        bitmap &= ~uint(16);\n        return vec2(0.0, 1.0);\n    } else if ((bitmap & uint(1)) > uint(0)) {\n        bitmap &= ~uint(1);\n        return vec2(-1.0, -1.0);\n    } else if ((bitmap & uint(4)) > uint(0)) {\n        bitmap &= ~uint(4);\n        return vec2(-1.0, 1.0);\n    } else if ((bitmap & uint(32)) > uint(0)) {\n        bitmap &= ~uint(32);\n        return vec2(1.0, -1.0);\n    } else if ((bitmap & uint(128)) > uint(0)) {\n        bitmap &= ~uint(128);\n        return vec2(1.0, 1.0);\n    }\n\n    // Should never get here.\n    return vec2(1000000.0, 1000000.0);\n}\n\n// Get summary of a point's drainage from the drainage texture.\nuvec4 getDrainageSummary(float x, float z) {\n    vec2 key = vec2(x / 100., z / 100.);\n    return texture2D(drainage, key);\n}\n\n// Returns true if pTest is inside the river.\n// For explanation of distance from line segment:\n// https://www.youtube.com/watch?v=PMltMdi1Wzg\nbool isColinear(vec2 a, vec2 b, vec2 p, float tolerance) {\n    float len = distance(b, a);\n    float h = min(1., max(0., dot(p - a, b - a) / (len * len)));\n    return length(p - a - h * (b - a)) < tolerance;\n}\n\nbool drawRiver(float x_, float z_) {\n    // Loop once for each corner of a tile.\n    for(int corner = 0; corner < 4; corner++) {\n        float x = x_ / scale;\n        float z = z_ / scale;\n\n        float ix = floor(x);\n        float iz = floor(z);\n        if(corner == 0) {\n        } else if(corner == 1) {\n            ix += 2.;\n            x += 1.;\n        } else if(corner == 2) {\n            iz += 2.;\n            z += 1.;\n        } else if(corner == 3) {\n            ix += 2.;\n            iz += 2.;\n            x += 1.;\n            z += 1.;\n        }\n\n        uvec4 drainageSummary = getDrainageSummary(x, z);\n\n        uint dampness = drainageSummary[2];\n        if (dampness <= uint(riverLikelihood)) {\n            continue;\n        }\n\n        if (drainageSummary[1] == uint(0)) {\n          continue;\n        }\n\n        vec2 toLowNeigh = getOffset(drainageSummary[1]);\n\n        vec2 p0 = vec2(ix, iz) + toLowNeigh * .5;  // Stop at tile boundary.\n        vec2 p1 = vec2(ix, iz) + toLowNeigh * .25;\n\n        float riverWidthRel = sqrt(float(dampness)) * riverWidth / 5000.;\n\n        if (isColinear(p0, p1, vec2(x, z), riverWidthRel)) {\n            return true;\n        }\n\n        while (drainageSummary[0] > uint(0)) {\n            vec2 toHighNeigh = getOffset(drainageSummary[0]);\n            vec2 pHighNeigh = vec2(x, z) + toHighNeigh;\n\n            uvec4 drainageSummaryHigh = getDrainageSummary(pHighNeigh[0], pHighNeigh[1]);\n            dampness = drainageSummaryHigh[2];\n            if (dampness <= uint(riverLikelihood)) {\n                continue;\n            }\n\n            riverWidthRel = sqrt(float(dampness)) * riverWidth / 5000.;\n\n            vec2 p2 = vec2(ix, iz) + toHighNeigh * .25;\n            vec2 p3 = vec2(ix, iz) + toHighNeigh * .5;  // Stop at tile boundary.\n            if (isColinear(p1, p2, vec2(x, z), riverWidthRel)) {\n                return true;\n            }\n            if (isColinear(p2, p3, vec2(x, z), riverWidthRel)) {\n                return true;\n            }\n        }\n    }\n    return false;\n}\n\nvoid setColor(inout vec3 diffuseColor) {\n    float x = vPositionW.x;\n    float y = vPositionW.y;\n    float z = vPositionW.z;\n\n    float noiseVal = get_noise(x, z);\n    float clampedNoiseVal = clamp(noiseVal, 0.001, 10.0);\n\n    if (drawRiver(x, z) && y / scale > sealevel) {\n      diffuseColor.rgb = river;\n    } else \n    if (y / scale >= snowline - (snowline * clampedNoiseVal / 2.0)) {\n      // Snow\n      diffuseColor.rgb = snow;\n    } else if (y / scale >= shoreline + noiseVal / 4.0 &&\n               y / scale > sealevel) {\n      // Land\n      if (pow(clampedNoiseVal, 5.) * y > rockLikelihood) {\n        diffuseColor.rgb = rock;\n      } else {\n        diffuseColor.rgb = mix(scrub, grass, max(0.0, 1.0 / max(1.0, y) - clampedNoiseVal / 2.0));\n      }\n    } else {\n      // Below shoreline\n      float multiplier = clamp(y / scale / shoreline, 0.0, 1.0);\n      if (clampedNoiseVal > rockLikelihood / 10.) {\n        diffuseColor.rgb = rock * multiplier;\n      } else {\n        diffuseColor.rgb = sand * multiplier;\n      }\n    }\n\n    //diffuseColor.rgb = vec3(clampedNoiseVal, clampedNoiseVal, clampedNoiseVal);\n}\n\nvoid main(void) {\n    #include<clipPlaneFragment>\n    vec3 viewDirectionW = normalize(vEyePosition.xyz - vPositionW);\n\n    vec4 baseColor = vec4(1., 1., 1., 1.);\n    vec3 diffuseColor = vDiffuseColor.rgb;\n    float alpha = vDiffuseColor.a;\n    setColor(diffuseColor);\n\n    #ifdef DIFFUSE\n    baseColor = texture2D(diffuseSampler, vDiffuseUV);\n\n    #include<depthPrePass>\n    baseColor.rgb *= vDiffuseInfos.y;\n    #endif\n\n    #ifdef VERTEXCOLOR\n    baseColor.rgb *= vColor.rgb;\n    #endif\n\n    #ifdef NORMAL\n    vec3 normalW = normalize(vNormalW);\n    #else\n    vec3 normalW = vec3(1.0, 1.0, 1.0);\n    #endif\n\n    vec3 diffuseBase = vec3(0., 0., 0.);\n    lightingInfo info;\n    float shadow = 1.;\n    float glossiness = 0.;\n\n    #ifdef SPECULARTERM\n    vec3 specularBase = vec3(0., 0., 0.);\n    #endif\n\n    #include<lightFragment>[0..maxSimultaneousLights]\n\n    #ifdef VERTEXALPHA\n    alpha *= vColor.a;\n    #endif\n    \n    vec3 finalDiffuse = clamp(diffuseBase * diffuseColor, 0.0, 1.0) * baseColor.rgb;\n\n    vec4 color = vec4(finalDiffuse, alpha);\n    #include<fogFragment>\n    gl_FragColor = color;\n    #include<imageProcessingCompatibility>\n}";
+var shader = "precision highp float;\nprecision highp int;\nprecision highp usampler2D;\n\n// Colors for terrain.\nconst vec3 river = vec3(0., 0.10, 0.82);\nconst vec3 snow = vec3(0.66, 0.78, 0.82);\nconst vec3 grass = vec3(0.24, 0.5, 0.16);\nconst vec3 scrub = vec3(0.24, 0.2, 0.16);\nconst vec3 rock = vec3(0.25, 0.3, 0.3);\nconst vec3 sand = vec3(0.78, 0.78, 0.27);\n\nuniform vec4 vEyePosition;\nuniform vec4 vDiffuseColor;\nuniform float[40] noiseCoeficientLow;\nuniform float[40] noiseCoeficientMid;\nuniform float[40] noiseCoeficientHigh;\nuniform float noiseWeightLow;\nuniform float noiseWeightMid;\nuniform float noiseWeightHigh;\nuniform float scale;\nuniform float shoreline;\nuniform float sealevel;\nuniform float snowline;\nuniform float rockLikelihood;\nuniform float riverWidth;\nuniform float riverLikelihood;\nuniform usampler2D drainage;\n\nvarying vec3 vPositionW;\n#ifdef NORMAL\nvarying vec3 vNormalW;\n#endif\n#ifdef VERTEXCOLOR\nvarying vec4 vColor;\n#endif\n\n#include<helperFunctions>\n\n#include<__decl__lightFragment>[0..maxSimultaneousLights]\n#include<lightsFragmentFunctions>\n#include<shadowsFragmentFunctions>\n\n#ifdef DIFFUSE\nvarying vec2 vDiffuseUV;\nuniform sampler2D diffuseSampler;\nuniform vec2 vDiffuseInfos;\n#endif\n#include<clipPlaneFragmentDeclaration>\n\n#include<fogFragmentDeclaration>\n\n// Helper function for repeatable noise value unique to a set of map coordinates.\nfloat get_octave_value(float[40] coefficients, float weight, float x, float y) {\n  int index = 0;\n  float count = 0.;\n  float returnVal = 0.0;\n  while(index < 20) {\n    if(coefficients[2 * index] > 0.0 || coefficients[2 * index + 1] > 0.0) {\n      returnVal += sin(coefficients[2 * index] * x / scale +\n                       coefficients[2 * index + 1] * y / scale);\n      count += 1.;\n    //} else {\n    //  break;;\n    }\n    index++;\n  }\n  if(count > 0.) {\n    returnVal /= sqrt(count);\n  }\n\n  return returnVal * weight;\n}\n\n// Return repeatable noise value unique to a set of map coordinates.\nfloat get_noise(float x, float y) {\n  return (get_octave_value(noiseCoeficientLow, noiseWeightLow, x, y) +\n          get_octave_value(noiseCoeficientMid, noiseWeightMid, x, y) +\n          get_octave_value(noiseCoeficientHigh, noiseWeightHigh, x, y)) / 3.0;\n}\n\n// Return one offset to a neighbouring tile from a bitmap.\n// The value is cleared from the passed bitmap.\nvec2 getOffset(inout uint bitmap) {\n    if ((bitmap & uint(2)) > uint(0)) {\n        bitmap &= ~uint(2);\n        return vec2(-1.0, 0.0);\n    } else if ((bitmap & uint(64)) > uint(0)) {\n        bitmap &= ~uint(64);\n        return vec2(1.0, 0.0);\n    } else if ((bitmap & uint(8)) > uint(0)) {\n        bitmap &= ~uint(8);\n        return vec2(0.0, -1.0);\n    } else if ((bitmap & uint(16)) > uint(0)) {\n        bitmap &= ~uint(16);\n        return vec2(0.0, 1.0);\n    } else if ((bitmap & uint(1)) > uint(0)) {\n        bitmap &= ~uint(1);\n        return vec2(-1.0, -1.0);\n    } else if ((bitmap & uint(4)) > uint(0)) {\n        bitmap &= ~uint(4);\n        return vec2(-1.0, 1.0);\n    } else if ((bitmap & uint(32)) > uint(0)) {\n        bitmap &= ~uint(32);\n        return vec2(1.0, -1.0);\n    } else if ((bitmap & uint(128)) > uint(0)) {\n        bitmap &= ~uint(128);\n        return vec2(1.0, 1.0);\n    }\n\n    // Should never get here.\n    return vec2(1000000.0, 1000000.0);\n}\n\n// Get summary of a point's drainage from the drainage texture.\nuvec4 getDrainageSummary(float x, float z) {\n    vec2 key = vec2(x / 100., z / 100.);\n    return texture2D(drainage, key);\n}\n\n// Returns true if pTest is inside the river.\n// For explanation of distance from line segment:\n// https://www.youtube.com/watch?v=PMltMdi1Wzg\nbool isColinear(vec2 a, vec2 b, vec2 p, float tolerance) {\n    float len = distance(b, a);\n    float h = min(1., max(0., dot(p - a, b - a) / (len * len)));\n    return length(p - a - h * (b - a)) < tolerance;\n}\n\nbool drawRiver(float x_, float z_) {\n    // Loop once for each corner of a tile.\n    for(int corner = 0; corner < 4; corner++) {\n        float x = x_ / scale;\n        float z = z_ / scale;\n\n        float ix = floor(x);\n        float iz = floor(z);\n        if(corner == 0) {\n        } else if(corner == 1) {\n            ix += 2.;\n            x += 1.;\n        } else if(corner == 2) {\n            iz += 2.;\n            z += 1.;\n        } else if(corner == 3) {\n            ix += 2.;\n            iz += 2.;\n            x += 1.;\n            z += 1.;\n        }\n\n        uvec4 drainageSummary = getDrainageSummary(x, z);\n\n        uint dampness = drainageSummary[2];\n        if (dampness <= uint(riverLikelihood)) {\n            continue;\n        }\n\n        if (drainageSummary[1] == uint(0)) {\n          continue;\n        }\n\n        vec2 toLowNeigh = getOffset(drainageSummary[1]);\n\n        vec2 p0 = vec2(ix, iz) + toLowNeigh * .5;  // Stop at tile boundary.\n        vec2 p1 = vec2(ix, iz) + toLowNeigh * .25;\n\n        float riverWidthRel = sqrt(float(dampness)) * riverWidth / 5000.;\n\n        if (isColinear(p0, p1, vec2(x, z), riverWidthRel)) {\n            return true;\n        }\n\n        while (drainageSummary[0] > uint(0)) {\n            vec2 toHighNeigh = getOffset(drainageSummary[0]);\n            vec2 pHighNeigh = vec2(x, z) + toHighNeigh;\n\n            uvec4 drainageSummaryHigh = getDrainageSummary(pHighNeigh[0], pHighNeigh[1]);\n            dampness = drainageSummaryHigh[2];\n            if (dampness <= uint(riverLikelihood)) {\n                continue;\n            }\n\n            riverWidthRel = sqrt(float(dampness)) * riverWidth / 5000.;\n\n            vec2 p2 = vec2(ix, iz) + toHighNeigh * .25;\n            vec2 p3 = vec2(ix, iz) + toHighNeigh * .5;  // Stop at tile boundary.\n            if (isColinear(p1, p2, vec2(x, z), riverWidthRel)) {\n                return true;\n            }\n            if (isColinear(p2, p3, vec2(x, z), riverWidthRel)) {\n                return true;\n            }\n        }\n    }\n    return false;\n}\n\nvoid setColor(inout vec3 diffuseColor) {\n    float x = vPositionW.x;\n    float y = vPositionW.y;\n    float z = vPositionW.z;\n\n    float noiseVal = get_noise(x, z);\n    float clampedNoiseVal = clamp(noiseVal, 0.001, 10.0);\n    float shoreHeight = max(shoreline + sealevel + clampedNoiseVal / 4.0, sealevel);\n\n    if (y / scale > sealevel && drawRiver(x, z)) {\n      diffuseColor.rgb = river;\n    } else if (y / scale >= snowline - (snowline * clampedNoiseVal / 2.0)) {\n      // Snow\n      diffuseColor.rgb = snow;\n    } else if (y / scale > shoreHeight) {\n      // Land\n      if (pow(clampedNoiseVal, 5.) * y > rockLikelihood) {\n        diffuseColor.rgb = rock;\n      } else {\n        diffuseColor.rgb = mix(scrub, grass, max(0.0, 1.0 / max(1.0, y) - clampedNoiseVal / 2.0));\n      }\n    } else {\n      // Below shoreline\n      float multiplier = clamp(y / scale / (sealevel + shoreline), 0.0, 1.0);\n      if (noiseVal > rockLikelihood - 1.) {\n        diffuseColor.rgb = rock * multiplier;\n      } else {\n        diffuseColor.rgb = sand * multiplier;\n      }\n    }\n\n    //diffuseColor.rgb = vec3(clampedNoiseVal, clampedNoiseVal, clampedNoiseVal);\n}\n\nvoid main(void) {\n    #include<clipPlaneFragment>\n    vec3 viewDirectionW = normalize(vEyePosition.xyz - vPositionW);\n\n    vec4 baseColor = vec4(1., 1., 1., 1.);\n    vec3 diffuseColor = vDiffuseColor.rgb;\n    float alpha = vDiffuseColor.a;\n    setColor(diffuseColor);\n\n    #ifdef DIFFUSE\n    baseColor = texture2D(diffuseSampler, vDiffuseUV);\n\n    #include<depthPrePass>\n    baseColor.rgb *= vDiffuseInfos.y;\n    #endif\n\n    #ifdef VERTEXCOLOR\n    baseColor.rgb *= vColor.rgb;\n    #endif\n\n    #ifdef NORMAL\n    vec3 normalW = normalize(vNormalW);\n    #else\n    vec3 normalW = vec3(1.0, 1.0, 1.0);\n    #endif\n\n    vec3 diffuseBase = vec3(0., 0., 0.);\n    lightingInfo info;\n    float shadow = 1.;\n    float glossiness = 0.;\n\n    #ifdef SPECULARTERM\n    vec3 specularBase = vec3(0., 0., 0.);\n    #endif\n\n    #include<lightFragment>[0..maxSimultaneousLights]\n\n    #ifdef VERTEXALPHA\n    alpha *= vColor.a;\n    #endif\n    \n    vec3 finalDiffuse = clamp(diffuseBase * diffuseColor, 0.0, 1.0) * baseColor.rgb;\n\n    vec4 color = vec4(finalDiffuse, alpha);\n    #include<fogFragment>\n    gl_FragColor = color;\n    #include<imageProcessingCompatibility>\n}";
 BABYLON.Effect.ShadersStore[name] = shader;
 /** @hidden */
 exports.landPixelShader = { name: name, shader: shader };

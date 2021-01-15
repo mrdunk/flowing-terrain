@@ -288,8 +288,7 @@ export class Display3d extends DisplayBase {
       this.config.get(`noise.mid_octave_weight`),
       this.config.get(`noise.high_octave_weight`));
 
-    this.land_material.shoreline = 
-      this.config.get("geography.sealevel") + this.config.get("geography.shoreline");
+    this.land_material.shoreline = this.config.get("geography.shoreline");
     this.land_material.sealevel = this.config.get("geography.sealevel");
     this.land_material.snowline = this.config.get("geography.snowline");
     this.land_material.rockLikelihood = this.config.get("geography.rockLikelihood");
@@ -680,8 +679,6 @@ export class Display3d extends DisplayBase {
       this.treeShadowMapSize = 2048;
     }
 
-    // const p = new Planting(this.geography, this.config);
-
     // Scrap any existing trees so we can regenerate.
     if(this.treesPine) {
       try {
@@ -726,6 +723,19 @@ export class Display3d extends DisplayBase {
           const position = new BABYLON.Vector3(
             plant.position.x * this.tile_size, 0, plant.position.z * this.tile_size);
           this.setHeightToSurface(position);
+
+          // shore_height matches the calculation used in the land material shader in
+          // land.fragment.ts.
+          const clamped_noise_val =
+            Math.max(0, this.geography.noise.get_value(plant.position.x, plant.position.z) / 4.0);
+          const shore_height = Math.max(
+            this.land_material.shoreline + this.land_material.sealevel + clamped_noise_val,
+            this.land_material.sealevel);
+
+          if(position.y / this.tile_size <= shore_height) {
+            // Don't draw a tree if it's on or below the beach.
+            continue;
+          }
 
           const matrix = BABYLON.Matrix.Compose(
             new BABYLON.Vector3(plant.height, plant.height, plant.height),
