@@ -83,6 +83,7 @@ export function seed_point_get_value(x: number, y: number, sea: Set<string>): nu
  * This area of seabed will flood in from the edges of the map so will never
  * leave "lakes" surrounded by higher areas. */
 export function seed_points(config: Config, tile_count: number): Set<string> {
+  console.time("seed_points");
   const seabed: Set<string> = new Set();
   const open: SortedSet = new SortedSet([], compare_floods);
   const random = seedrandom(config.get("seed_points.random_seed"));
@@ -109,6 +110,7 @@ export function seed_points(config: Config, tile_count: number): Set<string> {
 
     x = tile_count - 1;
     open.push(new Flood({x, y}, dist_from_center));
+
   }
 
   const threshold = config.get("seed_points.threshold");
@@ -128,6 +130,7 @@ export function seed_points(config: Config, tile_count: number): Set<string> {
     });
   }
 
+  console.timeEnd("seed_points");
   return seabed;
 }
 
@@ -146,10 +149,12 @@ export class Noise {
   length: number;
 
   constructor(label: string, config: Config) {
+    console.time(`Noise.constructor.${label}`);
     this.label = label;
     this.config = config;
     this.length = this.config.get("enviroment.tile_count");
     this.generate();
+    console.timeEnd(`Noise.constructor.${label}`);
   }
 
   set_octave(octave: string) {

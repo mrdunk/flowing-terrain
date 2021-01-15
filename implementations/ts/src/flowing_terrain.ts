@@ -79,9 +79,11 @@ export class Geography {
               config: Config,
               seed_points: Set<string>,
               noise: Noise) {
+    console.time("Geography.constructor");
     this.config = config;
     this.tile_count = this.config.get("enviroment.tile_count");
     this.terraform(enviroment, seed_points, noise);
+    console.timeEnd("Geography.constructor");
   }
 
   // Calculate the terrain.
@@ -258,16 +260,107 @@ export class Geography {
     }
     return neighbours;
   }
+
+  // Distance from the center of a river.
+  // This method presumes rivers do not strictly follow the correct lowest path
+  // across the terrain but instead cut corners. Although this means they may
+  // run uphill slightly where they cut a corner, the visual effect overall is
+  // looks more realistic.
+  distance_to_river(
+    coordinate: Coordinate,
+    river_width_mod: number,
+    min_dampness: number
+  ): number {
+    function dist(a: Coordinate, b: Coordinate) {
+      const dx = (a.x - b.x);
+      const dy = (a.y - b.y);
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+    
+    function dot(a: Coordinate, b: Coordinate): number {
+      return a.x * b.x + a.y * b.y;
+    }
+
+    // For explanation of distance from line segment:
+    // https://www.youtube.com/watch?v=PMltMdi1Wzg
+    function dist_to_line(a: Coordinate, b: Coordinate, p: Coordinate): number {
+      const len = dist(b, a);
+      const pa = {x: p.x - a.x, y: p.y - a.y};
+      const ba = {x: b.x - a.x, y: b.y - a.y};
+      const h = Math.min(1, Math.max(0, dot(pa, ba) / (len * len)));
+      return dist({x: 0, y: 0},
+                  {x: pa.x - h * ba.x, y: pa.y - h * ba.y});
+    }
+
+    const c: Coordinate = {x: Math.floor(coordinate.x), y: Math.floor(coordinate.y)};
+    const c00 = this.get_tile(c);
+    const c01 = this.get_tile({x: c.x, y: c.y + 1});
+    const c10 = this.get_tile({x: c.x + 1, y: c.y});
+    const c11 = this.get_tile({x: c.x + 1, y: c.y + 1});
+
+    let closest: number = 10000;
+    let dampness: number = 0;
+
+    const corners = [c00, c01, c10, c11];
+    corners.forEach((corner) => {
+      if (corner.dampness <= min_dampness) {
+        return;
+      }
+
+      if (corner.lowest_neighbour === null) {
+        return;
+      }
+
+      const p0: Coordinate = {x: corner.pos.x * 0.25 + corner.lowest_neighbour.pos.x * 0.75,
+        y: corner.pos.y * 0.25 + corner.lowest_neighbour.pos.y * 0.75};
+      const p1: Coordinate = {x: corner.pos.x * 0.75 + corner.lowest_neighbour.pos.x * 0.25,
+        y: corner.pos.y * 0.75 + corner.lowest_neighbour.pos.y * 0.25};
+
+      let d_sq = dist_to_line(p0, p1, coordinate);
+      if (d_sq < closest) {
+        closest = d_sq;
+        dampness = corner.dampness;
+      }
+
+      this.get_neighbours(corner).forEach((higher_neighbour) => {
+        if (higher_neighbour.lowest_neighbour !== corner) {
+          return;
+        }
+        if (higher_neighbour.dampness <= min_dampness) {
+          return;
+        }
+
+        const p2: Coordinate = {x: corner.pos.x * 0.75 + higher_neighbour.pos.x * 0.25,
+          y: corner.pos.y * 0.75 + higher_neighbour.pos.y * 0.25};
+        const p3: Coordinate = {x: corner.pos.x * 0.25 + higher_neighbour.pos.x * 0.75,
+          y: corner.pos.y * 0.25 + higher_neighbour.pos.y * 0.75};
+        d_sq = dist_to_line(p1, p2, coordinate);
+        if (d_sq < closest) {
+          closest = d_sq;
+          dampness = higher_neighbour.dampness;
+        }
+        d_sq = dist_to_line(p2, p3, coordinate);
+        if (d_sq < closest) {
+          closest = d_sq;
+          dampness = higher_neighbour.dampness;
+        }
+      });
+    });
+
+    // "5000" is the same constant we use in land.fragment.ts.
+    const river_width = Math.sqrt(dampness) * river_width_mod / 5000;
+
+    //return Math.sqrt(closest) - river_width;
+    return closest - river_width;
+  }
 }
 
 // Example to iterate over a Geography object.
 export class DisplayBase {
-  geography: Geography;
-  config: Config;
+  protected config: Config;
   tile_count: number;
 
-  constructor(geography: Geography) {
-    this.geography = geography;
+  constructor(protected geography: Geography) {
     this.config = this.geography.config;
     this.tile_count = this.config.get("enviroment.tile_count");
   }

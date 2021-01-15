@@ -119,22 +119,13 @@ uvec4 getDrainageSummary(float x, float z) {
     return texture2D(drainage, key);
 }
 
-// Get the distance of testPt from the line joining pt1-pt2.
-float distToLine(vec2 pt1, vec2 pt2, vec2 testPt)
-{
-  vec2 lineDir = pt2 - pt1;
-  vec2 perpDir = vec2(lineDir.y, -lineDir.x);
-  vec2 dirToPt1 = pt1 - testPt;
-  return abs(dot(normalize(perpDir), dirToPt1));
-}
-
-// Returns true if testPt is inside the river.
-bool isColinear(vec2 p1, vec2 p2, vec2 testPt, float tolerance) {
-    float dist = distToLine(p1, p2, testPt);
-
-    float len = distance(p1, p2);
-    return (abs(dist) < tolerance && distance((p1 + p2) / 2., testPt) <= len / 2.) ||
-            distance(p1, testPt) < tolerance || distance(p2, testPt) < tolerance ;
+// Returns true if pTest is inside the river.
+// For explanation of distance from line segment:
+// https://www.youtube.com/watch?v=PMltMdi1Wzg
+bool isColinear(vec2 a, vec2 b, vec2 p, float tolerance) {
+    float len = distance(b, a);
+    float h = min(1., max(0., dot(p - a, b - a) / (len * len)));
+    return length(p - a - h * (b - a)) < tolerance;
 }
 
 bool drawRiver(float x_, float z_) {
@@ -147,16 +138,16 @@ bool drawRiver(float x_, float z_) {
         float iz = floor(z);
         if(corner == 0) {
         } else if(corner == 1) {
+            ix += 2.;
             x += 1.;
-            ix = ceil(x);
         } else if(corner == 2) {
+            iz += 2.;
             z += 1.;
-            iz = ceil(z);
         } else if(corner == 3) {
+            ix += 2.;
+            iz += 2.;
             x += 1.;
-            ix = ceil(x);
             z += 1.;
-            iz = ceil(z);
         }
 
         uvec4 drainageSummary = getDrainageSummary(x, z);
@@ -166,43 +157,43 @@ bool drawRiver(float x_, float z_) {
             continue;
         }
 
-        vec2 p0;
-        vec2 p1;
-        vec2 p2;
-        vec2 p3;
+        if (drainageSummary[1] == uint(0)) {
+          continue;
+        }
 
-        vec2 toNext = getOffset(drainageSummary[1]);
-        p0 = vec2(ix, iz) + toNext / 2.;
-        p1 = vec2(ix, iz) + toNext / 4.;
+        vec2 toLowNeigh = getOffset(drainageSummary[1]);
 
-        if (isColinear(p0, p1, vec2(x, z), sqrt(float(dampness)) * riverWidth / 5000.)) {
-            // Cut corer on the way to the next tile.
+        vec2 p0 = vec2(ix, iz) + toLowNeigh * .5;  // Stop at tile boundary.
+        vec2 p1 = vec2(ix, iz) + toLowNeigh * .25;
+
+        float riverWidthRel = sqrt(float(dampness)) * riverWidth / 5000.;
+
+        if (isColinear(p0, p1, vec2(x, z), riverWidthRel)) {
             return true;
         }
 
         while (drainageSummary[0] > uint(0)) {
-            vec2 fromPrev = getOffset(drainageSummary[0]);
-            p2 = vec2(ix, iz) + fromPrev / 4.;
-            p3 = vec2(ix, iz) + fromPrev / 2.;
+            vec2 toHighNeigh = getOffset(drainageSummary[0]);
+            vec2 pHighNeigh = vec2(x, z) + toHighNeigh;
 
-            uvec4 drainageSummaryFrom = getDrainageSummary(x + fromPrev[0], z + fromPrev[1]);
-            dampness = drainageSummaryFrom[2];
+            uvec4 drainageSummaryHigh = getDrainageSummary(pHighNeigh[0], pHighNeigh[1]);
+            dampness = drainageSummaryHigh[2];
+            if (dampness <= uint(riverLikelihood)) {
+                continue;
+            }
 
-            if (drainageSummaryFrom[2] > uint(riverLikelihood)) {
-                float dampModified = sqrt(float(dampness)) * riverWidth / 5000.;
-                if (isColinear(p1, p2, vec2(x, z), dampModified)) {
-                    // Follow ideal drainage path.
-                    return true;
-                }
-        
-                if (isColinear(p2, p3, vec2(x, z), dampModified)) {
-                    // Cut corner on the way to the next tile.
-                    return true;
-                }
+            riverWidthRel = sqrt(float(dampness)) * riverWidth / 5000.;
+
+            vec2 p2 = vec2(ix, iz) + toHighNeigh * .25;
+            vec2 p3 = vec2(ix, iz) + toHighNeigh * .5;  // Stop at tile boundary.
+            if (isColinear(p1, p2, vec2(x, z), riverWidthRel)) {
+                return true;
+            }
+            if (isColinear(p2, p3, vec2(x, z), riverWidthRel)) {
+                return true;
             }
         }
     }
-
     return false;
 }
 
@@ -213,15 +204,14 @@ void setColor(inout vec3 diffuseColor) {
 
     float noiseVal = get_noise(x, z);
     float clampedNoiseVal = clamp(noiseVal, 0.001, 10.0);
+    float shoreHeight = max(shoreline + sealevel + clampedNoiseVal / 4.0, sealevel);
 
-    if (drawRiver(x, z) && y / scale > sealevel) {
+    if (y / scale > sealevel && drawRiver(x, z)) {
       diffuseColor.rgb = river;
-    } else 
-    if (y / scale >= snowline - (snowline * clampedNoiseVal / 2.0)) {
+    } else if (y / scale >= snowline - (snowline * clampedNoiseVal / 2.0)) {
       // Snow
       diffuseColor.rgb = snow;
-    } else if (y / scale >= shoreline + noiseVal / 4.0 &&
-               y / scale > sealevel) {
+    } else if (y / scale > shoreHeight) {
       // Land
       if (pow(clampedNoiseVal, 5.) * y > rockLikelihood) {
         diffuseColor.rgb = rock;
@@ -230,8 +220,8 @@ void setColor(inout vec3 diffuseColor) {
       }
     } else {
       // Below shoreline
-      float multiplier = clamp(y / scale / shoreline, 0.0, 1.0);
-      if (clampedNoiseVal > rockLikelihood / 10.) {
+      float multiplier = clamp(y / scale / (sealevel + shoreline), 0.0, 1.0);
+      if (noiseVal > rockLikelihood - 1.) {
         diffuseColor.rgb = rock * multiplier;
       } else {
         diffuseColor.rgb = sand * multiplier;
