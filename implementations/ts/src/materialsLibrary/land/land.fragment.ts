@@ -114,9 +114,8 @@ vec2 getOffset(inout uint bitmap) {
 }
 
 // Get summary of a point's drainage from the drainage texture.
-uvec4 getDrainageSummary(float x, float z) {
-    vec2 key = vec2(x / 100., z / 100.);
-    return texture2D(drainage, key);
+uvec4 getDrainageSummary(vec2 point) {
+    return texture2D(drainage, point / 100.);
 }
 
 // Returns true if pTest is inside the river.
@@ -128,29 +127,26 @@ bool isColinear(vec2 a, vec2 b, vec2 p, float tolerance) {
     return length(p - a - h * (b - a)) < tolerance;
 }
 
-bool drawRiver(float x_, float z_) {
+bool drawRiver(vec2 point_) {
     // Loop once for each corner of a tile.
     for(int corner = 0; corner < 4; corner++) {
-        float x = x_ / scale;
-        float z = z_ / scale;
-
-        float ix = floor(x);
-        float iz = floor(z);
+        vec2 point = point_ / scale;
+        vec2 ipoint = floor(point);
         if(corner == 0) {
         } else if(corner == 1) {
-            ix += 2.;
-            x += 1.;
+            ipoint.x += 2.;
+            point.x += 1.;
         } else if(corner == 2) {
-            iz += 2.;
-            z += 1.;
+            ipoint.y += 2.;
+            point.y += 1.;
         } else if(corner == 3) {
-            ix += 2.;
-            iz += 2.;
-            x += 1.;
-            z += 1.;
+            ipoint.x += 2.;
+            ipoint.y += 2.;
+            point.x += 1.;
+            point.y += 1.;
         }
 
-        uvec4 drainageSummary = getDrainageSummary(x, z);
+        uvec4 drainageSummary = getDrainageSummary(point);
 
         uint dampness = drainageSummary[2];
         if (dampness <= uint(riverLikelihood)) {
@@ -163,20 +159,20 @@ bool drawRiver(float x_, float z_) {
 
         vec2 toLowNeigh = getOffset(drainageSummary[1]);
 
-        vec2 p0 = vec2(ix, iz) + toLowNeigh * .5;  // Stop at tile boundary.
-        vec2 p1 = vec2(ix, iz) + toLowNeigh * .25;
+        vec2 a = ipoint + toLowNeigh * .5;  // Stop at tile boundary.
+        vec2 b = ipoint + toLowNeigh * .25;
 
         float riverWidthRel = sqrt(float(dampness)) * riverWidth / 5000.;
 
-        if (isColinear(p0, p1, vec2(x, z), riverWidthRel)) {
+        if (isColinear(a, b, point, riverWidthRel)) {
             return true;
         }
 
         while (drainageSummary[0] > uint(0)) {
             vec2 toHighNeigh = getOffset(drainageSummary[0]);
-            vec2 pHighNeigh = vec2(x, z) + toHighNeigh;
+            vec2 pHighNeigh = point + toHighNeigh;
 
-            uvec4 drainageSummaryHigh = getDrainageSummary(pHighNeigh[0], pHighNeigh[1]);
+            uvec4 drainageSummaryHigh = getDrainageSummary(pHighNeigh);
             dampness = drainageSummaryHigh[2];
             if (dampness <= uint(riverLikelihood)) {
                 continue;
@@ -184,12 +180,12 @@ bool drawRiver(float x_, float z_) {
 
             riverWidthRel = sqrt(float(dampness)) * riverWidth / 5000.;
 
-            vec2 p2 = vec2(ix, iz) + toHighNeigh * .25;
-            vec2 p3 = vec2(ix, iz) + toHighNeigh * .5;  // Stop at tile boundary.
-            if (isColinear(p1, p2, vec2(x, z), riverWidthRel)) {
+            vec2 c = ipoint + toHighNeigh * .25;
+            vec2 d = ipoint + toHighNeigh * .5;  // Stop at tile boundary.
+            if (isColinear(b, c, point, riverWidthRel)) {
                 return true;
             }
-            if (isColinear(p2, p3, vec2(x, z), riverWidthRel)) {
+            if (isColinear(c, d, point, riverWidthRel)) {
                 return true;
             }
         }
@@ -206,7 +202,7 @@ void setColor(inout vec3 diffuseColor) {
     float clampedNoiseVal = clamp(noiseVal, 0.001, 10.0);
     float shoreHeight = max(shoreline + sealevel + clampedNoiseVal / 4.0, sealevel);
 
-    if (y / scale > sealevel && drawRiver(x, z)) {
+    if (y / scale > sealevel && drawRiver(vPositionW.xz)) {
       diffuseColor.rgb = river;
     } else if (y / scale >= snowline - (snowline * clampedNoiseVal / 2.0)) {
       // Snow

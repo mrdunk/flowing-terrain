@@ -233,6 +233,8 @@ window.onload = () => {
     vegetation.noise.text(document.getElementById("vegetation_debug"));
   }
 
+
+  // Initialise the things.
   generate_seed_points();
   generate_noise();
   generate_terrain();
@@ -244,8 +246,8 @@ window.onload = () => {
 
   display.set_view("up");
 
-  // UI components below this point.
 
+  // UI components below this point.
 
   // Resize the window.
   function onResize() {

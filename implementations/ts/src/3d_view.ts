@@ -194,11 +194,6 @@ export class Display3d extends DisplayBase {
     // Hide the HTML loader.
     document.getElementById("loader").style.display = "none";
 
-    // Optimizations.
-    // this.scene.freezeActiveMeshes();
-    // this.scene.autoClear = false;
-    // this.scene.autoClearDepthAndStencil = false;
-
     // Optimizers
     this.deoptimizer =
       new BABYLON.SceneOptimizer(
@@ -218,7 +213,9 @@ export class Display3d extends DisplayBase {
       console.info(`Ran out of display enhancements before going below ${requestedFps} fps.`);
     });
 
-    this.optimize();
+    setTimeout(() => {
+      this.optimize();
+    }, 2000);
     console.timeEnd("Display3d.constructor");
   }
 
