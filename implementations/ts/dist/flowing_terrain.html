@@ -24,9 +24,10 @@
             <div>An explanation of the algorithm can be found here:
               <a href="https://github.com/mrdunk/flowing-terrain">https://github.com/mrdunk/flowing-terrain</a>
             </div>
-            <div><br>The map you see is randomly generated. For a new map, regenerate one of the sources under the Tool->Geography menu.</div>
-            <div>Cursor keys and mouse to move around.</div>
-            <div><br>This demonstration is made posible by the following projects:</div>
+            <div><br>The map you see is randomly generated. For a new map, either reload the page or regenerate one of the sources under the Tool->Geography menu.</div>
+            <div>Cursor keys and mouse to move around. Mouse drag button 1 to move, mouse drag button 2 to rotate and mouse-wheel to change altitude.</div>
+            <div>On a mobile platform, 1 finger drag to move, 2 finger drag to rotate and pinch to change altitude.</div>
+            <div><br>This demonstration is made possible by the following projects:</div>
             <div>
               <a href="https://www.typescriptlang.org/">TypeScript</a>. A much saner alternative to vanilla JavaScript in my opinion.
             </div>
@@ -66,8 +67,20 @@
                         <feedback-slider id="sea_transparency" title="Set the transparency of the sea" name="display.sea_transparency" min="0" max="1" step="0.05" value="0.5">
                           Sea Transparency
                         </feedback-slider>
-                        <feedback-slider id="river_threshold" title="Set how visible rivers are" name="display.river_threshold" min="0" max="20" value="10">
+                        <feedback-slider id="riverWidth" title="Set how wide rivers are" name="geography.riverWidth" min="0" max="50" step="0.1" value="10">
+                          River Width
+                        </feedback-slider>
+                        <feedback-slider id="riverLikelihood" title="Set how likely rivers are to form" name="geography.riverLikelihood" min="0" max="20" step="0.1" value="5">
                           River Likelihood
+                        </feedback-slider>
+                        <feedback-slider id="snowline" title="Set the snowline" name="geography.snowline" min="0" max="20" step="0.1" value="10">
+                          Snowline
+                        </feedback-slider>
+                        <feedback-slider id="shoreline" title="Set the shoreline" name="geography.shoreline" min="0" max="1" step="0.01" value="0.05">
+                          Beaches
+                        </feedback-slider>
+                        <feedback-slider id="rockLikelihood" title="Set the rockLikelihood" name="geography.rockLikelihood" min="0" max="2" step="0.001" value="1">
+                          Rock outcrops
                         </feedback-slider>
                       </div>
                     </div>
@@ -76,11 +89,17 @@
                       <div class="border higher-vis">
                         <input type="checkbox" id="vegetation_enabled" name="vegetation.enabled">
                         <label for="vegetation_enabled">Show trees</label>
-                      </div>
-
-                      <div class="border higher-vis">
+                        
                         <input type="checkbox" id="vegetation_shasow_enabled" name="vegetation.shadow_enabled">
                         <label for="vegetation_shadow_enabled">Show tree shadows</label>
+
+                        <feedback-slider id="noise_effect" title="Set the effect of noise-map on tree growth" name="vegetation.noise_effect" min="0" max="10" step="0.1" value="5">
+                          Effect of noise-map on trees
+                        </feedback-slider>
+
+                        <feedback-slider id="dampness_effect" title="Set the effect of rivers on tree growth" name="vegetation.dampness_effect" min="0" max="10" step="0.1" value="5">
+                          Effect of drainage on trees
+                        </feedback-slider>
                       </div>
 
                       <canvas id="vegetation_map"></canvas><br>

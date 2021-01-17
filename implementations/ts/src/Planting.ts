@@ -25,12 +25,13 @@
 import * as seedrandom from 'seedrandom';
 import {Config} from "./config";
 import {Geography, Tile} from "./flowing_terrain";
+import {Noise} from "./genesis";
 
 export const enum PlantType {
   Pine,
   Deciduous,
-  Thicket,
-  Shrub,
+  // Thicket,
+  // Shrub,
 }
 
 export class Plant {
@@ -44,49 +45,113 @@ export class Plant {
     this.positionBase = position;
     this.height = (random() + 0.5 ) * this.heightMultiplier;
 
-    if(random() < 0.2) {
+    if(position.y / 5 + random() > 1) {
       this.type_ = PlantType.Pine;
     } else {
       this.type_ = PlantType.Deciduous;
     }
 
     this.position = new BABYLON.Vector3(
-      random() + this.positionBase.x, 0, random() + this.positionBase.z);
+      random() + position.x, 0, random() + position.z);
   }
 }
 
 export class Planting {
   readonly treesPerTile: number = 10;
-  geography: Geography;
-  config: Config;
-  noise: number[][];
   locations: Map<number, Map<number, Plant[]>>;
-  countByType: number[];
+  countByType: [number, number, number, number];
   count: number;
+  sealevel: number;
+  shoreline: number;
+  tileCount: number;
+  noise_effect: number;
+  dampness_effect: number;
+  noise: Noise;
 
-  constructor(geography: Geography,
-              config: Config,
-              noise: number[][]) {
-    this.geography = geography;
-    this.config = config;
-    this.noise = noise;
-    this.countByType = [0, 0, 0, 0];
-    this.locations = new Map();
+  constructor(private geography: Geography,
+              private config: Config
+  ) {
+    console.assert(this.geography !== null);
+    console.assert(this.config !== null);
 
-    this.populate();
+    this.noise_update(true);
+    this.update();
   }
 
-  populate(): void {
+  noise_update(regenerate: boolean = false): void {
+    console.time("Planting.noise_update");
+    if(this.noise === undefined) {
+      console.log("new Noise.");
+      this.noise = new Noise("vegetation", this.config);
+    } else {
+      this.noise.generate(regenerate);
+    }
+    console.timeEnd("Planting.noise_update");
+  }
+
+  average_tile(x: number, y: number): [boolean, number, number] {
+    const tile00 = this.geography.tiles[x][y];
+    const tile10 = this.geography.tiles[x + 1][y];
+    const tile01 = this.geography.tiles[x][y + 1];
+    const tile11 = this.geography.tiles[x + 1][y + 1];
+
+    // This shore height does not take noise into account.
+    // We will populate a few trees on or below the beach which will need culled
+    // when we do the 3d render.
+    // We wait until then because only the 3d render code knows the exact shape
+    // of the shoreline.
+    const shore_height = Math.max(this.shoreline + this.sealevel, this.sealevel);
+
+    // Whole tile below water.
+    const below_water = (
+      tile00.height < shore_height &&
+      tile10.height < shore_height &&
+      tile01.height < shore_height &&
+      tile11.height < shore_height);
+
+    const dampness = ( tile00.dampness + tile10.dampness + tile01.dampness + tile11.dampness);
+
+    const altitude = tile00.height;
+
+    return [below_water, dampness, altitude];
+  }
+
+  update(): void {
+    console.time("Planting.update");
+    this.sealevel = this.config.get("geography.sealevel");
+    this.shoreline = this.config.get("geography.shoreline");
+    this.tileCount = this.config.get("enviroment.tile_count");
+    this.noise_effect = this.config.get("vegetation.noise_effect");
+    this.dampness_effect = this.config.get("vegetation.dampness_effect");
+    const river_width_mod = this.config.get("geography.riverWidth");
+    const river_likelihood = this.config.get("geography.riverLikelihood");
+
+    this.locations = new Map();
     this.countByType = [0, 0, 0, 0];
     this.count = 0;
-    for(let x = 0; x < this.noise.length; x++) {
-      const row = this.noise[x];
-      for(let y = 0; y < row.length; y++) {
-        for(let i = 0; i < this.treesPerTile; i++) {
-          this.set(x, y, this.createPlant(x, y));
+    for(let x = 0; x < this.noise.length - 1; x++) {
+      for(let y = 0; y < this.noise.length - 1; y++) {
+        const [below_water, dampness, altitude] = this.average_tile(x, y);
+        if(below_water) {
+          // Don't calculate the tree if the whole tile is below water.
+          // This will add some trees lower than required which we cull when we
+          // come to render the scene.
+          continue;
+        }
+
+        // Have both noise-map and drainage affect likelihood of trees growing.
+        const noiseVal = (this.noise.get_value(x, y) * this.noise_effect) +
+          Math.max(0, (Math.sqrt(dampness) * (this.dampness_effect + 1) / 100 - 0.2));
+
+        for(let i = 0; i < Math.floor(this.treesPerTile * noiseVal); i++) {
+          const plant = this.createPlant(x, y, altitude, river_width_mod, river_likelihood);
+          if (plant) {
+            this.set(x, y, plant);
+          }
         }
       }
     }
+    console.timeEnd("Planting.update");
   }
 
   set(keyX: number, keyY: number, value: BABYLON.Nullable<Plant>): void {
@@ -130,33 +195,19 @@ export class Planting {
     return row.get(keyY);
   }
 
-  createPlant(keyX: number, keyY: number): BABYLON.Nullable<Plant> {
-    const sealevel = this.config.get("geography.sealevel");
-    const tileCount = this.config.get("enviroment.tile_count");
+  createPlant(
+    x: number, y: number, altitude: number,
+    river_width_mod: number, river_likelihood: number
+  ): BABYLON.Nullable<Plant> {
 
-    if(keyX >= tileCount - 1 || keyY >= tileCount - 1){
+    let random: seedrandom.prng = seedrandom(`${x} ${y} ${this.count}`);
+    const plant = new Plant(new BABYLON.Vector3(x, altitude, y), random);
+
+    const d = this.geography.distance_to_river(
+      {x: plant.position.x, y: plant.position.z}, river_width_mod, river_likelihood);
+    if ( d <= 0.0) {
       return null;
     }
-
-    const tile00 = this.geography.tiles[keyX][keyY];
-    const tile10 = this.geography.tiles[keyX + 1][keyY];
-    const tile01 = this.geography.tiles[keyX][keyY + 1];
-    const tile11 = this.geography.tiles[keyX + 1][keyY + 1];
-
-    if(
-        tile00.height < sealevel ||
-        tile10.height < sealevel ||
-        tile01.height < sealevel ||
-        tile11.height < sealevel) {
-      return null;
-    }
-    const noiseVal = this.noise[keyX][keyY];
-    if(noiseVal < 0.1) {
-      return null;
-    }
-
-    let random: seedrandom.prng = seedrandom(`${noiseVal} ${this.count}`);
-    const plant = new Plant(new BABYLON.Vector3(keyX, tile00.height, keyY), random);
     this.countByType[plant.type_]++;
     this.count++;
 

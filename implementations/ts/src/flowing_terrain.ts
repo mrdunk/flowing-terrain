@@ -29,6 +29,7 @@
 import {SortedSet} from "./ordered_set"
 import {draw_2d} from "./2d_view"
 import {Config} from "./config"
+import {Noise} from "./genesis";
 
 export interface Coordinate {
   x: number;
@@ -69,20 +70,24 @@ export class Geography {
   enviroment: Enviroment;
   config: Config;
   seed_points: Set<string>;
-  noise: number[][];
+  noise: Noise;
   tiles: Tile[][] = [];
   open_set_sorted: SortedSet = new SortedSet([], this.compare_tiles);
+  tile_count: number;
 
   constructor(enviroment: Enviroment,
               config: Config,
               seed_points: Set<string>,
-              noise: number[][]) {
+              noise: Noise) {
+    console.time("Geography.constructor");
     this.config = config;
+    this.tile_count = this.config.get("enviroment.tile_count");
     this.terraform(enviroment, seed_points, noise);
+    console.timeEnd("Geography.constructor");
   }
 
   // Calculate the terrain.
-  terraform(enviroment: Enviroment, seed_points: Set<string>, noise: number[][]) {
+  terraform(enviroment: Enviroment, seed_points: Set<string>, noise: Noise) {
     this.enviroment = enviroment;
     this.seed_points = seed_points;
     this.noise = noise;
@@ -94,9 +99,9 @@ export class Geography {
     this.tiles = [];
 
     // Populate tile array with un-configured Tile elements.
-    for(let x = 0; x < this.config.get("enviroment.tile_count"); x++) {
+    for(let x = 0; x < this.tile_count; x++) {
       const row: Tile[] = [];
-      for(let y = 0; y < this.config.get("enviroment.tile_count"); y++) {
+      for(let y = 0; y < this.tile_count; y++) {
         const tile: Tile = new Tile({x, y}, this.enviroment);
         row.push(tile);
       }
@@ -165,10 +170,10 @@ export class Geography {
           const orientation_mod = (x !== nx && y !== ny) ? 1.414 : 1;
 
           // Basic value of the point on the noise map.
-          const height_diff = noise_height_weight * Math.max(this.noise[x][y], 0);
+          const height_diff = noise_height_weight * Math.max(this.noise.get_value(x, y), 0);
           // Gradient of the slope between point and the one the algorithm is flooding out to.
           const unevenness = ( noise_gradient_weight * 2 *
-            Math.max((this.noise[x][y] - this.noise[nx][ny]) + 0.03, 0));
+            Math.max((this.noise.get_value(x, y) - this.noise.get_value(nx, ny)) + 0.03, 0));
 
           neighbour.height = tile.height + height_constant;
           neighbour.height += orientation_mod * Math.pow(height_diff, noise_height_polarize);
@@ -188,8 +193,8 @@ export class Geography {
   // map. High tile.dampness values indicate a river runs through that tile.
   drainage_algorithm(): void {
     this.open_set_sorted.clear();
-    for(let y = 0; y < this.config.get("enviroment.tile_count"); y++) {
-      for(let x = 0; x < this.config.get("enviroment.tile_count"); x++) {
+    for(let y = 0; y < this.tile_count; y++) {
+      for(let x = 0; x < this.tile_count; x++) {
         const tile = this.get_tile({x, y});
         this.open_set_sorted.push(tile);
       }
@@ -214,9 +219,10 @@ export class Geography {
           }
         }
       });
-      console.assert(lowest_neighbours.length !== 0 );
-      tile.lowest_neighbour = lowest_neighbours[
-        Math.floor(Math.random() * lowest_neighbours.length)];
+      console.assert(lowest_neighbours.length !== 0);
+      //tile.lowest_neighbour = lowest_neighbours[
+      //  Math.floor(Math.random() * lowest_neighbours.length)];
+      tile.lowest_neighbour = lowest_neighbours[lowest_neighbours.length -1];
       tile.lowest_neighbour.dampness += tile.dampness;
 
       if(tile.lowest_neighbour.dampness > this.enviroment.dampest &&
@@ -230,14 +236,14 @@ export class Geography {
   get_tile(coordinate: Coordinate): Tile {
     if(coordinate.x < 0 ||
        coordinate.y < 0 ||
-       coordinate.x >= this.config.get("enviroment.tile_count") ||
-       coordinate.y >= this.config.get("enviroment.tile_count")) {
+       coordinate.x >= this.tile_count ||
+       coordinate.y >= this.tile_count) {
       return null;
     }
     return this.tiles[coordinate.x][coordinate.y];
   }
 
-  get_neighbours(tile: Tile): Tile[] {
+  get_neighbours(tile: Tile, filter: Boolean=true): Tile[] {
     const neighbours = [
       this.get_tile({x: tile.pos.x - 1, y: tile.pos.y - 1}),
       this.get_tile({x: tile.pos.x - 1, y: tile.pos.y}),
@@ -249,25 +255,121 @@ export class Geography {
       this.get_tile({x: tile.pos.x + 1, y: tile.pos.y + 1}),
     ];
 
-    return neighbours.filter((neighbour) => neighbour !== null);
+    if (filter) {
+      return neighbours.filter((neighbour) => neighbour !== null);
+    }
+    return neighbours;
+  }
+
+  // Distance from the center of a river.
+  // This method presumes rivers do not strictly follow the correct lowest path
+  // across the terrain but instead cut corners. Although this means they may
+  // run uphill slightly where they cut a corner, the visual effect overall is
+  // looks more realistic.
+  distance_to_river(
+    coordinate: Coordinate,
+    river_width_mod: number,
+    min_dampness: number
+  ): number {
+    function dist(a: Coordinate, b: Coordinate) {
+      const dx = (a.x - b.x);
+      const dy = (a.y - b.y);
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+    
+    function dot(a: Coordinate, b: Coordinate): number {
+      return a.x * b.x + a.y * b.y;
+    }
+
+    // For explanation of distance from line segment:
+    // https://www.youtube.com/watch?v=PMltMdi1Wzg
+    function dist_to_line(a: Coordinate, b: Coordinate, p: Coordinate): number {
+      const len = dist(b, a);
+      const pa = {x: p.x - a.x, y: p.y - a.y};
+      const ba = {x: b.x - a.x, y: b.y - a.y};
+      const h = Math.min(1, Math.max(0, dot(pa, ba) / (len * len)));
+      return dist({x: 0, y: 0},
+                  {x: pa.x - h * ba.x, y: pa.y - h * ba.y});
+    }
+
+    const c: Coordinate = {x: Math.floor(coordinate.x), y: Math.floor(coordinate.y)};
+    const c00 = this.get_tile(c);
+    const c01 = this.get_tile({x: c.x, y: c.y + 1});
+    const c10 = this.get_tile({x: c.x + 1, y: c.y});
+    const c11 = this.get_tile({x: c.x + 1, y: c.y + 1});
+
+    let closest: number = 10000;
+    let dampness: number = 0;
+
+    const corners = [c00, c01, c10, c11];
+    corners.forEach((corner) => {
+      if (corner.dampness <= min_dampness) {
+        return;
+      }
+
+      if (corner.lowest_neighbour === null) {
+        return;
+      }
+
+      const p0: Coordinate = {x: corner.pos.x * 0.25 + corner.lowest_neighbour.pos.x * 0.75,
+        y: corner.pos.y * 0.25 + corner.lowest_neighbour.pos.y * 0.75};
+      const p1: Coordinate = {x: corner.pos.x * 0.75 + corner.lowest_neighbour.pos.x * 0.25,
+        y: corner.pos.y * 0.75 + corner.lowest_neighbour.pos.y * 0.25};
+
+      let d_sq = dist_to_line(p0, p1, coordinate);
+      if (d_sq < closest) {
+        closest = d_sq;
+        dampness = corner.dampness;
+      }
+
+      this.get_neighbours(corner).forEach((higher_neighbour) => {
+        if (higher_neighbour.lowest_neighbour !== corner) {
+          return;
+        }
+        if (higher_neighbour.dampness <= min_dampness) {
+          return;
+        }
+
+        const p2: Coordinate = {x: corner.pos.x * 0.75 + higher_neighbour.pos.x * 0.25,
+          y: corner.pos.y * 0.75 + higher_neighbour.pos.y * 0.25};
+        const p3: Coordinate = {x: corner.pos.x * 0.25 + higher_neighbour.pos.x * 0.75,
+          y: corner.pos.y * 0.25 + higher_neighbour.pos.y * 0.75};
+        d_sq = dist_to_line(p1, p2, coordinate);
+        if (d_sq < closest) {
+          closest = d_sq;
+          dampness = higher_neighbour.dampness;
+        }
+        d_sq = dist_to_line(p2, p3, coordinate);
+        if (d_sq < closest) {
+          closest = d_sq;
+          dampness = higher_neighbour.dampness;
+        }
+      });
+    });
+
+    // "5000" is the same constant we use in land.fragment.ts.
+    const river_width = Math.sqrt(dampness) * river_width_mod / 5000;
+
+    //return Math.sqrt(closest) - river_width;
+    return closest - river_width;
   }
 }
 
 // Example to iterate over a Geography object.
 export class DisplayBase {
-  geography: Geography;
-  config: Config;
+  protected config: Config;
+  tile_count: number;
 
-  constructor(geography: Geography) {
-    this.geography = geography;
+  constructor(protected geography: Geography) {
     this.config = this.geography.config;
+    this.tile_count = this.config.get("enviroment.tile_count");
   }
 
   // Access all points in Geography and call `draw_tile(...)` method on each.
   draw(): void {
     this.draw_start();
-    for(let y = 0; y < this.config.get("enviroment.tile_count"); y += 1) {
-      for(let x = 0; x < this.config.get("enviroment.tile_count"); x += 1) {
+    for(let y = 0; y < this.tile_count; y += 1) {
+      for(let x = 0; x < this.tile_count; x += 1) {
         const tile = this.geography.get_tile({x, y});
         this.draw_tile(tile);
       }

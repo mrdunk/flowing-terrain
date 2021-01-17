@@ -17,7 +17,8 @@
       "babylonjs-gui",
       "babylonjs-materials"
     ],
-    "allowJs": true
+    "allowJs": true,
+    "experimentalDecorators": true
   },
   "include": ["./src/**/*"]
 }
