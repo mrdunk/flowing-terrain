@@ -52,7 +52,7 @@ uniform vec2 vDiffuseInfos;
 #include<fogFragmentDeclaration>
 
 // Helper function for repeatable noise value unique to a set of map coordinates.
-float get_octave_value(float[40] coefficients, float weight, float x, float y) {
+float get_octave_value(float[40] coefficients, float x, float y) {
   int index = 0;
   float count = 0.;
   float returnVal = 0.0;
@@ -70,14 +70,14 @@ float get_octave_value(float[40] coefficients, float weight, float x, float y) {
     returnVal /= sqrt(count);
   }
 
-  return returnVal * weight;
+  return returnVal;
 }
 
 // Return repeatable noise value unique to a set of map coordinates.
 float get_noise(float x, float y) {
-  return (get_octave_value(noiseCoeficientLow, noiseWeightLow, x, y) +
-          get_octave_value(noiseCoeficientMid, noiseWeightMid, x, y) +
-          get_octave_value(noiseCoeficientHigh, noiseWeightHigh, x, y)) / 3.0;
+  return (get_octave_value(noiseCoeficientLow, x, y) * noiseWeightLow +
+          get_octave_value(noiseCoeficientMid, x, y) * noiseWeightMid +
+          get_octave_value(noiseCoeficientHigh, x, y) * noiseWeightHigh);
 }
 
 // Return one offset to a neighbouring tile from a bitmap.

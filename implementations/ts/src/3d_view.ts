@@ -154,14 +154,6 @@ export class Display3d extends DisplayBase {
 
     this.camera.setTarget(new BABYLON.Vector3(this.mapsize / 2, 0, this.mapsize / 2));
 
-    // Skybox
-    //var envTexture = new BABYLON.CubeTexture("assets/skybox/bluecloud", this.scene);
-    //let skybox = this.scene.createDefaultSkybox(envTexture, false, this.mapsize * 10);
-    //skybox.applyFog = false
-
-    //this.scene.fogMode = BABYLON.Scene.FOGMODE_EXP;
-    //this.scene.fogDensity = 0.01;
-
     // FPS meter.
     //const instrumentation = new BABYLON.EngineInstrumentation(this.engine);
     //instrumentation.captureGPUFrameTime = true;
@@ -269,7 +261,6 @@ export class Display3d extends DisplayBase {
   }
 
   set_land_material(): void {
-    console.log("set_land_material");
     if (this.land_material) {
       this.land_material.dispose();
     }
@@ -305,8 +296,6 @@ export class Display3d extends DisplayBase {
     for(let y = 0; y < this.tile_count; y++) {
       for(let x = 0; x < this.tile_count; x++) {
         const tile = this.geography.get_tile({x, y});
-        //let lowest_neighbour = 0;
-
         // Create a bitmaps of neighbours draining into this one and out of this one.
         // TODO: Would it be cheaper to calculate drain_from when we are calculating drainage?
         let drain_from = 0;
@@ -593,12 +582,6 @@ export class Display3d extends DisplayBase {
     this.set_land_material();
   }
 
-  // Set what Tile.dampness value to display rivers at and schedule a re-draw.
-  set_rivers(value: number): void {
-    console.log("set_rivers", value);
-    this.set_land_material();
-  }
-
   /* Given a vector populated with the x and z coordinates, calculate the
    * corresponding y (height). */
   setHeightToSurface(point: BABYLON.Vector3): number {
@@ -792,6 +775,57 @@ export class Display3d extends DisplayBase {
       this.treeShadowGenerator.addShadowCaster(this.treesDeciduous.leaves, true);
       this.land_mesh.receiveShadows = true;
     }
+  }
+
+  debug(): void {
+    const river_width_mod = this.config.get("geography.riverWidth");
+    const river_likelihood = this.config.get("geography.riverLikelihood");
+    const maxSpheres = 200000;
+    const diameter = 0.1;
+    let bufferMatrices = new Float32Array(16 * maxSpheres);
+
+    let count = 0;
+    for(let y = 0; y < this.tile_count; y++) {
+      for(let x = 0; x < this.tile_count; x++) {
+        const tile = this.geography.get_tile({x, y});
+        if (tile.height < this.land_material.sealevel) {
+          continue;
+        }
+        for(let yy = y; yy < y + 1; yy += 0.1) {
+          if (count > maxSpheres) {
+            break;
+          }
+          for(let xx = x; xx < x + 1; xx += 0.1) {
+            if (count > maxSpheres) {
+              break;
+            }
+
+            if (this.geography.distance_to_river(
+              {x: xx, y: yy}, river_width_mod, river_likelihood) <= 0.0
+            ) {
+              continue;
+            }
+
+            const position = new BABYLON.Vector3(xx * this.tile_size, 0, yy * this.tile_size);
+            this.setHeightToSurface(position);
+
+            const matrix = BABYLON.Matrix.Compose(
+              new BABYLON.Vector3(1, 1, 1),
+              BABYLON.Quaternion.Zero(),
+              position
+            );
+
+            matrix.copyToArray(bufferMatrices, count * 16);
+
+            count++;
+          }
+        }
+      }
+    }
+
+    const sphere = BABYLON.MeshBuilder.CreateSphere(
+      "sphere", {diameter, segments: 2}, this.scene);
+    sphere.thinInstanceSetBuffer("matrix", bufferMatrices, 16, true);
   }
 }
 

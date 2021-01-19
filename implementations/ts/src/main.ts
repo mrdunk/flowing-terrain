@@ -65,15 +65,15 @@ window.onload = () => {
 
   config.set_if_null("noise.low_octave", 3);
   config.set_callback("noise.low_octave", noise_octaves_callback);
-  config.set_if_null("noise.mid_octave", 5);
+  config.set_if_null("noise.mid_octave", 3);
   config.set_callback("noise.mid_octave", noise_octaves_callback);
-  config.set_if_null("noise.high_octave", 10);
+  config.set_if_null("noise.high_octave", 3);
   config.set_callback("noise.high_octave", noise_octaves_callback);
-  config.set_if_null("noise.low_octave_weight", 1.5);
+  config.set_if_null("noise.low_octave_weight", 3 / 4);
   config.set_callback("noise.low_octave_weight", noise_octaves_callback);
-  config.set_if_null("noise.mid_octave_weight", 0.5);
+  config.set_if_null("noise.mid_octave_weight", 1 / 4);
   config.set_callback("noise.mid_octave_weight", noise_octaves_callback);
-  config.set_if_null("noise.high_octave_weight", 0.2);
+  config.set_if_null("noise.high_octave_weight", 1 / 16);
   config.set_callback("noise.high_octave_weight", noise_octaves_callback);
 
   config.set_if_null("vegetation.enabled", 1);
@@ -103,20 +103,20 @@ window.onload = () => {
   config.set_callback("terrain.noise_height_weight", terrain_callback);
   config.set_if_null("terrain.noise_height_polarize", 1.0);
   config.set_callback("terrain.noise_height_polarize", terrain_callback);
-  config.set_if_null("terrain.noise_gradient_weight", 0.6);
+  config.set_if_null("terrain.noise_gradient_weight", 1.0);
   config.set_callback("terrain.noise_gradient_weight", terrain_callback);
   config.set_if_null("terrain.noise_gradient_polarize", 1.0);
   config.set_callback("terrain.noise_gradient_polarize", terrain_callback);
 
   config.set_if_null("geography.riverWidth", 20);
   config.set_callback("geography.riverWidth", (key: string, value: any) => {
-    display.set_rivers(value);
+    display.set_land_material();
     vegetation_octaves_callback(null, null);
   });
 
   config.set_if_null("geography.riverLikelihood", 5);
   config.set_callback("geography.riverLikelihood", (key: string, value: any) => {
-    display.set_rivers(value);
+    display.set_land_material();
     vegetation_octaves_callback(null, null);
   });
 
@@ -138,7 +138,6 @@ window.onload = () => {
 
   config.set_if_null("geography.shoreline", 0.05);
   config.set_callback("geography.shoreline", (key: string, value: any) => {
-    console.log("geography.shoreline");
     if (display && display.land_material) {
       display.set_land_material();
       vegetation_octaves_callback(null, null);

@@ -298,7 +298,7 @@ export class Geography {
     const c10 = this.get_tile({x: c.x + 1, y: c.y});
     const c11 = this.get_tile({x: c.x + 1, y: c.y + 1});
 
-    let closest: number = 10000;
+    let closest: number = 9999999999;
     let dampness: number = 0;
 
     const corners = [c00, c01, c10, c11];
@@ -350,7 +350,6 @@ export class Geography {
     // "5000" is the same constant we use in land.fragment.ts.
     const river_width = Math.sqrt(dampness) * river_width_mod / 5000;
 
-    //return Math.sqrt(closest) - river_width;
     return closest - river_width;
   }
 }

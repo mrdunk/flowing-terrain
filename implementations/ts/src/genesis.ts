@@ -164,7 +164,7 @@ export class Noise {
 
     switch (octave) {
       case "low":
-        scale = 20 / this.length;
+        scale = 0.25;
         this.coefficients_low = new Array;
         coefficients = this.coefficients_low;
         random = seedrandom(this.config.get(`${this.label}.random_seed_low`));
@@ -172,7 +172,7 @@ export class Noise {
         //console.assert(this.coefficients_low !== this.coefficients_high);
         break;
       case "mid":
-        scale = 100 / this.length;
+        scale = 1;
         this.coefficients_mid = new Array;
         coefficients = this.coefficients_mid;
         random = seedrandom(this.config.get(`${this.label}.random_seed_mid`));
@@ -180,7 +180,7 @@ export class Noise {
         //console.assert(this.coefficients_mid !== this.coefficients_high);
         break;
       case "high":
-        scale = 10;
+        scale = 4;
         this.coefficients_high = new Array;
         coefficients = this.coefficients_high;
         random = seedrandom(this.config.get(`${this.label}.random_seed_high`));
@@ -201,26 +201,24 @@ export class Noise {
   }
 
   get_value(x: number, y: number): number {
-    return (this.get_octave_value("high", x, y) +
-      this.get_octave_value("mid", x, y) +
-      this.get_octave_value("low", x, y)) / 3;
+    return (
+      this.get_octave_value("high", x, y) * this.weight_high +
+      this.get_octave_value("mid", x, y) * this.weight_mid +
+      this.get_octave_value("low", x, y) * this.weight_low
+    );
   }
 
   get_octave_value(octave: string, x: number, y: number): number {
-    let weight: number = 1;
     let coefficients: number[][] = null;
 
     switch (octave) {
       case "low":
-        weight = this.weight_low;
         coefficients = this.coefficients_low;
         break;
       case "mid":
-        weight = this.weight_mid;
         coefficients = this.coefficients_mid;
         break;
       case "high":
-        weight = this.weight_high;
         coefficients = this.coefficients_high;
         break;
       default:
@@ -235,7 +233,7 @@ export class Noise {
       // Normalize output.
       val /= Math.sqrt(coefficients.length);
     }
-    return val * weight;
+    return val;
   }
 
   generate(regenerate: boolean = false) {

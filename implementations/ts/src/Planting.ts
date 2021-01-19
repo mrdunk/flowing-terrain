@@ -144,8 +144,12 @@ export class Planting {
           Math.max(0, (Math.sqrt(dampness) * (this.dampness_effect + 1) / 100 - 0.2));
 
         for(let i = 0; i < Math.floor(this.treesPerTile * noiseVal); i++) {
-          const plant = this.createPlant(x, y, altitude, river_width_mod, river_likelihood);
-          if (plant) {
+          const plant = this.createPlant(x, y, altitude);
+
+          const d = this.geography.distance_to_river(
+            {x: plant.position.x, y: plant.position.z}, river_width_mod, river_likelihood);
+          if ( d > 0.0) {
+            // Not in river.
             this.set(x, y, plant);
           }
         }
@@ -195,19 +199,11 @@ export class Planting {
     return row.get(keyY);
   }
 
-  createPlant(
-    x: number, y: number, altitude: number,
-    river_width_mod: number, river_likelihood: number
-  ): BABYLON.Nullable<Plant> {
+  createPlant(x: number, y: number, altitude: number): BABYLON.Nullable<Plant> {
 
-    let random: seedrandom.prng = seedrandom(`${x} ${y} ${this.count}`);
+    const random: seedrandom.prng = seedrandom(`${x} ${y} ${this.count}`);
     const plant = new Plant(new BABYLON.Vector3(x, altitude, y), random);
 
-    const d = this.geography.distance_to_river(
-      {x: plant.position.x, y: plant.position.z}, river_width_mod, river_likelihood);
-    if ( d <= 0.0) {
-      return null;
-    }
     this.countByType[plant.type_]++;
     this.count++;
 
