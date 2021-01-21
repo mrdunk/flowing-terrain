@@ -75,6 +75,9 @@ export class Display3d extends DisplayBase {
 
     this.canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
     this.engine = new BABYLON.Engine(this.canvas, true);
+    
+    console.timeLog("Display3d.constructor");
+
     this.scene = new BABYLON.Scene(this.engine);
     this.scene.clearColor = new BABYLON.Color4(0.65, 0.77, 0.9, 1.0);
 
@@ -103,12 +106,14 @@ export class Display3d extends DisplayBase {
     this.camera.checkCollisions = true;
     this.camera.ellipsoid = new BABYLON.Vector3(1.0, 0.5, 1.0);
     this.camera.updateUpVectorFromRotation = true;
+    this.camera.setTarget(new BABYLON.Vector3(this.mapsize / 2, 0, this.mapsize / 2));
 
     // Higher the less sensitive.
     this.camera.touchMoveSensibility = 200;
     this.camera.touchAngularSensibility = 60000;
 
     this.camera.attachControl(this.canvas, true);
+    
     this.light_1 = new BABYLON.DirectionalLight(
       "light_1",
       new BABYLON.Vector3(-100, -100, 0),
@@ -150,10 +155,6 @@ export class Display3d extends DisplayBase {
       that.sea_material.time = time;
     });
 
-    this.draw();
-
-    this.camera.setTarget(new BABYLON.Vector3(this.mapsize / 2, 0, this.mapsize / 2));
-
     // FPS meter.
     //const instrumentation = new BABYLON.EngineInstrumentation(this.engine);
     //instrumentation.captureGPUFrameTime = true;
@@ -183,9 +184,6 @@ export class Display3d extends DisplayBase {
       //  (instrumentation.gpuFrameTimeCounter.average * 0.000001).toFixed(2) + "ms";
     });
 
-    // Hide the HTML loader.
-    document.getElementById("loader").style.display = "none";
-
     // Optimizers
     this.deoptimizer =
       new BABYLON.SceneOptimizer(
@@ -205,10 +203,13 @@ export class Display3d extends DisplayBase {
       console.info(`Ran out of display enhancements before going below ${requestedFps} fps.`);
     });
 
-    setTimeout(() => {
-      this.optimize();
-    }, 2000);
     console.timeEnd("Display3d.constructor");
+  }
+
+  startRender(): void {
+    this.engine.runRenderLoop(() => {
+      this.scene.render();
+    });
   }
 
   optimize(): void {
@@ -961,7 +962,7 @@ class TreePine {
 class ShadowMapOptimization extends BABYLON.SceneOptimization {
 
   public getDescription(): string {
-    return "Setting shadpwMap size to " + this.requestedSize;
+    return "Setting shadowMap size to " + this.requestedSize;
   }
 
   constructor(
@@ -985,7 +986,7 @@ class ShadowMapOptimization extends BABYLON.SceneOptimization {
 class HardwareScalingOptimization extends BABYLON.SceneOptimization {
 
   public getDescription(): string {
-    return "Setting shadpwMap size to " + this.requestedSize;
+    return "Setting HW scaling to " + this.requestedSize;
   }
 
   constructor(

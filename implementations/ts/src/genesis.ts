@@ -82,12 +82,15 @@ export function seed_point_get_value(x: number, y: number, sea: Set<string>): nu
  * ie: height===0.
  * This area of seabed will flood in from the edges of the map so will never
  * leave "lakes" surrounded by higher areas. */
-export function seed_points(config: Config, tile_count: number): Set<string> {
+export function* gen_seed_points(
+  config: Config, tile_count: number
+): Generator<null, Set<string>, boolean> {
   console.time("seed_points");
+
+  let start_time = window.performance.now();
   const seabed: Set<string> = new Set();
   const open: SortedSet = new SortedSet([], compare_floods);
   const random = seedrandom(config.get("seed_points.random_seed"));
-
   // Edge tiles on map should always be seed points.
   for(let x = 0; x < tile_count; x++){
     const dx = x - tile_count / 2;
@@ -110,11 +113,14 @@ export function seed_points(config: Config, tile_count: number): Set<string> {
 
     x = tile_count - 1;
     open.push(new Flood({x, y}, dist_from_center));
-
   }
 
   const threshold = config.get("seed_points.threshold");
   while(open.length > 0) {
+    if (open.length % 100 === 0 && window.performance.now() - start_time >= 10) {
+      yield;
+      start_time = window.performance.now();
+    }
     const tile = open.pop();
     seabed.add(coord_to_str(tile.coordinate));
 

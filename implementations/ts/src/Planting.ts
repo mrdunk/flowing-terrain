@@ -75,7 +75,6 @@ export class Planting {
     console.assert(this.config !== null);
 
     this.noise_update(true);
-    this.update();
   }
 
   noise_update(regenerate: boolean = false): void {
@@ -116,8 +115,10 @@ export class Planting {
     return [below_water, dampness, altitude];
   }
 
-  update(): void {
+  * update(): Generator<null, void, boolean> {
     console.time("Planting.update");
+    let generator_start_time = window.performance.now();
+
     this.sealevel = this.config.get("geography.sealevel");
     this.shoreline = this.config.get("geography.shoreline");
     this.tileCount = this.config.get("enviroment.tile_count");
@@ -131,6 +132,11 @@ export class Planting {
     this.count = 0;
     for(let x = 0; x < this.noise.length - 1; x++) {
       for(let y = 0; y < this.noise.length - 1; y++) {
+        if(window.performance.now() - generator_start_time > 10) {
+          yield;
+          generator_start_time = window.performance.now()
+        }
+
         const [below_water, dampness, altitude] = this.average_tile(x, y);
         if(below_water) {
           // Don't calculate the tree if the whole tile is below water.

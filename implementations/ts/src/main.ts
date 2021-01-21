@@ -27,9 +27,10 @@
 
 import * as $ from "jquery";
 import "bootstrap";
+import "regenerator-runtime/runtime";
 
 import {Enviroment, Geography, Tile} from "./flowing_terrain";
-import {seed_points, seed_point_get_value, Noise} from "./genesis";
+import {gen_seed_points, seed_point_get_value, Noise} from "./genesis";
 import {draw_2d} from "./2d_view";
 import {Display3d} from "./3d_view";
 import {Config} from "./config";
@@ -40,12 +41,89 @@ import {Planting} from './Planting';
 // Hack to force ./custom_html_elements to be loaded.
 new CollapsibleMenu();
 
+interface Task {
+  label: string;
+  getter: any;
+  time_spent?: number;
+  setter?: (value: any) => void;
+  generator?: any;
+}
+
+class TaskList {
+  private task_list: Task[] = [];
+  private requested: number = 0;
+
+  push(task: Task): void {
+    this.task_list.push(task);
+    if (this.requested === 0) {
+      this.requested = requestAnimationFrame((now: number) => {this.processTasks(now);});
+    }
+  }
+
+  processTasks(taskStartTime_: number): void {
+    const taskStartTime: number = window.performance.now();
+    let taskFinishTime: number = window.performance.now();
+    console.log("TaskList.processTasks", this.task_list.length);
+    this.requested = 0;
+    while (taskFinishTime - taskStartTime < 10 && this.task_list.length > 0) {
+      const task = this.task_list[0];
+      console.log("task: ", task.label);
+
+      if (task.time_spent === undefined) {
+        task.time_spent = 0;
+      }
+
+      let value;
+      if (task.generator !== undefined) {
+        console.log("Continuing generator");
+      } else {
+        value = task.getter();
+        if (value !== undefined && "next" in value) {
+          console.log("New generator");
+          task.generator = value;
+        }
+      }
+
+      if (task.generator !== undefined) {
+        value = task.generator.next();
+        console.assert("done" in value, value);
+        if(!value.done) {
+          taskFinishTime = window.performance.now();
+          console.log("Generator not finished. Spent:", taskFinishTime - taskStartTime);
+          task.time_spent += taskFinishTime;
+          task.time_spent -= taskStartTime;
+          continue;
+        }
+        console.log("Generator finished");
+        value = value.value;
+      }
+
+      this.task_list.shift();
+
+      if(task.setter !== undefined) {
+        task.setter(value);
+      }
+
+      taskFinishTime = window.performance.now();
+      task.time_spent += taskFinishTime;
+      task.time_spent -= taskStartTime;
+      console.log("task: ", task.label, "took:", task.time_spent);
+    }
+
+    if (this.task_list.length > 0 && this.requested === 0) {
+      this.requested = requestAnimationFrame((now: number) => {this.processTasks(now);});
+    }
+  }
+}
+
+const taskList = new TaskList();
+
 window.onload = () => {
   console.time("window.onload");
   const canvas = document.getElementById("renderCanvas");
   const enviroment: Enviroment = new Enviroment();
   const config: Config = new Config();
-  let seabed: Set<string> = null;
+  let seed_points: Set<string> = null;
   let noise: Noise = null;
   let geography: Geography = null;
   let display: Display3d = null;
@@ -159,8 +237,14 @@ window.onload = () => {
   });
 
   function generate_seed_points() {
-    seabed = seed_points(config, config.get("enviroment.tile_count"));
-    draw_2d("2d_seed_map", config.get("enviroment.tile_count"), seabed, seed_point_get_value, 2);
+    const gen = gen_seed_points(config, config.get("enviroment.tile_count"));
+    let data = gen.next();
+    while (! data.done) {
+      data = gen.next();
+    }
+    seed_points = data.value;
+
+    draw_2d("2d_seed_map", config.get("enviroment.tile_count"), seed_points, seed_point_get_value, 2);
   }
 
   function generate_noise(regenerate: boolean = false) {
@@ -180,10 +264,9 @@ window.onload = () => {
 
   function generate_terrain() {
     if(geography === null) {
-      geography = new Geography(enviroment, config, seabed, noise);
-    } else {
-      geography.terraform(enviroment, seabed, noise);
+      geography = new Geography(config);
     }
+    geography.terraform(enviroment, seed_points, noise);
     
     generate_vegetation();
 
@@ -232,20 +315,7 @@ window.onload = () => {
     vegetation.noise.text(document.getElementById("vegetation_debug"));
   }
 
-
-  // Initialise the things.
-  generate_seed_points();
-  generate_noise();
-  generate_terrain();
-
-  // Start drawing the 3d view.
-  display.engine.runRenderLoop(() => {
-    display.scene.render();
-  })
-
-  display.set_view("up");
-
-
+  
   // UI components below this point.
 
   // Resize the window.
@@ -280,7 +350,7 @@ window.onload = () => {
       }
     }
     if(width <= minimum_width && menus_open > 1) {
-      // Wave more than one menu open when display is too narrow to fit them.
+      // Have more than one menu open but display is too narrow to fit them.
       // Close all menus.
       for(const menu of document.getElementsByTagName("collapsable-menu")) {
         menu.setAttribute("active", "false");
@@ -290,7 +360,6 @@ window.onload = () => {
     display.optimize();
   }
   window.addEventListener("resize", onResize);
-  onResize();
 
 
   // Initialise Slider controls.
@@ -478,5 +547,132 @@ window.onload = () => {
   window.addEventListener("mouseup", (event) => {
     window.setTimeout(() => canvas.focus(), 0);
   });
+
+  // Initialise the things.
+  //generate_seed_points();
+  //generate_noise();
+  //generate_terrain();
+
+  // Start drawing the 3d view.
+  //display.engine.runRenderLoop(() => {
+  //  display.scene.render();
+  //})
+
+  //display.set_view("up");
+  //onResize();
+
+  taskList.push({
+    label: "seed_points",
+    getter: () => {
+      return gen_seed_points(config, config.get("enviroment.tile_count"));
+    },
+    setter: (value) => {
+      seed_points = value;
+    }
+  });
+  
+  taskList.push({
+    label: "2d_seed_map",
+    getter: () => {
+      return draw_2d(
+        "2d_seed_map",
+        config.get("enviroment.tile_count"),
+        seed_points,
+        seed_point_get_value,
+        2);
+    }
+  });
+  
+  taskList.push({
+    label: "generate_noise",
+    getter: () => {
+      noise = new Noise("noise", config);
+    }
+  });
+  
+  taskList.push({
+    label: "2d_noise_map",
+    getter: () => {
+      return draw_2d(
+        "2d_noise_map",
+        noise.length,
+        null,
+        (x, y, unused) => {return noise.get_value(x, y);},
+        2);
+      noise.text(document.getElementById("height_debug"));
+    }
+  });
+  
+  taskList.push({
+    label: "geography",
+    getter: () => {
+      geography = new Geography(config);
+      return geography.terraform(enviroment, seed_points, noise);
+    }
+  });
+  
+  taskList.push({
+    label: "2d_terrain_map",
+    getter: () => {
+      return draw_2d(
+        "2d_height_map",
+        config.get("enviroment.tile_count"),
+        null,
+        (x, y, unused) => {return geography.tiles[x][y].height / enviroment.highest_point;},
+        2);
+    }
+  });
+
+  taskList.push({
+    label: "vegetation",
+    getter: () => {
+      vegetation = new Planting(geography, config);
+      return vegetation.update();
+    }
+  });
+
+  taskList.push({
+    label: "display.constructor",
+    getter: () => {
+      return new Display3d(geography, vegetation, config);
+    },
+    setter: (value) => {
+      display = value;
+    }
+  });
+
+  taskList.push({
+    label: "display.draw",
+    getter: () => {
+      display.draw();
+    }
+  });
+
+  taskList.push({
+    label: "startRender",
+    getter: () => {
+      display.startRender();
+    }
+  });
+
+  taskList.push({
+    label: "hide spinner",
+    getter: () => {
+      document.getElementById("loader").style.display = "none";
+    }
+  });
+
+  taskList.push({
+    label: "onResize",
+    getter: onResize
+  });
+
+  taskList.push({
+    label: "move camera",
+    getter: () => {
+      display.set_view("up");
+    }
+  });
+
   console.timeEnd("window.onload");
 }

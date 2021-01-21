@@ -22,13 +22,14 @@
  * SOFTWARE.
  */
 
-export function draw_2d(
+export function* draw_2d(
   id: string,
   size: number,
   data_container: any,
   data_accessor: (x: number, y: number, contaner: any) => number,
   scale: number
-): void {
+): Generator<null, void, boolean> {
+  let start_time = window.performance.now();
   const canvas = document.getElementById(id) as HTMLCanvasElement;
   console.assert(canvas !== undefined, `Can't find canvas element: ${id}`);
   const ctx = canvas.getContext('2d');
@@ -38,6 +39,10 @@ export function draw_2d(
 
   for(let x = 0; x < size; x++) {
     for(let y = 0; y < size; y++) {
+      if (window.performance.now() - start_time > 10) {
+        yield;
+        start_time = window.performance.now();
+      }
       const val = data_accessor(x, y, data_container) * 255;
       ctx.fillStyle = `rgba(${val}, ${val}, ${val}, 1`;
       ctx.fillRect((size - x - 1) * scale, y * scale, scale, scale);

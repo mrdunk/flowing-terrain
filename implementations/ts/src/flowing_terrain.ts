@@ -67,27 +67,26 @@ export class Tile {
 
 // Data for a procedurally generated map.
 export class Geography {
-  enviroment: Enviroment;
-  config: Config;
-  seed_points: Set<string>;
-  noise: Noise;
   tiles: Tile[][] = [];
   open_set_sorted: SortedSet = new SortedSet([], this.compare_tiles);
   tile_count: number;
+  enviroment: Enviroment;
+  seed_points: Set<string>;
+  noise: Noise;
+  private generator_start_time: number;
 
-  constructor(enviroment: Enviroment,
-              config: Config,
-              seed_points: Set<string>,
-              noise: Noise) {
+  constructor(public config: Config) {
     console.time("Geography.constructor");
-    this.config = config;
     this.tile_count = this.config.get("enviroment.tile_count");
-    this.terraform(enviroment, seed_points, noise);
     console.timeEnd("Geography.constructor");
   }
 
   // Calculate the terrain.
-  terraform(enviroment: Enviroment, seed_points: Set<string>, noise: Noise) {
+  * terraform(
+    enviroment: Enviroment, seed_points: Set<string>, noise: Noise
+  ): Generator<null, void, boolean> {
+    console.time("Geography.terraform");
+
     this.enviroment = enviroment;
     this.seed_points = seed_points;
     this.noise = noise;
@@ -108,9 +107,17 @@ export class Geography {
       this.tiles.push(row);
     }
 
-    this.starting_points();
-    this.heights_algorithm();
-    this.drainage_algorithm();
+    this.generator_start_time = window.performance.now();
+    const tasks = [this.starting_points, this.heights_algorithm, this.drainage_algorithm];
+    for(const task of tasks) {
+      const generator = task.bind(this)();
+      while(generator && "next" in generator && !generator.next().done) {
+        // If the callback is actually a yielding generator, yield here.
+        yield;
+      }
+    }
+    
+    console.timeEnd("Geography.terraform");
   }
 
   // Used for sorting tiles according to height.
@@ -149,7 +156,7 @@ export class Geography {
   // drained as it is being populated so we typically never see anything like
   // "n" entries in it. Also many attempted inserts into SortedSet are
   // duplicates and are dealt with in o(log n) time.
-  heights_algorithm(): void {
+  * heights_algorithm(): Generator<null, void, boolean> {
     const height_constant = this.config.get("terrain.height_constant");
     const noise_height_weight = this.config.get("terrain.noise_height_weight");
     const noise_height_polarize = this.config.get("terrain.noise_height_polarize");
@@ -157,6 +164,11 @@ export class Geography {
     const noise_gradient_polarize = this.config.get("terrain.noise_gradient_polarize");
 
     while(this.open_set_sorted.length) {
+      if(window.performance.now() - this.generator_start_time > 10) {
+        yield;
+        this.generator_start_time = window.performance.now();
+      }
+
       const tile = this.open_set_sorted.shift();
       this.get_neighbours(tile).forEach((neighbour) => {
         if(neighbour.height === null) {
@@ -191,7 +203,7 @@ export class Geography {
 
   // Calculate the number of uphill tiles draining into each tile on the
   // map. High tile.dampness values indicate a river runs through that tile.
-  drainage_algorithm(): void {
+  * drainage_algorithm(): Generator<null, void, boolean> {
     this.open_set_sorted.clear();
     for(let y = 0; y < this.tile_count; y++) {
       for(let x = 0; x < this.tile_count; x++) {
@@ -203,6 +215,11 @@ export class Geography {
     // Work through all tiles from the highest on the map downwards.
     this.enviroment.dampest = 0;
     while(this.open_set_sorted.length > 0) {
+      if(window.performance.now() - this.generator_start_time > 10) {
+        yield;
+        this.generator_start_time = window.performance.now();
+      }
+
       const tile = this.open_set_sorted.pop();
       if(tile.height === 0) {
         continue;
