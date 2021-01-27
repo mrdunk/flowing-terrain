@@ -76,17 +76,13 @@ export class Geography {
   private generator_start_time: number;
 
   constructor(public config: Config) {
-    console.time("Geography.constructor");
     this.tile_count = this.config.get("enviroment.tile_count");
-    console.timeEnd("Geography.constructor");
   }
 
   // Calculate the terrain.
   * terraform(
     enviroment: Enviroment, seed_points: Set<string>, noise: Noise
   ): Generator<null, void, boolean> {
-    console.time("Geography.terraform");
-
     this.enviroment = enviroment;
     this.seed_points = seed_points;
     this.noise = noise;
@@ -116,8 +112,6 @@ export class Geography {
         yield;
       }
     }
-    
-    console.timeEnd("Geography.terraform");
   }
 
   // Used for sorting tiles according to height.
@@ -374,6 +368,7 @@ export class Geography {
 // Example to iterate over a Geography object.
 export class DisplayBase {
   protected config: Config;
+  protected generator_start_time: number;
   tile_count: number;
 
   constructor(protected geography: Geography) {
@@ -382,24 +377,44 @@ export class DisplayBase {
   }
 
   // Access all points in Geography and call `draw_tile(...)` method on each.
-  draw(): void {
-    this.draw_start();
+  * draw(): Generator<null, void, boolean> {
+    this.generator_start_time = window.performance.now();
+
+    let generator = this.draw_start();
+    while(!generator.next().done) {
+      // If the callback is actually a yielding generator, yield here.
+      yield;
+    }
+
     for(let y = 0; y < this.tile_count; y += 1) {
       for(let x = 0; x < this.tile_count; x += 1) {
+        if(window.performance.now() - this.generator_start_time > 10) {
+          yield;
+          this.generator_start_time = window.performance.now()
+        }
+
         const tile = this.geography.get_tile({x, y});
         this.draw_tile(tile);
       }
     }
-    this.draw_end();
+    
+    yield;
+    this.generator_start_time = window.performance.now()
+
+    generator = this.draw_end();
+    while(!generator.next().done) {
+      // If the callback is actually a yielding generator, yield here.
+      yield;
+    }
   }
 
   // Called before iteration through map's points.
-  draw_start(): void {
+  * draw_start(): Generator<null, void, boolean> {
     // Override this method with display set-up related code.
   }
 
   // Called after iteration through map's points.
-  draw_end(): void {
+  * draw_end(): Generator<null, void, boolean> {
     // Override this method with code to draw whole map and cleanup.
   }
 

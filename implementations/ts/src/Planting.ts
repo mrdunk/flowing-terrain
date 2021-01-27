@@ -78,14 +78,11 @@ export class Planting {
   }
 
   noise_update(regenerate: boolean = false): void {
-    console.time("Planting.noise_update");
     if(this.noise === undefined) {
-      console.log("new Noise.");
       this.noise = new Noise("vegetation", this.config);
     } else {
       this.noise.generate(regenerate);
     }
-    console.timeEnd("Planting.noise_update");
   }
 
   average_tile(x: number, y: number): [boolean, number, number] {
@@ -116,7 +113,6 @@ export class Planting {
   }
 
   * update(): Generator<null, void, boolean> {
-    console.time("Planting.update");
     let generator_start_time = window.performance.now();
 
     this.sealevel = this.config.get("geography.sealevel");
@@ -161,7 +157,6 @@ export class Planting {
         }
       }
     }
-    console.timeEnd("Planting.update");
   }
 
   set(keyX: number, keyY: number, value: BABYLON.Nullable<Plant>): void {

@@ -85,8 +85,6 @@ export function seed_point_get_value(x: number, y: number, sea: Set<string>): nu
 export function* gen_seed_points(
   config: Config, tile_count: number
 ): Generator<null, Set<string>, boolean> {
-  console.time("seed_points");
-
   let start_time = window.performance.now();
   const seabed: Set<string> = new Set();
   const open: SortedSet = new SortedSet([], compare_floods);
@@ -136,7 +134,6 @@ export function* gen_seed_points(
     });
   }
 
-  console.timeEnd("seed_points");
   return seabed;
 }
 
@@ -155,12 +152,10 @@ export class Noise {
   length: number;
 
   constructor(label: string, config: Config) {
-    console.time(`Noise.constructor.${label}`);
     this.label = label;
     this.config = config;
     this.length = this.config.get("enviroment.tile_count");
     this.generate();
-    console.timeEnd(`Noise.constructor.${label}`);
   }
 
   set_octave(octave: string) {
