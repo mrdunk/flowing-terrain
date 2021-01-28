@@ -66,7 +66,7 @@ export class Display3d extends DisplayBase {
   deoptimizer: BABYLON.SceneOptimizer;
 
   constructor(protected geography: Geography,
-              private planting: Planting,
+              public vegetation: Planting,
               protected config: Config
   ) {
     super(geography);
@@ -678,7 +678,7 @@ export class Display3d extends DisplayBase {
   }
 
   * plant(): Generator<null, void, boolean> {
-    if(this.planting === null) {
+    if(this.vegetation === null) {
       console.log("Not ready to plant trees yet.");
       return;
     }
@@ -718,19 +718,19 @@ export class Display3d extends DisplayBase {
     let deciduousCount = 0;
 
     let bufferMatricesPine =
-      new Float32Array(16 * this.planting.countByType[PlantType.Pine]);
+      new Float32Array(16 * this.vegetation.countByType[PlantType.Pine]);
     let bufferMatricesDeciduous =
-      new Float32Array(16 * this.planting.countByType[PlantType.Deciduous]);
+      new Float32Array(16 * this.vegetation.countByType[PlantType.Deciduous]);
 
-    for(let [keyX, row] of this.planting.locations.entries()) {
+    for(let [keyX, row] of this.vegetation.locations.entries()) {
       for(let [keyY, Plant] of row.entries()) {
-        
+
         if(window.performance.now() - this.generator_start_time > 10) {
           yield;
           this.generator_start_time = window.performance.now()
         }
 
-        for(let tree of this.planting.get(keyX, keyY)) {
+        for(let tree of this.vegetation.get(keyX, keyY)) {
           const position = new BABYLON.Vector3(
             tree.position.x * this.tile_size, 0, tree.position.z * this.tile_size);
           this.setHeightToSurface(position);
@@ -816,7 +816,7 @@ export class Display3d extends DisplayBase {
 
     // Tree shadows.
     if(this.config.get("vegetation.shadow_enabled")) {
-      if(this.planting === null) {
+      if(this.vegetation === null) {
         console.log("No trees planted yet.");
         return;
       }

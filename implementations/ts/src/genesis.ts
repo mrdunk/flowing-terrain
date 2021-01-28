@@ -238,6 +238,7 @@ export class Noise {
   }
 
   generate(regenerate: boolean = false) {
+    console.log("Noise.generate(", regenerate, ")");
     if(regenerate) {
       // Do not use same values again.
       this.config.set(`${this.label}.random_seed_low`, `low ${(new Date()).getTime()}`);

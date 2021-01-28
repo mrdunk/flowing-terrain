@@ -92,6 +92,7 @@ export class Geography {
 
     // Clear existing geography.
     this.tiles = [];
+    this.open_set_sorted.clear();
 
     // Populate tile array with un-configured Tile elements.
     for(let x = 0; x < this.tile_count; x++) {
@@ -231,8 +232,6 @@ export class Geography {
         }
       });
       console.assert(lowest_neighbours.length !== 0);
-      //tile.lowest_neighbour = lowest_neighbours[
-      //  Math.floor(Math.random() * lowest_neighbours.length)];
       tile.lowest_neighbour = lowest_neighbours[lowest_neighbours.length -1];
       tile.lowest_neighbour.dampness += tile.dampness;
 

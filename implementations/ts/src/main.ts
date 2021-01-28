@@ -44,26 +44,79 @@ new CollapsibleMenu();
 interface Task {
   label: string;
   getter: any;
+  priority?: number;
   time_spent?: number;
   setter?: (value: any) => void;
   generator?: any;
 }
 
+/* A simple task scheduler.
+ * Tasks are wrappers around functions or generators.
+ * The task `label` field is a unique identifier.
+ * Tasks have a priority. Lower priority tasks get scheduled before higher.
+ * If a task is scheduled and there is already a task with the same label
+ * currently being executed (because it is a generator function) the existing
+ * task will get deleted and a new, unstarted task will be scheduled.
+ */
 class TaskList {
-  private task_list: Task[] = [];
+  private task_lists: (Task[])[] = [];
   private requested: number = 0;
+  length: number = 0;
 
   push(task: Task): void {
-    for(let existing_task of this.task_list) {
-      if (existing_task.time_spent === undefined &&
-          existing_task.label === task.label) {
+    if (task.priority === undefined) {
+      task.priority = 0;  // Best priority.
+    }
+
+    // Ensure we have enough task lists. One per priority.
+    for(let new_index = this.task_lists.length; new_index <= task.priority; new_index++) {
+      this.task_lists.push([]);
+    }
+
+    const task_list = this.task_lists[task.priority];
+    for(let index of task_list.keys()) {
+      const existing_task = task_list[index];
+      if (existing_task.label === task.label) {
         // Already have task in queue.
-        return;
+        if (existing_task.time_spent === undefined) {
+          // Task not started so no need to do anything more.
+          return;
+        }
+        // There is an incomplete task of the same type in progress.
+        // Abandon it so the new (unstarted) task takes it's place.
+        console.log("Abandon task: ", existing_task.label);
+        task_list.splice(index, 1);
+        this.length--;
+        break;
       }
     }
-    this.task_list.push(task);
+    task_list.push(task);
+    this.length++;
     if (this.requested === 0) {
       this.requested = requestAnimationFrame((now: number) => {this.processTasks(now);});
+    }
+  }
+
+  getNextTask(): Task {
+    for(let task_list of this.task_lists) {
+      if (task_list.length === 0) {
+        continue;
+      }
+
+      return task_list[0];
+    }
+  }
+
+  deleteTask(label: string) {
+    for(let task_list of this.task_lists) {
+      for(let index of task_list.keys()) {
+        const existing_task = task_list[index];
+        if (existing_task.label === label) {
+          task_list.splice(index, 1);
+          this.length--;
+          return;
+        }
+      }
     }
   }
 
@@ -72,11 +125,12 @@ class TaskList {
     let taskFinishTime: number = window.performance.now();
     //console.log("TaskList.processTasks", this.task_list.length);
     this.requested = 0;
-    while (taskFinishTime - taskStartTime < 10 && this.task_list.length > 0) {
-      const task = this.task_list[0];
+    while (taskFinishTime - taskStartTime < 10 && this.length > 0) {
+      const task = this.getNextTask();
       //console.log("task: ", task.label);
 
       if (task.time_spent === undefined) {
+        console.log("New task: ", task.label);
         task.time_spent = 0;
       }
 
@@ -105,7 +159,7 @@ class TaskList {
         value = value.value;
       }
 
-      this.task_list.shift();
+      this.deleteTask(task.label);
 
       if(task.setter !== undefined) {
         task.setter(value);
@@ -119,7 +173,7 @@ class TaskList {
         "Took:", task.time_spent);
     }
 
-    if (this.task_list.length > 0 && this.requested === 0) {
+    if (this.length > 0 && this.requested === 0) {
       this.requested = requestAnimationFrame((now: number) => {this.processTasks(now);});
     }
   }
@@ -151,49 +205,49 @@ window.onload = () => {
   config.set_callback("seed_points.threshold", regenerate_seedpoints);
 
   config.set_if_null("noise.low_octave", 3);
-  config.set_callback("noise.low_octave", noise_octaves_callback);
+  config.set_callback("noise.low_octave", recalculate_heights);
   config.set_if_null("noise.mid_octave", 3);
-  config.set_callback("noise.mid_octave", noise_octaves_callback);
+  config.set_callback("noise.mid_octave", recalculate_heights);
   config.set_if_null("noise.high_octave", 3);
-  config.set_callback("noise.high_octave", noise_octaves_callback);
+  config.set_callback("noise.high_octave", recalculate_heights);
   config.set_if_null("noise.low_octave_weight", 3 / 4);
-  config.set_callback("noise.low_octave_weight", noise_octaves_callback);
+  config.set_callback("noise.low_octave_weight", recalculate_heights);
   config.set_if_null("noise.mid_octave_weight", 1 / 4);
-  config.set_callback("noise.mid_octave_weight", noise_octaves_callback);
+  config.set_callback("noise.mid_octave_weight", recalculate_heights);
   config.set_if_null("noise.high_octave_weight", 1 / 16);
-  config.set_callback("noise.high_octave_weight", noise_octaves_callback);
+  config.set_callback("noise.high_octave_weight", recalculate_heights);
 
   config.set_if_null("vegetation.enabled", 1);
-  config.set_callback("vegetation.enabled", vegetation_enabled);
+  config.set_callback("vegetation.enabled", redraw_vegetation);
   config.set_if_null("vegetation.shadow_enabled", 1);
-  config.set_callback("vegetation.shadow_enabled", vegetation_enabled);
+  config.set_callback("vegetation.shadow_enabled", redraw_vegetation);
   config.set_if_null("vegetation.noise_effect", 5);
-  config.set_callback("vegetation.noise_effect", vegetation_octaves_callback);
+  config.set_callback("vegetation.noise_effect", recalculate_vegetation);
   config.set_if_null("vegetation.dampness_effect", 5);
-  config.set_callback("vegetation.dampness_effect", vegetation_octaves_callback);
+  config.set_callback("vegetation.dampness_effect", recalculate_vegetation);
   config.set_if_null("vegetation.low_octave", 3);
-  config.set_callback("vegetation.low_octave", vegetation_octaves_callback);
+  config.set_callback("vegetation.low_octave", recalculate_vegetation);
   config.set_if_null("vegetation.mid_octave", 5);
-  config.set_callback("vegetation.mid_octave", vegetation_octaves_callback);
+  config.set_callback("vegetation.mid_octave", recalculate_vegetation);
   config.set_if_null("vegetation.high_octave", 10);
-  config.set_callback("vegetation.high_octave", vegetation_octaves_callback);
+  config.set_callback("vegetation.high_octave", recalculate_vegetation);
   config.set_if_null("vegetation.low_octave_weight", 0.2);
-  config.set_callback("vegetation.low_octave_weight", vegetation_octaves_callback);
+  config.set_callback("vegetation.low_octave_weight", recalculate_vegetation);
   config.set_if_null("vegetation.mid_octave_weight", 0.5);
-  config.set_callback("vegetation.mid_octave_weight", vegetation_octaves_callback);
+  config.set_callback("vegetation.mid_octave_weight", recalculate_vegetation);
   config.set_if_null("vegetation.high_octave_weight", 0.2);
-  config.set_callback("vegetation.high_octave_weight", vegetation_octaves_callback);
+  config.set_callback("vegetation.high_octave_weight", recalculate_vegetation);
 
   config.set_if_null("terrain.height_constant", 0.01);
-  config.set_callback("terrain.height_constant", terrain_callback);
+  config.set_callback("terrain.height_constant", recalculate_terrain);
   config.set_if_null("terrain.noise_height_weight", 1.0);
-  config.set_callback("terrain.noise_height_weight", terrain_callback);
+  config.set_callback("terrain.noise_height_weight", recalculate_terrain);
   config.set_if_null("terrain.noise_height_polarize", 1.0);
-  config.set_callback("terrain.noise_height_polarize", terrain_callback);
+  config.set_callback("terrain.noise_height_polarize", recalculate_terrain);
   config.set_if_null("terrain.noise_gradient_weight", 1.0);
-  config.set_callback("terrain.noise_gradient_weight", terrain_callback);
+  config.set_callback("terrain.noise_gradient_weight", recalculate_terrain);
   config.set_if_null("terrain.noise_gradient_polarize", 1.0);
-  config.set_callback("terrain.noise_gradient_polarize", terrain_callback);
+  config.set_callback("terrain.noise_gradient_polarize", recalculate_terrain);
 
   config.set_if_null("geography.riverWidth", 20);
   config.set_callback("geography.riverWidth", (key: string, value: any) => {
@@ -449,24 +503,25 @@ window.onload = () => {
 
   // Button to regenerate all aspects of the noise map.
   const menu_noise = document.getElementById("noise") as HTMLInputElement;
-  menu_noise.addEventListener("click", (event) => {
+  /*menu_noise.addEventListener("click", (event) => {
     generate_noise(true);
     generate_terrain();
-  });
+  });*/
+  menu_noise.addEventListener("click", regenerate_heights);
 
 
   // Callback to set noise octaves.
   // This single callback will work for all octaves.
-  function noise_octaves_callback(keys: string, value: any) {
+  /*function noise_octaves_callback(keys: string, value: any) {
     setTimeout(() => {
       generate_noise();
     }, 0);
     terrain_callback(keys, value);
-  }
+  }*/
 
 
   // Callback to regenerate terrain after settings change.
-  let terrain_timer: ReturnType<typeof setTimeout> = 0;
+  /*let terrain_timer: ReturnType<typeof setTimeout> = 0;
   function terrain_callback(keys: string, value: any) {
     // Only change the 3d display every 2 seconds.
     if(terrain_timer === 0) {
@@ -475,20 +530,21 @@ window.onload = () => {
         generate_terrain();
       }, 2000);
     }
-  }
+  }*/
 
 
   // Button to regenerate all aspects of the vegetation map.
   const menu_vegetation = document.getElementById("vegetation") as HTMLInputElement;
-  menu_vegetation.addEventListener("click", (event) => {
+  /*menu_vegetation.addEventListener("click", (event) => {
     vegetation.noise_update(true);
     generate_vegetation();
-  });
+  });*/
+  menu_vegetation.addEventListener("click", regenerate_vegetation);
 
   // Callback to set whether trees should be displayed or not.
-  function vegetation_enabled(keys: string, value: any) {
+  /*function redraw_vegetation(keys: string, value: any) {
     draw_vegetation();
-  }
+  }*/
 
   // Callback to set vegetation noise octaves.
   // This single callback will work for all octaves.
@@ -565,6 +621,7 @@ window.onload = () => {
   function gen_seed_points_task(): void {
     taskList.push({
       label: "gen_seed_points",
+      priority: 0,
       getter: () => {
         return gen_seed_points(config, config.get("enviroment.tile_count"));
       },
@@ -577,6 +634,7 @@ window.onload = () => {
   function draw_2d_seed_map_task(): void {
     taskList.push({
       label: "draw_2d_seed_map",
+      priority: 1,
       getter: () => {
         return draw_2d(
           "2d_seed_map",
@@ -588,11 +646,16 @@ window.onload = () => {
     });
   }
 
-  function gen_noise_task(): void {
+  function gen_noise_task(regenerate: boolean = false): void {
     taskList.push({
       label: "gen_noise",
+      priority: 2,
       getter: () => {
-        noise = new Noise("noise", config);
+        if (noise === null) {
+          noise = new Noise("noise", config);
+        } else {
+          noise.generate(regenerate);
+        }
       }
     });
   }
@@ -600,14 +663,15 @@ window.onload = () => {
   function draw_2d_noise_map_task(): void {
     taskList.push({
       label: "draw_2d_noise_map",
+      priority: 3,
       getter: () => {
+        noise.text(document.getElementById("height_debug"));
         return draw_2d(
           "2d_noise_map",
           noise.length,
           null,
           (x, y, unused) => {return noise.get_value(x, y);},
           2);
-        noise.text(document.getElementById("height_debug"));
       }
     });
   }
@@ -615,6 +679,7 @@ window.onload = () => {
   function gen_geography_task(): void {
     taskList.push({
       label: "gen_geography",
+      priority: 4,
       getter: () => {
         if (geography === null) {
           geography = new Geography(config);
@@ -627,6 +692,7 @@ window.onload = () => {
   function draw_2d_terrain_map_task(): void {
     taskList.push({
       label: "draw_2d_terrain_map",
+      priority: 5,
       getter: () => {
         return draw_2d(
           "2d_height_map",
@@ -638,34 +704,50 @@ window.onload = () => {
     });
   }
 
-  function gen_vegetation_task(): void {
+  function gen_vegetation_task(regenerate_noise: boolean = false): void {
     taskList.push({
       label: "gen_vegetation",
+      priority: 7,
       getter: () => {
-        if(vegetation === null) {
+        if (vegetation === null) {
           vegetation = new Planting(geography, config);
+          if (display !== null && display.vegetation === null) {
+            display.vegetation = vegetation;
+          }
         }
+        // TODO: Don't always need to recalculate noise.
+        // Only if we are reacting to the noise controls.
+        // Eg: Changing sealevel we don't need to recalculate.
+        vegetation.noise_update(regenerate_noise);
         return vegetation.update();
       }
     });
   }
-
-  function init_3d_task(): void {
+  
+  function draw_2d_vegetation_map_task(): void {
     taskList.push({
-      label: "init_3d",
+      label: "draw_2d_vegetation_map",
+      priority: 8,
       getter: () => {
-        return new Display3d(geography, vegetation, config);
-      },
-      setter: (value) => {
-        display = value;
+        vegetation.noise.text(document.getElementById("vegetation_debug"));
+        return draw_2d(
+          "vegetation_map",
+          vegetation.noise.length,
+          null,
+          (x, y, unused) => {return vegetation.noise.get_value(x, y);},
+          2);
       }
     });
   }
 
-  function draw_3d_task(): void {
+  function gen_3d_task(): void {
     taskList.push({
-      label: "draw_3d",
+      label: "gen_3d",
+      priority: 6,
       getter: () => {
+        if (display === null) {
+          display = new Display3d(geography, vegetation, config);
+        }
         return display.draw();
       }
     });
@@ -674,6 +756,7 @@ window.onload = () => {
   function start_3d_task(): void {
     taskList.push({
       label: "start_3d",
+      priority: 9,
       getter: () => {
         display.startRender();
         document.getElementById("loader").style.display = "none";
@@ -684,6 +767,7 @@ window.onload = () => {
   function onResize_task(): void {
     taskList.push({
       label: "onResize",
+      priority: 10,
       getter: () => {
         return onResize();
       }
@@ -693,6 +777,7 @@ window.onload = () => {
   function final_3d_setup_task(): void {
     taskList.push({
       label: "final_3d_setup",
+      priority: 11,
       getter: () => {
         display.set_view("up");
       }
@@ -702,6 +787,7 @@ window.onload = () => {
   function draw_vegetation_3d_task(): void {
     taskList.push({
       label: "draw_vegetation_3d",
+      priority: 9,
       getter: () => {
         return display.plant();
       }
@@ -714,10 +800,58 @@ window.onload = () => {
     draw_2d_seed_map_task();
     gen_geography_task();
     draw_2d_terrain_map_task();
-    draw_3d_task();
+    gen_3d_task();
     gen_vegetation_task();
     draw_vegetation_3d_task();
     console.log("---------");
+  }
+
+  function regenerate_heights(): void {
+    gen_noise_task(true);
+    draw_2d_noise_map_task();
+    gen_geography_task();
+    draw_2d_terrain_map_task();
+    gen_3d_task();
+    gen_vegetation_task();
+    draw_vegetation_3d_task();
+    console.log("---------");
+  }
+
+  function recalculate_heights(): void {
+    gen_noise_task(false);
+    draw_2d_noise_map_task();
+    gen_geography_task();
+    draw_2d_terrain_map_task();
+    gen_3d_task();
+    gen_vegetation_task();
+    draw_vegetation_3d_task();
+    console.log("---------");
+  }
+
+  function recalculate_terrain(): void {
+    gen_geography_task();
+    draw_2d_terrain_map_task();
+    gen_3d_task();
+    gen_vegetation_task();
+    draw_vegetation_3d_task();
+    console.log("---------");
+  }
+
+  function regenerate_vegetation(): void {
+    gen_vegetation_task(true);
+    draw_2d_vegetation_map_task();
+    draw_vegetation_3d_task();
+  }
+
+  function recalculate_vegetation(): void {
+    gen_vegetation_task(false);
+    // TODO: Only need to draw 2D if we have changed the noise.
+    draw_2d_vegetation_map_task();
+    draw_vegetation_3d_task();
+  }
+
+  function redraw_vegetation(): void {
+    draw_vegetation_3d_task();
   }
 
   // Return focus to canvas after any menu is clicked so keyboard controls
@@ -728,13 +862,13 @@ window.onload = () => {
 
   gen_seed_points_task();
   draw_2d_seed_map_task();
-  gen_noise_task();
+  gen_noise_task(true);
   draw_2d_noise_map_task();
   gen_geography_task();
   draw_2d_terrain_map_task();
   gen_vegetation_task();
-  init_3d_task();
-  draw_3d_task();
+  draw_2d_vegetation_map_task();
+  gen_3d_task();
   start_3d_task();
   onResize_task();
   final_3d_setup_task();
