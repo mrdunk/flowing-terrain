@@ -231,9 +231,9 @@ window.onload = () => {
 
   config.set_if_null("noise.low_octave", 3);
   config.set_callback("noise.low_octave", recalculate_heights);
-  config.set_if_null("noise.mid_octave", 3);
+  config.set_if_null("noise.mid_octave", 4);
   config.set_callback("noise.mid_octave", recalculate_heights);
-  config.set_if_null("noise.high_octave", 3);
+  config.set_if_null("noise.high_octave", 6);
   config.set_callback("noise.high_octave", recalculate_heights);
   config.set_if_null("noise.low_octave_weight", 3 / 4);
   config.set_callback("noise.low_octave_weight", recalculate_heights);
