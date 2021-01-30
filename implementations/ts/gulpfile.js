@@ -5,7 +5,7 @@ var tsify = require("tsify");
 var sourcemaps = require("gulp-sourcemaps");
 var buffer = require("vinyl-buffer");
 var paths = {
-  html: ["src/*.html", "src/*.css", "src/favicon.ico"],
+  html: ["src/*.html", "src/*.css"],
   shaders: ["src/*.fx"],
   materials:["src/materialsLibrary/**/*"],
   assets: ["src/assets/**/*"]
