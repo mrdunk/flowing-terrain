@@ -75,18 +75,14 @@ export class Planting {
     console.assert(this.config !== null);
 
     this.noise_update(true);
-    this.update();
   }
 
   noise_update(regenerate: boolean = false): void {
-    console.time("Planting.noise_update");
     if(this.noise === undefined) {
-      console.log("new Noise.");
       this.noise = new Noise("vegetation", this.config);
     } else {
       this.noise.generate(regenerate);
     }
-    console.timeEnd("Planting.noise_update");
   }
 
   average_tile(x: number, y: number): [boolean, number, number] {
@@ -116,8 +112,9 @@ export class Planting {
     return [below_water, dampness, altitude];
   }
 
-  update(): void {
-    console.time("Planting.update");
+  * update(): Generator<null, void, boolean> {
+    let generator_start_time = window.performance.now();
+
     this.sealevel = this.config.get("geography.sealevel");
     this.shoreline = this.config.get("geography.shoreline");
     this.tileCount = this.config.get("enviroment.tile_count");
@@ -131,6 +128,11 @@ export class Planting {
     this.count = 0;
     for(let x = 0; x < this.noise.length - 1; x++) {
       for(let y = 0; y < this.noise.length - 1; y++) {
+        if(window.performance.now() - generator_start_time > 10) {
+          yield;
+          generator_start_time = window.performance.now()
+        }
+
         const [below_water, dampness, altitude] = this.average_tile(x, y);
         if(below_water) {
           // Don't calculate the tree if the whole tile is below water.
@@ -144,14 +146,17 @@ export class Planting {
           Math.max(0, (Math.sqrt(dampness) * (this.dampness_effect + 1) / 100 - 0.2));
 
         for(let i = 0; i < Math.floor(this.treesPerTile * noiseVal); i++) {
-          const plant = this.createPlant(x, y, altitude, river_width_mod, river_likelihood);
-          if (plant) {
+          const plant = this.createPlant(x, y, altitude);
+
+          const d = this.geography.distance_to_river(
+            {x: plant.position.x, y: plant.position.z}, river_width_mod, river_likelihood);
+          if ( d > 0.0) {
+            // Not in river.
             this.set(x, y, plant);
           }
         }
       }
     }
-    console.timeEnd("Planting.update");
   }
 
   set(keyX: number, keyY: number, value: BABYLON.Nullable<Plant>): void {
@@ -195,19 +200,11 @@ export class Planting {
     return row.get(keyY);
   }
 
-  createPlant(
-    x: number, y: number, altitude: number,
-    river_width_mod: number, river_likelihood: number
-  ): BABYLON.Nullable<Plant> {
+  createPlant(x: number, y: number, altitude: number): BABYLON.Nullable<Plant> {
 
-    let random: seedrandom.prng = seedrandom(`${x} ${y} ${this.count}`);
+    const random: seedrandom.prng = seedrandom(`${x} ${y} ${this.count}`);
     const plant = new Plant(new BABYLON.Vector3(x, altitude, y), random);
 
-    const d = this.geography.distance_to_river(
-      {x: plant.position.x, y: plant.position.z}, river_width_mod, river_likelihood);
-    if ( d <= 0.0) {
-      return null;
-    }
     this.countByType[plant.type_]++;
     this.count++;
 

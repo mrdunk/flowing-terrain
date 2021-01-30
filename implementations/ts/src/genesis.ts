@@ -82,12 +82,13 @@ export function seed_point_get_value(x: number, y: number, sea: Set<string>): nu
  * ie: height===0.
  * This area of seabed will flood in from the edges of the map so will never
  * leave "lakes" surrounded by higher areas. */
-export function seed_points(config: Config, tile_count: number): Set<string> {
-  console.time("seed_points");
+export function* gen_seed_points(
+  config: Config, tile_count: number
+): Generator<null, Set<string>, boolean> {
+  let start_time = window.performance.now();
   const seabed: Set<string> = new Set();
   const open: SortedSet = new SortedSet([], compare_floods);
   const random = seedrandom(config.get("seed_points.random_seed"));
-
   // Edge tiles on map should always be seed points.
   for(let x = 0; x < tile_count; x++){
     const dx = x - tile_count / 2;
@@ -110,11 +111,14 @@ export function seed_points(config: Config, tile_count: number): Set<string> {
 
     x = tile_count - 1;
     open.push(new Flood({x, y}, dist_from_center));
-
   }
 
   const threshold = config.get("seed_points.threshold");
   while(open.length > 0) {
+    if (open.length % 100 === 0 && window.performance.now() - start_time >= 10) {
+      yield;
+      start_time = window.performance.now();
+    }
     const tile = open.pop();
     seabed.add(coord_to_str(tile.coordinate));
 
@@ -130,7 +134,6 @@ export function seed_points(config: Config, tile_count: number): Set<string> {
     });
   }
 
-  console.timeEnd("seed_points");
   return seabed;
 }
 
@@ -149,12 +152,10 @@ export class Noise {
   length: number;
 
   constructor(label: string, config: Config) {
-    console.time(`Noise.constructor.${label}`);
     this.label = label;
     this.config = config;
     this.length = this.config.get("enviroment.tile_count");
     this.generate();
-    console.timeEnd(`Noise.constructor.${label}`);
   }
 
   set_octave(octave: string) {
@@ -164,7 +165,7 @@ export class Noise {
 
     switch (octave) {
       case "low":
-        scale = 20 / this.length;
+        scale = 0.25;
         this.coefficients_low = new Array;
         coefficients = this.coefficients_low;
         random = seedrandom(this.config.get(`${this.label}.random_seed_low`));
@@ -172,7 +173,7 @@ export class Noise {
         //console.assert(this.coefficients_low !== this.coefficients_high);
         break;
       case "mid":
-        scale = 100 / this.length;
+        scale = 1;
         this.coefficients_mid = new Array;
         coefficients = this.coefficients_mid;
         random = seedrandom(this.config.get(`${this.label}.random_seed_mid`));
@@ -180,7 +181,7 @@ export class Noise {
         //console.assert(this.coefficients_mid !== this.coefficients_high);
         break;
       case "high":
-        scale = 10;
+        scale = 4;
         this.coefficients_high = new Array;
         coefficients = this.coefficients_high;
         random = seedrandom(this.config.get(`${this.label}.random_seed_high`));
@@ -201,26 +202,24 @@ export class Noise {
   }
 
   get_value(x: number, y: number): number {
-    return (this.get_octave_value("high", x, y) +
-      this.get_octave_value("mid", x, y) +
-      this.get_octave_value("low", x, y)) / 3;
+    return (
+      this.get_octave_value("high", x, y) * this.weight_high +
+      this.get_octave_value("mid", x, y) * this.weight_mid +
+      this.get_octave_value("low", x, y) * this.weight_low
+    );
   }
 
   get_octave_value(octave: string, x: number, y: number): number {
-    let weight: number = 1;
     let coefficients: number[][] = null;
 
     switch (octave) {
       case "low":
-        weight = this.weight_low;
         coefficients = this.coefficients_low;
         break;
       case "mid":
-        weight = this.weight_mid;
         coefficients = this.coefficients_mid;
         break;
       case "high":
-        weight = this.weight_high;
         coefficients = this.coefficients_high;
         break;
       default:
@@ -235,10 +234,11 @@ export class Noise {
       // Normalize output.
       val /= Math.sqrt(coefficients.length);
     }
-    return val * weight;
+    return val;
   }
 
   generate(regenerate: boolean = false) {
+    console.log("Noise.generate(", regenerate, ")");
     if(regenerate) {
       // Do not use same values again.
       this.config.set(`${this.label}.random_seed_low`, `low ${(new Date()).getTime()}`);

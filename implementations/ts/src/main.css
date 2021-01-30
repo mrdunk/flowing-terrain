@@ -18,9 +18,36 @@ img.logo{
   font-size: 1em;
   color: white;
   bottom: 15px;
-  right: 10px;
+  left: 10px;
   width: fit-content;
   height: fit-content;
+}
+
+#tasklist {
+  -webkit-transition-property: 
+  height;
+  -webkit-transition-duration: 0.5s;
+  -webkit-transition-timing-function: ease;
+  transition-property: 
+  height;
+  transition-duration: 0.5s;
+  transition-timing-function: ease;
+  visibility: visible;
+
+  z-index: 10001;
+  position: absolute;
+  text-align: left;
+  font-size: 0.8em;
+  bottom: 15px;
+  right: 10px;
+  width: 15em;
+  height: 8em;
+  overflow-y: hidden;
+}
+
+#tasklist.close {
+  height: 0em;
+  visibility: hidden;
 }
 
 #renderCanvas {
@@ -55,12 +82,6 @@ img.logo{
   margin: 0;
   width: 10rem;
   height: 3rem;
-}
-
-.toast {
-  position: absolute;
-  top: 60px;
-  right: 200px;
 }
 
 .higher-vis {

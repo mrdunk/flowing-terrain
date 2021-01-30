@@ -66,15 +66,15 @@ export class Display3d extends DisplayBase {
   deoptimizer: BABYLON.SceneOptimizer;
 
   constructor(protected geography: Geography,
-              private planting: Planting,
+              public vegetation: Planting,
               protected config: Config
   ) {
     super(geography);
-    console.time("Display3d.constructor");
     this.mapsize = this.tile_size * this.tile_count;
 
     this.canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
     this.engine = new BABYLON.Engine(this.canvas, true);
+
     this.scene = new BABYLON.Scene(this.engine);
     this.scene.clearColor = new BABYLON.Color4(0.65, 0.77, 0.9, 1.0);
 
@@ -103,12 +103,14 @@ export class Display3d extends DisplayBase {
     this.camera.checkCollisions = true;
     this.camera.ellipsoid = new BABYLON.Vector3(1.0, 0.5, 1.0);
     this.camera.updateUpVectorFromRotation = true;
+    this.camera.setTarget(new BABYLON.Vector3(this.mapsize / 2, 0, this.mapsize / 2));
 
     // Higher the less sensitive.
     this.camera.touchMoveSensibility = 200;
     this.camera.touchAngularSensibility = 60000;
 
     this.camera.attachControl(this.canvas, true);
+
     this.light_1 = new BABYLON.DirectionalLight(
       "light_1",
       new BABYLON.Vector3(-100, -100, 0),
@@ -142,25 +144,13 @@ export class Display3d extends DisplayBase {
     this.sea_material.diffuseColor.r = this.scene.clearColor.r;
     this.sea_material.diffuseColor.g = this.scene.clearColor.g;
     this.sea_material.diffuseColor.b = this.scene.clearColor.b;
-    
+
     let time = 0.0;
     const that = this;
     this.scene.registerBeforeRender(() => {
       time += 0.003;
       that.sea_material.time = time;
     });
-
-    this.draw();
-
-    this.camera.setTarget(new BABYLON.Vector3(this.mapsize / 2, 0, this.mapsize / 2));
-
-    // Skybox
-    //var envTexture = new BABYLON.CubeTexture("assets/skybox/bluecloud", this.scene);
-    //let skybox = this.scene.createDefaultSkybox(envTexture, false, this.mapsize * 10);
-    //skybox.applyFog = false
-
-    //this.scene.fogMode = BABYLON.Scene.FOGMODE_EXP;
-    //this.scene.fogDensity = 0.01;
 
     // FPS meter.
     //const instrumentation = new BABYLON.EngineInstrumentation(this.engine);
@@ -191,9 +181,6 @@ export class Display3d extends DisplayBase {
       //  (instrumentation.gpuFrameTimeCounter.average * 0.000001).toFixed(2) + "ms";
     });
 
-    // Hide the HTML loader.
-    document.getElementById("loader").style.display = "none";
-
     // Optimizers
     this.deoptimizer =
       new BABYLON.SceneOptimizer(
@@ -212,14 +199,15 @@ export class Display3d extends DisplayBase {
       const requestedFps = this.config.get("display.target_fps");
       console.info(`Ran out of display enhancements before going below ${requestedFps} fps.`);
     });
-
-    setTimeout(() => {
-      this.optimize();
-    }, 2000);
-    console.timeEnd("Display3d.constructor");
   }
 
-  optimize(): void {
+  startRender(): void {
+    this.engine.runRenderLoop(() => {
+      this.scene.render();
+    });
+  }
+
+  * optimize(): Generator<null, void, boolean> {
     console.info(`Optimizing for ${this.config.get("display.target_fps")} fps.`);
 
     this.scene.lensFlaresEnabled = false;
@@ -228,7 +216,12 @@ export class Display3d extends DisplayBase {
     this.scene.shadowsEnabled = false;
     this.engine.setHardwareScalingLevel(4);
     this.treeShadowMapSize = 512;
-    this.plant();
+
+    let generator = this.plant();
+    while(!generator.next().done) {
+      // If the callback is actually a yielding generator, yield here.
+      yield;
+    }
 
     this.deoptimizer.targetFrameRate = this.config.get("display.target_fps") - 1;
     this.deoptimizer.reset();
@@ -269,14 +262,13 @@ export class Display3d extends DisplayBase {
   }
 
   set_land_material(): void {
-    console.log("set_land_material");
     if (this.land_material) {
       this.land_material.dispose();
     }
 
     this.land_material = new LandMaterial("land_material", this.tile_size, this.scene);
     this.land_material.diffuseColor = new BABYLON.Color3(0.3, 0.8, 0.1);
-    
+
     this.land_material.setNoise(
       this.geography.noise.coefficients_low,
       this.geography.noise.coefficients_mid,
@@ -298,15 +290,13 @@ export class Display3d extends DisplayBase {
       this.land_mesh.material = this.land_material;
     }
   }
-  
+
   summarise_drainage(): BABYLON.RawTexture {
     const data = new Uint32Array(this.tile_count * this.tile_count * 4);
     let iterator = 0;
     for(let y = 0; y < this.tile_count; y++) {
       for(let x = 0; x < this.tile_count; x++) {
         const tile = this.geography.get_tile({x, y});
-        //let lowest_neighbour = 0;
-
         // Create a bitmaps of neighbours draining into this one and out of this one.
         // TODO: Would it be cheaper to calculate drain_from when we are calculating drainage?
         let drain_from = 0;
@@ -426,9 +416,14 @@ export class Display3d extends DisplayBase {
   }
 
   // Called before iteration through map's points.
-  draw_start(): void {
+  * draw_start(): Generator<null, void, boolean> {
     // Cleanup any existing meshes from previous draw.
     while(this.scene.meshes.length > 0) {
+      if(window.performance.now() - this.generator_start_time > 10) {
+        yield;
+        this.generator_start_time = window.performance.now()
+      }
+
       const mesh = this.scene.meshes.pop();
       if(mesh) {
         try {
@@ -446,7 +441,12 @@ export class Display3d extends DisplayBase {
 
     for(let y = 0; y < this.tile_count; y++) {
       for(let x = 0; x < this.tile_count; x++) {
-        // These are the points at the corners of the grid.
+        if(window.performance.now() - this.generator_start_time > 10) {
+          yield;
+          this.generator_start_time = window.performance.now()
+        }
+
+        // These are the points at the corners of each tile.
         // We actually form these into triangles later in draw_tile(...) where
         // we populate the this.indices[] collection with indexes of
         // this.positions entries.
@@ -534,9 +534,15 @@ export class Display3d extends DisplayBase {
   }
 
   // Called as the last stage of the render.
-  draw_end(): void {
+  * draw_end(): Generator<null, void, boolean> {
     // Finish computing land.
     BABYLON.VertexData.ComputeNormals(this.positions, this.indices, this.normals);
+
+    if(window.performance.now() - this.generator_start_time > 10) {
+      yield;
+      this.generator_start_time = window.performance.now()
+    }
+
     const vertexData = new BABYLON.VertexData();
     vertexData.positions = this.positions;
     vertexData.indices = this.indices;
@@ -549,6 +555,11 @@ export class Display3d extends DisplayBase {
     // Required to keep camera above ground.
     this.land_mesh.checkCollisions = true;
     //this.land_mesh.convertToFlatShadedMesh();
+
+    if(window.performance.now() - this.generator_start_time > 10) {
+      yield;
+      this.generator_start_time = window.performance.now()
+    }
 
     // Show tile edges.
     /*this.land_mesh.enableEdgesRendering(.9999999999);
@@ -568,6 +579,11 @@ export class Display3d extends DisplayBase {
     seabed.material = this.seabed_material;
     seabed.checkCollisions = true;
 
+    if(window.performance.now() - this.generator_start_time > 10) {
+      yield;
+      this.generator_start_time = window.performance.now()
+    }
+
     // Generate sea.
     this.sea_mesh = BABYLON.MeshBuilder.CreateGround(
       "sea",
@@ -581,7 +597,7 @@ export class Display3d extends DisplayBase {
     //this.sea_mesh.freezeWorldMatrix();
 
     // Plant trees.
-    this.plant();
+    //this.plant();
   }
 
   // Move the height of the sea mesh on the Z axis.
@@ -590,12 +606,6 @@ export class Display3d extends DisplayBase {
       this.mapsize / 2, (sealevel + 0.02) * this.tile_size, this.mapsize / 2);
 
     // Re-texture everything so beaches are at the right height.
-    this.set_land_material();
-  }
-
-  // Set what Tile.dampness value to display rivers at and schedule a re-draw.
-  set_rivers(value: number): void {
-    console.log("set_rivers", value);
     this.set_land_material();
   }
 
@@ -667,8 +677,8 @@ export class Display3d extends DisplayBase {
     return Math.abs((triangle[0].y + triangle[1].y) / 2 - triangle[2].y);
   }
 
-  plant(): void {
-    if(this.planting === null) {
+  * plant(): Generator<null, void, boolean> {
+    if(this.vegetation === null) {
       console.log("Not ready to plant trees yet.");
       return;
     }
@@ -704,27 +714,31 @@ export class Display3d extends DisplayBase {
       return;
     }
 
-    this.treesPine = new TreePine(this.scene);
-    this.treesDeciduous = new TreeDeciduous(this.scene);
     let pineCount = 0;
     let deciduousCount = 0;
 
     let bufferMatricesPine =
-      new Float32Array(16 * this.planting.countByType[PlantType.Pine]);
+      new Float32Array(16 * this.vegetation.countByType[PlantType.Pine]);
     let bufferMatricesDeciduous =
-      new Float32Array(16 * this.planting.countByType[PlantType.Deciduous]);
+      new Float32Array(16 * this.vegetation.countByType[PlantType.Deciduous]);
 
-    for(let [keyX, row] of this.planting.locations.entries()) {
+    for(let [keyX, row] of this.vegetation.locations.entries()) {
       for(let [keyY, Plant] of row.entries()) {
-        for(let plant of this.planting.get(keyX, keyY)) {
+
+        if(window.performance.now() - this.generator_start_time > 10) {
+          yield;
+          this.generator_start_time = window.performance.now()
+        }
+
+        for(let tree of this.vegetation.get(keyX, keyY)) {
           const position = new BABYLON.Vector3(
-            plant.position.x * this.tile_size, 0, plant.position.z * this.tile_size);
+            tree.position.x * this.tile_size, 0, tree.position.z * this.tile_size);
           this.setHeightToSurface(position);
 
           // shore_height matches the calculation used in the land material shader in
           // land.fragment.ts.
           const clamped_noise_val =
-            Math.max(0, this.geography.noise.get_value(plant.position.x, plant.position.z) / 4.0);
+            Math.max(0, this.geography.noise.get_value(tree.position.x, tree.position.z) / 4.0);
           const shore_height = Math.max(
             this.land_material.shoreline + this.land_material.sealevel + clamped_noise_val,
             this.land_material.sealevel);
@@ -735,12 +749,12 @@ export class Display3d extends DisplayBase {
           }
 
           const matrix = BABYLON.Matrix.Compose(
-            new BABYLON.Vector3(plant.height, plant.height, plant.height),
+            new BABYLON.Vector3(tree.height, tree.height, tree.height),
             BABYLON.Quaternion.Zero(),
             position
           );
 
-          switch(plant.type_){
+          switch(tree.type_){
             case PlantType.Pine:
               matrix.copyToArray(bufferMatricesPine, pineCount * 16);
               pineCount++;
@@ -754,18 +768,42 @@ export class Display3d extends DisplayBase {
       }
     }
 
-    this.treesDeciduous.leaves.thinInstanceSetBuffer("matrix", bufferMatricesDeciduous, 16, true);
-    this.treesDeciduous.trunk.thinInstanceSetBuffer("matrix", bufferMatricesDeciduous, 16, true);
+    this.treesPine = new TreePine(this.scene);
     this.treesPine.leaves.thinInstanceSetBuffer("matrix", bufferMatricesPine, 16, true);
     this.treesPine.trunk.thinInstanceSetBuffer("matrix", bufferMatricesPine, 16, true);
+    
+    if(window.performance.now() - this.generator_start_time > 10) {
+      yield;
+      this.generator_start_time = window.performance.now()
+    }
+          
+    this.treesDeciduous = new TreeDeciduous(this.scene);
+    this.treesDeciduous.leaves.thinInstanceSetBuffer("matrix", bufferMatricesDeciduous, 16, true);
+    this.treesDeciduous.trunk.thinInstanceSetBuffer("matrix", bufferMatricesDeciduous, 16, true);
+
+    if(window.performance.now() - this.generator_start_time > 10) {
+      yield;
+      this.generator_start_time = window.performance.now()
+    }
 
     if(deciduousCount === 0) {
       this.treesDeciduous.trunk.isVisible = false;
       this.treesDeciduous.leaves.isVisible = false;
     }
+
+    if(window.performance.now() - this.generator_start_time > 10) {
+      yield;
+      this.generator_start_time = window.performance.now()
+    }
+
     if(pineCount === 0) {
       this.treesPine.trunk.isVisible = false;
       this.treesPine.leaves.isVisible = false;
+    }
+
+    if(window.performance.now() - this.generator_start_time > 10) {
+      yield;
+      this.generator_start_time = window.performance.now()
     }
 
     this.treeShadows();
@@ -778,7 +816,7 @@ export class Display3d extends DisplayBase {
 
     // Tree shadows.
     if(this.config.get("vegetation.shadow_enabled")) {
-      if(this.planting === null) {
+      if(this.vegetation === null) {
         console.log("No trees planted yet.");
         return;
       }
@@ -792,6 +830,57 @@ export class Display3d extends DisplayBase {
       this.treeShadowGenerator.addShadowCaster(this.treesDeciduous.leaves, true);
       this.land_mesh.receiveShadows = true;
     }
+  }
+
+  debug(): void {
+    const river_width_mod = this.config.get("geography.riverWidth");
+    const river_likelihood = this.config.get("geography.riverLikelihood");
+    const maxSpheres = 200000;
+    const diameter = 0.1;
+    let bufferMatrices = new Float32Array(16 * maxSpheres);
+
+    let count = 0;
+    for(let y = 0; y < this.tile_count; y++) {
+      for(let x = 0; x < this.tile_count; x++) {
+        const tile = this.geography.get_tile({x, y});
+        if (tile.height < this.land_material.sealevel) {
+          continue;
+        }
+        for(let yy = y; yy < y + 1; yy += 0.1) {
+          if (count > maxSpheres) {
+            break;
+          }
+          for(let xx = x; xx < x + 1; xx += 0.1) {
+            if (count > maxSpheres) {
+              break;
+            }
+
+            if (this.geography.distance_to_river(
+              {x: xx, y: yy}, river_width_mod, river_likelihood) <= 0.0
+            ) {
+              continue;
+            }
+
+            const position = new BABYLON.Vector3(xx * this.tile_size, 0, yy * this.tile_size);
+            this.setHeightToSurface(position);
+
+            const matrix = BABYLON.Matrix.Compose(
+              new BABYLON.Vector3(1, 1, 1),
+              BABYLON.Quaternion.Zero(),
+              position
+            );
+
+            matrix.copyToArray(bufferMatrices, count * 16);
+
+            count++;
+          }
+        }
+      }
+    }
+
+    const sphere = BABYLON.MeshBuilder.CreateSphere(
+      "sphere", {diameter, segments: 2}, this.scene);
+    sphere.thinInstanceSetBuffer("matrix", bufferMatrices, 16, true);
   }
 }
 
@@ -927,7 +1016,7 @@ class TreePine {
 class ShadowMapOptimization extends BABYLON.SceneOptimization {
 
   public getDescription(): string {
-    return "Setting shadpwMap size to " + this.requestedSize;
+    return "Setting shadowMap size to " + this.requestedSize;
   }
 
   constructor(
@@ -951,7 +1040,7 @@ class ShadowMapOptimization extends BABYLON.SceneOptimization {
 class HardwareScalingOptimization extends BABYLON.SceneOptimization {
 
   public getDescription(): string {
-    return "Setting shadpwMap size to " + this.requestedSize;
+    return "Setting HW scaling to " + this.requestedSize;
   }
 
   constructor(

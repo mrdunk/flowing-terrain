@@ -67,27 +67,22 @@ export class Tile {
 
 // Data for a procedurally generated map.
 export class Geography {
-  enviroment: Enviroment;
-  config: Config;
-  seed_points: Set<string>;
-  noise: Noise;
   tiles: Tile[][] = [];
   open_set_sorted: SortedSet = new SortedSet([], this.compare_tiles);
   tile_count: number;
+  enviroment: Enviroment;
+  seed_points: Set<string>;
+  noise: Noise;
+  private generator_start_time: number;
 
-  constructor(enviroment: Enviroment,
-              config: Config,
-              seed_points: Set<string>,
-              noise: Noise) {
-    console.time("Geography.constructor");
-    this.config = config;
+  constructor(public config: Config) {
     this.tile_count = this.config.get("enviroment.tile_count");
-    this.terraform(enviroment, seed_points, noise);
-    console.timeEnd("Geography.constructor");
   }
 
   // Calculate the terrain.
-  terraform(enviroment: Enviroment, seed_points: Set<string>, noise: Noise) {
+  * terraform(
+    enviroment: Enviroment, seed_points: Set<string>, noise: Noise
+  ): Generator<null, void, boolean> {
     this.enviroment = enviroment;
     this.seed_points = seed_points;
     this.noise = noise;
@@ -97,6 +92,7 @@ export class Geography {
 
     // Clear existing geography.
     this.tiles = [];
+    this.open_set_sorted.clear();
 
     // Populate tile array with un-configured Tile elements.
     for(let x = 0; x < this.tile_count; x++) {
@@ -108,9 +104,15 @@ export class Geography {
       this.tiles.push(row);
     }
 
-    this.starting_points();
-    this.heights_algorithm();
-    this.drainage_algorithm();
+    this.generator_start_time = window.performance.now();
+    const tasks = [this.starting_points, this.heights_algorithm, this.drainage_algorithm];
+    for(const task of tasks) {
+      const generator = task.bind(this)();
+      while(generator && "next" in generator && !generator.next().done) {
+        // If the callback is actually a yielding generator, yield here.
+        yield;
+      }
+    }
   }
 
   // Used for sorting tiles according to height.
@@ -149,7 +151,7 @@ export class Geography {
   // drained as it is being populated so we typically never see anything like
   // "n" entries in it. Also many attempted inserts into SortedSet are
   // duplicates and are dealt with in o(log n) time.
-  heights_algorithm(): void {
+  * heights_algorithm(): Generator<null, void, boolean> {
     const height_constant = this.config.get("terrain.height_constant");
     const noise_height_weight = this.config.get("terrain.noise_height_weight");
     const noise_height_polarize = this.config.get("terrain.noise_height_polarize");
@@ -157,6 +159,11 @@ export class Geography {
     const noise_gradient_polarize = this.config.get("terrain.noise_gradient_polarize");
 
     while(this.open_set_sorted.length) {
+      if(window.performance.now() - this.generator_start_time > 10) {
+        yield;
+        this.generator_start_time = window.performance.now();
+      }
+
       const tile = this.open_set_sorted.shift();
       this.get_neighbours(tile).forEach((neighbour) => {
         if(neighbour.height === null) {
@@ -191,7 +198,7 @@ export class Geography {
 
   // Calculate the number of uphill tiles draining into each tile on the
   // map. High tile.dampness values indicate a river runs through that tile.
-  drainage_algorithm(): void {
+  * drainage_algorithm(): Generator<null, void, boolean> {
     this.open_set_sorted.clear();
     for(let y = 0; y < this.tile_count; y++) {
       for(let x = 0; x < this.tile_count; x++) {
@@ -203,6 +210,11 @@ export class Geography {
     // Work through all tiles from the highest on the map downwards.
     this.enviroment.dampest = 0;
     while(this.open_set_sorted.length > 0) {
+      if(window.performance.now() - this.generator_start_time > 10) {
+        yield;
+        this.generator_start_time = window.performance.now();
+      }
+
       const tile = this.open_set_sorted.pop();
       if(tile.height === 0) {
         continue;
@@ -220,8 +232,6 @@ export class Geography {
         }
       });
       console.assert(lowest_neighbours.length !== 0);
-      //tile.lowest_neighbour = lowest_neighbours[
-      //  Math.floor(Math.random() * lowest_neighbours.length)];
       tile.lowest_neighbour = lowest_neighbours[lowest_neighbours.length -1];
       tile.lowest_neighbour.dampness += tile.dampness;
 
@@ -298,7 +308,7 @@ export class Geography {
     const c10 = this.get_tile({x: c.x + 1, y: c.y});
     const c11 = this.get_tile({x: c.x + 1, y: c.y + 1});
 
-    let closest: number = 10000;
+    let closest: number = 9999999999;
     let dampness: number = 0;
 
     const corners = [c00, c01, c10, c11];
@@ -350,7 +360,6 @@ export class Geography {
     // "5000" is the same constant we use in land.fragment.ts.
     const river_width = Math.sqrt(dampness) * river_width_mod / 5000;
 
-    //return Math.sqrt(closest) - river_width;
     return closest - river_width;
   }
 }
@@ -358,6 +367,7 @@ export class Geography {
 // Example to iterate over a Geography object.
 export class DisplayBase {
   protected config: Config;
+  protected generator_start_time: number;
   tile_count: number;
 
   constructor(protected geography: Geography) {
@@ -366,24 +376,44 @@ export class DisplayBase {
   }
 
   // Access all points in Geography and call `draw_tile(...)` method on each.
-  draw(): void {
-    this.draw_start();
+  * draw(): Generator<null, void, boolean> {
+    this.generator_start_time = window.performance.now();
+
+    let generator = this.draw_start();
+    while(!generator.next().done) {
+      // If the callback is actually a yielding generator, yield here.
+      yield;
+    }
+
     for(let y = 0; y < this.tile_count; y += 1) {
       for(let x = 0; x < this.tile_count; x += 1) {
+        if(window.performance.now() - this.generator_start_time > 10) {
+          yield;
+          this.generator_start_time = window.performance.now()
+        }
+
         const tile = this.geography.get_tile({x, y});
         this.draw_tile(tile);
       }
     }
-    this.draw_end();
+    
+    yield;
+    this.generator_start_time = window.performance.now()
+
+    generator = this.draw_end();
+    while(!generator.next().done) {
+      // If the callback is actually a yielding generator, yield here.
+      yield;
+    }
   }
 
   // Called before iteration through map's points.
-  draw_start(): void {
+  * draw_start(): Generator<null, void, boolean> {
     // Override this method with display set-up related code.
   }
 
   // Called after iteration through map's points.
-  draw_end(): void {
+  * draw_end(): Generator<null, void, boolean> {
     // Override this method with code to draw whole map and cleanup.
   }
 

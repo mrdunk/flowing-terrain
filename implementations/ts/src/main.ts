@@ -27,9 +27,10 @@
 
 import * as $ from "jquery";
 import "bootstrap";
+import "regenerator-runtime/runtime";
 
 import {Enviroment, Geography, Tile} from "./flowing_terrain";
-import {seed_points, seed_point_get_value, Noise} from "./genesis";
+import {gen_seed_points, seed_point_get_value, Noise} from "./genesis";
 import {draw_2d} from "./2d_view";
 import {Display3d} from "./3d_view";
 import {Config} from "./config";
@@ -40,12 +41,177 @@ import {Planting} from './Planting';
 // Hack to force ./custom_html_elements to be loaded.
 new CollapsibleMenu();
 
+interface Task {
+  label: string;
+  getter: any;
+  description: string;
+  priority?: number;
+  time_spent?: number;
+  setter?: (value: any) => void;
+  generator?: any;
+}
+
+/* A simple task scheduler.
+ * Tasks are wrappers around functions or generators.
+ * The task `label` field is a unique identifier.
+ * Tasks have a priority. Lower priority tasks get scheduled before higher.
+ * If a task is scheduled and there is already a task with the same label
+ * currently being executed (because it is a generator function) the existing
+ * task will get deleted and a new, unstarted task will be scheduled.
+ */
+class TaskList {
+  private task_lists: (Task[])[] = [];
+  private requested: number = 0;
+  private tasklist_div: HTMLElement;
+  length: number = 0;
+
+  constructor() {
+    this.tasklist_div = document.getElementById("tasklist");
+  }
+
+  push(task: Task): void {
+    if (task.priority === undefined) {
+      task.priority = 0;  // Best priority.
+    }
+
+    // Ensure we have enough task lists. One per priority.
+    for(let new_index = this.task_lists.length; new_index <= task.priority; new_index++) {
+      this.task_lists.push([]);
+    }
+
+    const task_list = this.task_lists[task.priority];
+    for(let index of task_list.keys()) {
+      const existing_task = task_list[index];
+      if (existing_task.label === task.label) {
+        // Already have task in queue.
+        if (existing_task.time_spent === undefined) {
+          // Task not started so no need to do anything more.
+          return;
+        }
+        // There is an incomplete task of the same type in progress.
+        // Abandon it so the new (unstarted) task takes it's place.
+        console.log("Abandon task: ", existing_task.label);
+        task_list.splice(index, 1);
+        this.length--;
+        break;
+      }
+    }
+    task_list.push(task);
+    this.length++;
+    if (this.requested === 0) {
+      this.requested = requestAnimationFrame((now: number) => {this.processTasks(now);});
+    }
+
+    this.update_div();
+  }
+
+  getNextTask(): Task {
+    for(let task_list of this.task_lists) {
+      if (task_list.length === 0) {
+        continue;
+      }
+
+      return task_list[0];
+    }
+  }
+
+  deleteTask(label: string) {
+    for(let task_list of this.task_lists) {
+      for(let index of task_list.keys()) {
+        const existing_task = task_list[index];
+        if (existing_task.label === label) {
+          task_list.splice(index, 1);
+          this.length--;
+          this.update_div();
+          return;
+        }
+      }
+    }
+  }
+
+  processTasks(taskStartTime_: number): void {
+    const taskStartTime: number = window.performance.now();
+    let taskFinishTime: number = window.performance.now();
+    //console.log("TaskList.processTasks", this.task_list.length);
+    this.requested = 0;
+    while (taskFinishTime - taskStartTime < 10 && this.length > 0) {
+      const task = this.getNextTask();
+
+      if (task.time_spent === undefined) {
+        console.log("New task: ", task.label);
+        task.time_spent = 0;
+      }
+
+      let value;
+      if (task.generator !== undefined) {
+      } else {
+        value = task.getter();
+        if (value !== undefined && "next" in value) {
+          task.generator = value;
+        }
+      }
+
+      if (task.generator !== undefined) {
+        value = task.generator.next();
+        console.assert("done" in value, value);
+        if(!value.done) {
+          taskFinishTime = window.performance.now();
+          task.time_spent += taskFinishTime;
+          task.time_spent -= taskStartTime;
+          continue;
+        }
+        value = value.value;
+      }
+
+      this.deleteTask(task.label);
+
+      if(task.setter !== undefined) {
+        task.setter(value);
+      }
+
+      taskFinishTime = window.performance.now();
+      task.time_spent += taskFinishTime;
+      task.time_spent -= taskStartTime;
+      console.log("task: ", task.label,
+        "Took:", task.time_spent);
+    }
+
+    if (this.length > 0 && this.requested === 0) {
+      this.requested = requestAnimationFrame((now: number) => {this.processTasks(now);});
+    }
+  }
+
+  update_div(): void {
+    let html = "";
+    let count = 0;
+    
+    for(let task_list of this.task_lists) {
+      if (task_list.length === 0) {
+        continue;
+      }
+      for(let task of task_list) {
+        count++;
+        html += `${task.description}<br>`;
+      }
+    }
+
+    if(count > 0) {
+      this.tasklist_div.innerHTML = `<b>Updating. ${count} tasks to do.</b><br>` + html;
+      this.tasklist_div.classList.remove("close");
+      return;
+    }
+    this.tasklist_div.classList.add("close");
+  }
+}
+
+const taskList = new TaskList();
+
 window.onload = () => {
   console.time("window.onload");
   const canvas = document.getElementById("renderCanvas");
   const enviroment: Enviroment = new Enviroment();
   const config: Config = new Config();
-  let seabed: Set<string> = null;
+  let seed_points: Set<string> = null;
   let noise: Noise = null;
   let geography: Geography = null;
   let display: Display3d = null;
@@ -61,63 +227,63 @@ window.onload = () => {
   config.set_if_null("vegetation.random_seed_high", `v high ${(new Date()).getTime()}`);
 
   config.set_if_null("seed_points.threshold", 0.18);
-  config.set_callback("seed_points.threshold", seed_threshold_callback);
+  config.set_callback("seed_points.threshold", regenerate_seedpoints);
 
   config.set_if_null("noise.low_octave", 3);
-  config.set_callback("noise.low_octave", noise_octaves_callback);
-  config.set_if_null("noise.mid_octave", 5);
-  config.set_callback("noise.mid_octave", noise_octaves_callback);
-  config.set_if_null("noise.high_octave", 10);
-  config.set_callback("noise.high_octave", noise_octaves_callback);
-  config.set_if_null("noise.low_octave_weight", 1.5);
-  config.set_callback("noise.low_octave_weight", noise_octaves_callback);
-  config.set_if_null("noise.mid_octave_weight", 0.5);
-  config.set_callback("noise.mid_octave_weight", noise_octaves_callback);
-  config.set_if_null("noise.high_octave_weight", 0.2);
-  config.set_callback("noise.high_octave_weight", noise_octaves_callback);
+  config.set_callback("noise.low_octave", recalculate_heights);
+  config.set_if_null("noise.mid_octave", 3);
+  config.set_callback("noise.mid_octave", recalculate_heights);
+  config.set_if_null("noise.high_octave", 3);
+  config.set_callback("noise.high_octave", recalculate_heights);
+  config.set_if_null("noise.low_octave_weight", 3 / 4);
+  config.set_callback("noise.low_octave_weight", recalculate_heights);
+  config.set_if_null("noise.mid_octave_weight", 1 / 4);
+  config.set_callback("noise.mid_octave_weight", recalculate_heights);
+  config.set_if_null("noise.high_octave_weight", 1 / 16);
+  config.set_callback("noise.high_octave_weight", recalculate_heights);
 
   config.set_if_null("vegetation.enabled", 1);
-  config.set_callback("vegetation.enabled", vegetation_enabled);
+  config.set_callback("vegetation.enabled", redraw_vegetation);
   config.set_if_null("vegetation.shadow_enabled", 1);
-  config.set_callback("vegetation.shadow_enabled", vegetation_enabled);
+  config.set_callback("vegetation.shadow_enabled", redraw_vegetation);
   config.set_if_null("vegetation.noise_effect", 5);
-  config.set_callback("vegetation.noise_effect", vegetation_octaves_callback);
+  config.set_callback("vegetation.noise_effect", recalculate_vegetation);
   config.set_if_null("vegetation.dampness_effect", 5);
-  config.set_callback("vegetation.dampness_effect", vegetation_octaves_callback);
+  config.set_callback("vegetation.dampness_effect", recalculate_vegetation);
   config.set_if_null("vegetation.low_octave", 3);
-  config.set_callback("vegetation.low_octave", vegetation_octaves_callback);
+  config.set_callback("vegetation.low_octave", recalculate_vegetation_noise);
   config.set_if_null("vegetation.mid_octave", 5);
-  config.set_callback("vegetation.mid_octave", vegetation_octaves_callback);
+  config.set_callback("vegetation.mid_octave", recalculate_vegetation_noise);
   config.set_if_null("vegetation.high_octave", 10);
-  config.set_callback("vegetation.high_octave", vegetation_octaves_callback);
+  config.set_callback("vegetation.high_octave", recalculate_vegetation_noise);
   config.set_if_null("vegetation.low_octave_weight", 0.2);
-  config.set_callback("vegetation.low_octave_weight", vegetation_octaves_callback);
+  config.set_callback("vegetation.low_octave_weight", recalculate_vegetation_noise);
   config.set_if_null("vegetation.mid_octave_weight", 0.5);
-  config.set_callback("vegetation.mid_octave_weight", vegetation_octaves_callback);
+  config.set_callback("vegetation.mid_octave_weight", recalculate_vegetation_noise);
   config.set_if_null("vegetation.high_octave_weight", 0.2);
-  config.set_callback("vegetation.high_octave_weight", vegetation_octaves_callback);
+  config.set_callback("vegetation.high_octave_weight", recalculate_vegetation_noise);
 
   config.set_if_null("terrain.height_constant", 0.01);
-  config.set_callback("terrain.height_constant", terrain_callback);
+  config.set_callback("terrain.height_constant", recalculate_terrain);
   config.set_if_null("terrain.noise_height_weight", 1.0);
-  config.set_callback("terrain.noise_height_weight", terrain_callback);
+  config.set_callback("terrain.noise_height_weight", recalculate_terrain);
   config.set_if_null("terrain.noise_height_polarize", 1.0);
-  config.set_callback("terrain.noise_height_polarize", terrain_callback);
-  config.set_if_null("terrain.noise_gradient_weight", 0.6);
-  config.set_callback("terrain.noise_gradient_weight", terrain_callback);
+  config.set_callback("terrain.noise_height_polarize", recalculate_terrain);
+  config.set_if_null("terrain.noise_gradient_weight", 1.0);
+  config.set_callback("terrain.noise_gradient_weight", recalculate_terrain);
   config.set_if_null("terrain.noise_gradient_polarize", 1.0);
-  config.set_callback("terrain.noise_gradient_polarize", terrain_callback);
+  config.set_callback("terrain.noise_gradient_polarize", recalculate_terrain);
 
   config.set_if_null("geography.riverWidth", 20);
   config.set_callback("geography.riverWidth", (key: string, value: any) => {
-    display.set_rivers(value);
-    vegetation_octaves_callback(null, null);
+    display.set_land_material();
+    recalculate_vegetation();
   });
 
   config.set_if_null("geography.riverLikelihood", 5);
   config.set_callback("geography.riverLikelihood", (key: string, value: any) => {
-    display.set_rivers(value);
-    vegetation_octaves_callback(null, null);
+    display.set_land_material();
+    recalculate_vegetation();
   });
 
   config.set_if_null("display.target_fps", 30);
@@ -126,7 +292,7 @@ window.onload = () => {
   config.set_if_null("geography.sealevel", 0.5);
   config.set_callback("geography.sealevel", (key: string, value: any) => {
     display.set_sealevel(value);
-    vegetation_octaves_callback(null, null);
+    recalculate_vegetation();
   });
 
   config.set_if_null("display.sea_transparency", 0.9);
@@ -138,10 +304,9 @@ window.onload = () => {
 
   config.set_if_null("geography.shoreline", 0.05);
   config.set_callback("geography.shoreline", (key: string, value: any) => {
-    console.log("geography.shoreline");
     if (display && display.land_material) {
       display.set_land_material();
-      vegetation_octaves_callback(null, null);
+      recalculate_vegetation();
     }
   });
 
@@ -159,98 +324,12 @@ window.onload = () => {
     }
   });
 
-  function generate_seed_points() {
-    seabed = seed_points(config, config.get("enviroment.tile_count"));
-    draw_2d("2d_seed_map", config.get("enviroment.tile_count"), seabed, seed_point_get_value, 2);
-  }
-
-  function generate_noise(regenerate: boolean = false) {
-    if(noise === null) {
-      noise = new Noise("noise", config);
-    } else {
-      noise.generate(regenerate);
-    }
-    draw_2d(
-      "2d_noise_map",
-      noise.length,
-      null,
-      (x, y, unused) => {return noise.get_value(x, y);},
-      2);
-    noise.text(document.getElementById("height_debug"));
-  }
-
-  function generate_terrain() {
-    if(geography === null) {
-      geography = new Geography(enviroment, config, seabed, noise);
-    } else {
-      geography.terraform(enviroment, seabed, noise);
-    }
-    
-    generate_vegetation();
-
-    draw_2d(
-      "2d_height_map",
-      config.get("enviroment.tile_count"),
-      null,
-      (x, y, unused) => {return geography.tiles[x][y].height / enviroment.highest_point;},
-      2);
-
-    if(display === null) {
-      display = new Display3d(geography, vegetation, config);
-    } else {
-      display.draw();
-    }
-  }
-
-  let vegetation_timer: ReturnType<typeof setTimeout> = 0;
-  function generate_vegetation() {
-    if(vegetation === null) {
-      vegetation = new Planting(geography, config);
-    }
-    if(vegetation_timer === 0) {
-      vegetation_timer = setTimeout(() => {
-        vegetation_timer = 0;
-        vegetation.update();
-        draw_vegetation();
-        draw_vegetation_2d_map();
-      }, 1000);
-    }
-  }
-
-  function draw_vegetation() {
-    if(display !== null) {
-      display.plant();
-    }
-  }
-
-  function draw_vegetation_2d_map() {
-    draw_2d(
-      "vegetation_map",
-      vegetation.noise.length,
-      null,
-      (x, y, unused) => {return vegetation.noise.get_value(x, y);},
-      2);
-    vegetation.noise.text(document.getElementById("vegetation_debug"));
-  }
-
-
-  // Initialise the things.
-  generate_seed_points();
-  generate_noise();
-  generate_terrain();
-
-  // Start drawing the 3d view.
-  display.engine.runRenderLoop(() => {
-    display.scene.render();
-  })
-
-  display.set_view("up");
-
 
   // UI components below this point.
 
   // Resize the window.
-  function onResize() {
+  function* onResize(): Generator<null, void, boolean> {
+    let generator_start_time = window.performance.now();
     display.engine.resize();
 
     const width = window.innerWidth
@@ -260,6 +339,11 @@ window.onload = () => {
 
     let menus_open = 0;
     for(const menu of document.getElementsByTagName("collapsable-menu")) {
+      if(window.performance.now() - generator_start_time > 10) {
+        yield;
+        generator_start_time = window.performance.now();
+      }
+
       // Count how many menus are open.
       if(menu.hasAttribute("active") &&
           menu.getAttribute("active").toLowerCase() === "true") {
@@ -281,17 +365,20 @@ window.onload = () => {
       }
     }
     if(width <= minimum_width && menus_open > 1) {
-      // Wave more than one menu open when display is too narrow to fit them.
+      // Have more than one menu open but display is too narrow to fit them.
       // Close all menus.
       for(const menu of document.getElementsByTagName("collapsable-menu")) {
         menu.setAttribute("active", "false");
       }
     }
 
-    display.optimize();
+    const generator = display.optimize();
+    while(!generator.next().done) {
+      // If the callback is actually a yielding generator, yield here.
+      yield;
+    }
   }
-  window.addEventListener("resize", onResize);
-  onResize();
+  window.addEventListener("resize", onResize_task);
 
 
   // Initialise Slider controls.
@@ -342,77 +429,17 @@ window.onload = () => {
 
   // Button to regenerate the seed_point map.
   const menu_seed_points = document.getElementById("seed_points") as HTMLInputElement;
-  menu_seed_points.addEventListener("click", (event: Event) => {
-    config.set("seed_points.random_seed", `${(new Date()).getTime()}`);
-    generate_seed_points();
-    generate_terrain();
-  });
-
-
-  // Callback for adjusting detail of the seed_point map.
-  function seed_threshold_callback(keys: string, value: any) {
-    setTimeout(() => {
-      config.set("seed_points.random_seed", `${(new Date()).getTime()}`);
-      generate_seed_points();
-    }, 0);
-    terrain_callback(keys, value);
-  }
+  menu_seed_points.addEventListener("click", regenerate_seedpoints);
 
 
   // Button to regenerate all aspects of the noise map.
   const menu_noise = document.getElementById("noise") as HTMLInputElement;
-  menu_noise.addEventListener("click", (event) => {
-    generate_noise(true);
-    generate_terrain();
-  });
-
-
-  // Callback to set noise octaves.
-  // This single callback will work for all octaves.
-  function noise_octaves_callback(keys: string, value: any) {
-    setTimeout(() => {
-      generate_noise();
-    }, 0);
-    terrain_callback(keys, value);
-  }
-
-
-  // Callback to regenerate terrain after settings change.
-  let terrain_timer: ReturnType<typeof setTimeout> = 0;
-  function terrain_callback(keys: string, value: any) {
-    // Only change the 3d display every 2 seconds.
-    if(terrain_timer === 0) {
-      terrain_timer = setTimeout(() => {
-        terrain_timer = 0;
-        generate_terrain();
-      }, 2000);
-    }
-  }
+  menu_noise.addEventListener("click", regenerate_heights);
 
 
   // Button to regenerate all aspects of the vegetation map.
   const menu_vegetation = document.getElementById("vegetation") as HTMLInputElement;
-  menu_vegetation.addEventListener("click", (event) => {
-    vegetation.noise_update(true);
-    generate_vegetation();
-  });
-
-  // Callback to set whether trees should be displayed or not.
-  function vegetation_enabled(keys: string, value: any) {
-    draw_vegetation();
-  }
-
-  // Callback to set vegetation noise octaves.
-  // This single callback will work for all octaves.
-  function vegetation_octaves_callback(keys: string, value: any) {
-    setTimeout(() => {
-      vegetation.noise_update();
-      draw_vegetation_2d_map();
-    }, 0);
-
-    generate_vegetation();    
-  }
-
+  menu_vegetation.addEventListener("click", regenerate_vegetation);
 
   // Move camera to selected view.
   const views = document.getElementById("views").querySelectorAll(".btn");
@@ -474,10 +501,276 @@ window.onload = () => {
   }
 
 
+  function gen_seed_points_task(): void {
+    taskList.push({
+      label: "gen_seed_points",
+      description: "Generate terrain start points",
+      priority: 0,
+      getter: () => {
+        return gen_seed_points(config, config.get("enviroment.tile_count"));
+      },
+      setter: (value) => {
+        seed_points = value;
+      }
+    });
+  }
+
+  function draw_2d_seed_map_task(): void {
+    taskList.push({
+      label: "draw_2d_seed_map",
+      description: "Draw terrain start points minimap",
+      priority: 1,
+      getter: () => {
+        return draw_2d(
+          "2d_seed_map",
+          config.get("enviroment.tile_count"),
+          seed_points,
+          seed_point_get_value,
+          2);
+      }
+    });
+  }
+
+  function gen_noise_task(regenerate: boolean = false): void {
+    taskList.push({
+      label: "gen_noise",
+      description: "Generate terrain noise",
+      priority: 2,
+      getter: () => {
+        if (noise === null) {
+          noise = new Noise("noise", config);
+        } else {
+          noise.generate(regenerate);
+        }
+      }
+    });
+  }
+
+  function draw_2d_noise_map_task(): void {
+    taskList.push({
+      label: "draw_2d_noise_map",
+      description: "Draw terrain noise minimap",
+      priority: 3,
+      getter: () => {
+        noise.text(document.getElementById("height_debug"));
+        return draw_2d(
+          "2d_noise_map",
+          noise.length,
+          null,
+          (x, y, unused) => {return noise.get_value(x, y);},
+          2);
+      }
+    });
+  }
+
+  function gen_geography_task(): void {
+    taskList.push({
+      label: "gen_geography",
+      description: "Calculate landscape",
+      priority: 4,
+      getter: () => {
+        if (geography === null) {
+          geography = new Geography(config);
+        }
+        return geography.terraform(enviroment, seed_points, noise);
+      }
+    });
+  }
+
+  function draw_2d_terrain_map_task(): void {
+    taskList.push({
+      label: "draw_2d_terrain_map",
+      description: "Draw terrain minimap",
+      priority: 5,
+      getter: () => {
+        return draw_2d(
+          "2d_height_map",
+          config.get("enviroment.tile_count"),
+          null,
+          (x, y, unused) => {return geography.get_tile({x, y}).height / enviroment.highest_point;},
+          2);
+      }
+    });
+  }
+
+  function gen_vegetation_task(
+    recalculate_noise: boolean = false,
+    regenerate_noise: boolean = false
+  ): void {
+    taskList.push({
+      label: "gen_vegetation",
+      description: "Calculate tree locations",
+      priority: 7,
+      getter: () => {
+        if (vegetation === null) {
+          vegetation = new Planting(geography, config);
+          if (display !== null && display.vegetation === null) {
+            display.vegetation = vegetation;
+          }
+        }
+        if(recalculate_noise) {
+          vegetation.noise_update(regenerate_noise);
+        }
+        return vegetation.update();
+      }
+    });
+  }
+  
+  function draw_2d_vegetation_map_task(): void {
+    taskList.push({
+      label: "draw_2d_vegetation_map",
+      description: "Draw trees minimap",
+      priority: 8,
+      getter: () => {
+        vegetation.noise.text(document.getElementById("vegetation_debug"));
+        return draw_2d(
+          "vegetation_map",
+          vegetation.noise.length,
+          null,
+          (x, y, unused) => {return vegetation.noise.get_value(x, y);},
+          2);
+      }
+    });
+  }
+
+  function draw_3d_terrain_task(): void {
+    taskList.push({
+      label: "gen_3d",
+      description: "Draw 3D land",
+      priority: 6,
+      getter: () => {
+        if (display === null) {
+          display = new Display3d(geography, vegetation, config);
+        }
+        return display.draw();
+      }
+    });
+  }
+
+  function start_3d_task(): void {
+    taskList.push({
+      label: "start_3d",
+      description: "Start displaying 3D",
+      priority: 9,
+      getter: () => {
+        display.startRender();
+        document.getElementById("loader").style.display = "none";
+      }
+    });
+  }
+
+  function onResize_task(): void {
+    taskList.push({
+      label: "onResize",
+      description: "Optimise for scrren size",
+      priority: 10,
+      getter: () => {
+        return onResize();
+      }
+    });
+  }
+
+  function final_3d_setup_task(): void {
+    taskList.push({
+      label: "final_3d_setup",
+      description: "Finalise 3d display",
+      priority: 11,
+      getter: () => {
+        display.set_view("up");
+      }
+    });
+  }
+
+  function draw_vegetation_3d_task(): void {
+    taskList.push({
+      label: "draw_vegetation_3d",
+      description: "Draw trees",
+      priority: 9,
+      getter: () => {
+        return display.plant();
+      }
+    });
+  }
+
+  function regenerate_seedpoints(): void {
+    config.set("seed_points.random_seed", `${(new Date()).getTime()}`);
+    gen_seed_points_task();
+    draw_2d_seed_map_task();
+    gen_geography_task();
+    draw_2d_terrain_map_task();
+    draw_3d_terrain_task();
+    gen_vegetation_task();
+    draw_vegetation_3d_task();
+  }
+
+  function regenerate_heights(): void {
+    gen_noise_task(true);
+    draw_2d_noise_map_task();
+    gen_geography_task();
+    draw_2d_terrain_map_task();
+    draw_3d_terrain_task();
+    gen_vegetation_task();
+    draw_vegetation_3d_task();
+  }
+
+  function recalculate_heights(): void {
+    gen_noise_task(false);
+    draw_2d_noise_map_task();
+    gen_geography_task();
+    draw_2d_terrain_map_task();
+    draw_3d_terrain_task();
+    gen_vegetation_task();
+    draw_vegetation_3d_task();
+  }
+
+  function recalculate_terrain(): void {
+    gen_geography_task();
+    draw_2d_terrain_map_task();
+    draw_3d_terrain_task();
+    gen_vegetation_task();
+    draw_vegetation_3d_task();
+  }
+
+  function regenerate_vegetation(): void {
+    gen_vegetation_task(true, true);
+    draw_2d_vegetation_map_task();
+    draw_vegetation_3d_task();
+  }
+
+  function recalculate_vegetation_noise(): void {
+    gen_vegetation_task(true, false);
+    draw_2d_vegetation_map_task();
+    draw_vegetation_3d_task();
+  }
+
+  function recalculate_vegetation(): void {
+    gen_vegetation_task();
+    draw_vegetation_3d_task();
+  }
+
+  function redraw_vegetation(): void {
+    draw_vegetation_3d_task();
+  }
+
   // Return focus to canvas after any menu is clicked so keyboard controls
   // work.
   window.addEventListener("mouseup", (event) => {
     window.setTimeout(() => canvas.focus(), 0);
   });
+
+  gen_seed_points_task();
+  draw_2d_seed_map_task();
+  gen_noise_task(true);
+  draw_2d_noise_map_task();
+  gen_geography_task();
+  draw_2d_terrain_map_task();
+  gen_vegetation_task();
+  draw_2d_vegetation_map_task();
+  draw_3d_terrain_task();
+  start_3d_task();
+  onResize_task();
+  final_3d_setup_task();
+
+
   console.timeEnd("window.onload");
 }
