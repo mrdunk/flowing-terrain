@@ -263,7 +263,7 @@ window.onload = () => {
   config.set_if_null("vegetation.high_octave_weight", 0.2);
   config.set_callback("vegetation.high_octave_weight", recalculate_vegetation_noise);
 
-  config.set_if_null("terrain.height_constant", 0.01);
+  config.set_if_null("terrain.height_constant", 0.05);
   config.set_callback("terrain.height_constant", recalculate_terrain);
   config.set_if_null("terrain.noise_height_weight", 1.0);
   config.set_callback("terrain.noise_height_weight", recalculate_terrain);
