@@ -55,7 +55,6 @@ export class Tile {
   lowest_neighbour: Tile = null;
   enviroment: Enviroment;
   wave_height: number = 0;
-  wave_height_blured: number = 0;
 
   constructor(pos: Coordinate, enviroment: Enviroment) {
     this.pos = pos;
@@ -552,26 +551,6 @@ export class Geography {
 
     console.assert(open.length === 0);
     closed.clear();
-
-    // Blur the results.
-    /*open.push(this.get_tile({x, y}));
-    for(let yy = 0; yy < this.tile_count; yy++) {
-      for(let xx = 0; xx < this.tile_count; xx++) {
-        tile = this.get_tile({x: xx, y: yy});
-        if(tile.wave_height > 0) {
-          const same_windward = this.get_tiles_windward(wind_direction_int, tile).same;
-          tile.wave_height_blured = tile.wave_height;
-          let count = 1;
-          for( let same of same_windward) {
-            if(same.wave_height > 0) {
-              tile.wave_height_blured += same.wave_height;
-              count++;
-            }
-          }
-          tile.wave_height_blured /= count;
-        }
-      }
-    }*/
 
 
     if(true) {

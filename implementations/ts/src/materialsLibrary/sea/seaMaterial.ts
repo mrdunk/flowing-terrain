@@ -30,6 +30,8 @@ import "./sea.vertex";
 
 export class SeaMaterial extends BaseMaterial {
     public time: number = 0;
+    public windDir: number = 0;
+    public waveHeight: BABYLON.RawTexture;
     protected shaderName: string = "sea";
 
     // Methods
@@ -38,8 +40,10 @@ export class SeaMaterial extends BaseMaterial {
         this.uniforms = this.uniforms.concat([
             "size",    // Circle size to draw before changing to background colour.
             "offset",  // How much the horizon circle is offset from center.
-            "time"     // Wave movement.
+            "time",    // Wave movement.
+            "windDir"  // Wind direction (0.0 = Northerly. 0.5 = Southerly).
         ]);
+        this.samplers = this.samplers.concat([ "waveHeight" ]);
     }
 
     public clone(name: string): BaseMaterial {
@@ -58,6 +62,8 @@ export class SeaMaterial extends BaseMaterial {
         this._activeEffect.setFloat("size", this.size);
         this._activeEffect.setFloat("offset", this.offset);
         this._activeEffect.setFloat("time", this.time);
+        this._activeEffect.setFloat("windDir", this.windDir);
+        this._activeEffect.setTexture("waveHeight", this.waveHeight);
     }
 
     public getClassName(): string {

@@ -1,12 +1,15 @@
 let name = 'seaPixelShader';
 let shader = `precision highp float;
 precision highp int;
+precision highp usampler2D;
 
 uniform vec4 vEyePosition;
 uniform vec4 vDiffuseColor;
 uniform float size;
 uniform float offset;
 uniform float time;
+uniform float windDir;
+uniform usampler2D waveHeight;
 
 varying vec3 vPositionW;
 #ifdef NORMAL
@@ -31,9 +34,21 @@ uniform vec2 vDiffuseInfos;
 
 #include<fogFragmentDeclaration>
 
+// Get summary of a point's wave data from the waveHeight texture.
+uvec4 getWaveSummary(vec2 point) {
+    return texture2D(waveHeight, point / 100.);
+}
+
 void setColor(inout vec3 diffuseColor) {
-    float x = vPositionW.x - offset / 2. + time;
-    float z = vPositionW.z - offset / 2. + time;
+    float pi = 3.141573;
+    float angle = windDir * pi * 2.;
+    //angle = 0.25 * pi;
+
+    float offX = vPositionW.x - (offset / 2.);
+    float offZ = vPositionW.z - (offset / 2.);
+
+    float x = offX * cos(angle) - offZ * sin(angle);
+    float z = offX * sin(angle) + offZ * cos(angle) - time;
 
     float jitter = 0.0;
     jitter += 0.2 * sin(1.0 * z) * sin(0.75 * x + 0.65 * z);
@@ -45,22 +60,34 @@ void setColor(inout vec3 diffuseColor) {
 
     float val = 0.0;
 
-    val += sin(30. * x + 30. * z);
-    val += sin(20. * x + 7. * z);
+    val += sin(30. * z);
+    val += sin(20. * z + 5. * x) / 4.;
+    val += sin(40. * z - 6. * x) / 4.;
 
-    val *= 1.0 + 0.3 * sin(17.1 * x + 23.4 * z);
-    val *= 1.0 + 0.3 * sin(33.4 * x + 16.1 * z);
+    //val += sin(30. * x + 30. * z);
+    //val += sin(20. * x + 7. * z + angle);
 
-    val *= 1.0 + 0.3 * sin(7.2 * x + 6.8 * z);
-    val *= 1.0 + 0.3 * sin(10.0 * x + 6.3 * z);
+    //val *= 1.0 + 0.3 * sin(17.1 * x + 23.4 * z + angle);
+    //val *= 1.0 + 0.3 * sin(33.4 * x + 16.1 * z + angle);
 
-    val *= 1.0 + 0.25 * sin(1.0 * z);
-    val *= 1.0 + 0.25 * sin(0.7 * x + 0.7 * z);
+    //val *= 1.0 + 0.3 * sin(7.2 * x + 6.8 * z + angle);
+    //val *= 1.0 + 0.3 * sin(10.0 * x + 6.3 * z + angle);
 
-    val *= 1.0 + 0.5 * sin(0.1 * x);
-    val *= 1.0 + 0.5 * sin(0.07 * x + 0.07 * z);
+    //val *= 1.0 + 0.25 * sin(1.0 * z + angle);
+    //val *= 1.0 + 0.25 * sin(0.7 * x + 0.7 * z + angle);
+
+    //val *= 1.0 + 0.5 * sin(0.1 * x + angle);
+    //val *= 1.0 + 0.5 * sin(0.07 * x + 0.07 * z + angle);
 
     val /= 50.0;
+
+    uvec4 waveSummary = getWaveSummary(vPositionW.xz / 2.);
+    val *= float(waveSummary[0]) / 10.;
+
+    /*if(abs(fract(x)) <= 0.1 || abs(fract(z)) <= 0.1) {
+        diffuseColor = vec3(0., 0., 0.);
+        return;
+    }*/
 
     diffuseColor = vec3(0.1, 0.5 + val / 2.0, 0.9 + val);
 }

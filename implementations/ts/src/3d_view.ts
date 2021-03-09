@@ -145,6 +145,9 @@ export class Display3d extends DisplayBase {
     this.sea_material.diffuseColor.g = this.scene.clearColor.g;
     this.sea_material.diffuseColor.b = this.scene.clearColor.b;
 
+    this.sea_material.waveHeight = this.summarise_waves();
+    this.sea_material.windDir = this.geography.enviroment.wind_direction;
+
     let time = 0.0;
     const that = this;
     this.scene.registerBeforeRender(() => {
@@ -334,6 +337,33 @@ export class Display3d extends DisplayBase {
     );
   }
 
+  summarise_waves(): BABYLON.RawTexture {
+    const data = new Uint32Array(this.tile_count * this.tile_count * 4);
+    let iterator = 0;
+    for(let y = 0; y < this.tile_count; y++) {
+      for(let x = 0; x < this.tile_count; x++) {
+        const tile = this.geography.get_tile({x, y});
+
+        data[iterator] = tile.wave_height;
+        data[iterator + 1] = 0;
+        data[iterator + 2] = 0;
+        data[iterator + 3] = 0;
+        iterator += 4;
+      }
+    }
+
+    return new BABYLON.RawTexture(
+      data,
+      this.tile_count,
+      this.tile_count,
+      BABYLON.Engine.TEXTUREFORMAT_RGBA_INTEGER,
+      this.scene,
+      false,
+      false,
+      BABYLON.Engine.TEXTURE_NEAREST_SAMPLINGMODE,
+      BABYLON.Engine.TEXTURETYPE_UNSIGNED_INTEGER
+    );
+  }
 
   // Move camera to selected view.
   set_view(direction: string): void {
