@@ -34,21 +34,33 @@ uniform vec2 vDiffuseInfos;
 
 #include<fogFragmentDeclaration>
 
+#define PI 3.1415926538
+
 // Get summary of a point's wave data from the waveHeight texture.
 uvec4 getWaveSummary(vec2 point) {
-    return texture2D(waveHeight, point / 100.);
+    return texture2D(waveHeight, (point + vec2(0.5, 0.5)) / 100.);
 }
 
 void setColor(inout vec3 diffuseColor) {
-    float pi = 3.141573;
-    float angle = windDir * pi * 2.;
-    //angle = 0.25 * pi;
+    float angle = windDir * PI * 2.;
 
-    float offX = vPositionW.x - (offset / 2.);
-    float offZ = vPositionW.z - (offset / 2.);
+    vec2 offsets = vPositionW.xz - vec2(offset / 2., offset / 2.);
 
-    float x = offX * cos(angle) - offZ * sin(angle);
-    float z = offX * sin(angle) + offZ * cos(angle) - time;
+    mat2 transform = mat2(
+                          cos(angle), sin(angle)
+                          ,
+                          -sin(angle), cos(angle)
+                          );
+
+    vec2 pos = transform * offsets;
+    float x = pos[0];
+    float z = pos[1] - time;
+
+    /*if(abs(fract(x / 10.)) <= 0.01 || abs(fract(z / 10.)) <= 0.01) {
+        // Draw grid.
+        diffuseColor = vec3(0., 0., 0.);
+        return;
+    }*/
 
     float jitter = 0.0;
     jitter += 0.2 * sin(1.0 * z) * sin(0.75 * x + 0.65 * z);
@@ -64,32 +76,17 @@ void setColor(inout vec3 diffuseColor) {
     val += sin(20. * z + 5. * x) / 4.;
     val += sin(40. * z - 6. * x) / 4.;
 
-    //val += sin(30. * x + 30. * z);
-    //val += sin(20. * x + 7. * z + angle);
-
-    //val *= 1.0 + 0.3 * sin(17.1 * x + 23.4 * z + angle);
-    //val *= 1.0 + 0.3 * sin(33.4 * x + 16.1 * z + angle);
-
-    //val *= 1.0 + 0.3 * sin(7.2 * x + 6.8 * z + angle);
-    //val *= 1.0 + 0.3 * sin(10.0 * x + 6.3 * z + angle);
-
-    //val *= 1.0 + 0.25 * sin(1.0 * z + angle);
-    //val *= 1.0 + 0.25 * sin(0.7 * x + 0.7 * z + angle);
-
-    //val *= 1.0 + 0.5 * sin(0.1 * x + angle);
-    //val *= 1.0 + 0.5 * sin(0.07 * x + 0.07 * z + angle);
-
-    val /= 50.0;
+    val /= 30.0;
 
     uvec4 waveSummary = getWaveSummary(vPositionW.xz / 2.);
     val *= float(waveSummary[0]) / 10.;
 
-    /*if(abs(fract(x)) <= 0.1 || abs(fract(z)) <= 0.1) {
-        diffuseColor = vec3(0., 0., 0.);
-        return;
-    }*/
-
-    diffuseColor = vec3(0.1, 0.5 + val / 2.0, 0.9 + val);
+    if(float(waveSummary[1]) * val > 0.01 &&
+       vPositionW.x >= 0. && vPositionW.z >= 0. && vPositionW.x < 200. && vPositionW.z < 200.) {
+        diffuseColor = vec3(1., 1., 1.);
+    } else {
+        diffuseColor = vec3(0.1, 0.5 + val / 2.0, 0.8 + val);
+    }
 }
 
 bool checkHorizon() {

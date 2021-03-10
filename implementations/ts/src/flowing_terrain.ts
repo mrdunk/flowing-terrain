@@ -55,6 +55,7 @@ export class Tile {
   lowest_neighbour: Tile = null;
   enviroment: Enviroment;
   wave_height: number = 0;
+  shore_gradient: number = 0;
 
   constructor(pos: Coordinate, enviroment: Enviroment) {
     this.pos = pos;
@@ -373,27 +374,33 @@ export class Geography {
   set_wave_height(
     tile: Tile, to_windward: Tile[], wind_direction_int: number, sealevel: number
   ): void {
-    if(tile.height >= sealevel) {
-      return;
-    }
-
     if (to_windward[0] === null) {
       // Upwind edge of map.
       tile.wave_height = this.enviroment.wind_strength;
       return;
     }
-    //tile.wave_height = to_windward[0].wave_height +
-    //  (this.enviroment.wind_strength - to_windward[0].wave_height) / 8;
+
     tile.wave_height = 0;
-    let count = 0;
     for(let more of to_windward) {
       if(more === null) {
         tile.wave_height += this.enviroment.wind_strength;
-      } else {
+      } else if(more.height <= sealevel) {
         tile.wave_height += more.wave_height;
       }
     }
     tile.wave_height /= to_windward.length;
+
+    // Gain more waves the further down wind from land.
+    tile.wave_height += (this.enviroment.wind_strength - tile.wave_height) / 32;
+  }
+
+  break_waves(tile: Tile, to_leeward: Tile, sealevel: number) {
+    if(tile.height <= sealevel && to_leeward && to_leeward.height > sealevel) {
+      if(to_leeward.height >= sealevel + 0.1) {
+        tile.shore_gradient += Math.max(0, (to_leeward.height - tile.height) * 10);
+      }
+      to_leeward.shore_gradient += Math.max(0, (to_leeward.height - tile.height) * 10);
+    }
   }
 
   get_tiles_windward(wind_direction_int: number, tile: Tile) {
@@ -493,6 +500,7 @@ export class Geography {
     const wind_direction_int = Math.round(this.enviroment.wind_direction * 8 - 0.5);
     console.log(wind_direction_int);
     const open: Tile[] = [];
+    let next_down_wind: Tile[] = [];
     const closed = new Set();
     let x, y;
     switch (wind_direction_int) {
@@ -532,18 +540,34 @@ export class Geography {
         tile = open.pop();
         const windward = this.get_tiles_windward(wind_direction_int, tile);
         this.set_wave_height(tile, windward.more, wind_direction_int, sealevel);
+        //this.break_waves(tile, windward.less, sealevel);
         closed.add(tile);
         for(let same of windward.same) {
           if(!closed.has(same)) {
             open.push(same);
           }
         }
+        if(windward.less !== null) {
+          console.assert(!closed.has(windward.less));
+          next_down_wind.push(windward.less);
+        }
       }
 
       // Get any tile further down wind.
-      for(let neighbour of this.get_neighbours(tile)) {
-        if (!closed.has(neighbour)) {
-          open.push(neighbour);
+      while(next_down_wind.length > 0) {
+        let t = next_down_wind.pop();
+        const windward = this.get_tiles_windward(wind_direction_int, t);
+        if(windward.more[1] !== null && !closed.has(windward.more[1])) {
+          open.push(windward.more[1]);
+        }
+        if(windward.more[2] !== null && !closed.has(windward.more[2])) {
+          open.push(windward.more[2]);
+        }
+        if(open.length > 0) {
+          break;
+        }
+        if(!closed.has(t)) {
+          open.push(t);
           break;
         }
       }
@@ -553,7 +577,7 @@ export class Geography {
     closed.clear();
 
 
-    if(true) {
+    if(false) {
       // Debug to console
       let line;
       for(let y = 0; y < 25; y++) {
@@ -575,7 +599,8 @@ export class Geography {
         line = `${y} `.padStart(3, " ");
         //for(let x = this.tile_count - 1; x >= this.tile_count - 26; x--) {
         for(let x = 26; x >= 0; x--) {
-          const height = Math.round(this.get_tile({x, y}).wave_height);
+          //const height = Math.round(this.get_tile({x, y}).wave_height);
+          const height = Math.round(this.get_tile({x, y}).shore_gradient);
           if(height > 0) {
             line += `${height}`.padStart(3, " ");
           } else {
