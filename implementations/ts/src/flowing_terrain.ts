@@ -119,8 +119,6 @@ export class Geography {
         yield;
       }
     }
-
-    this.blow_wind();
   }
 
   // Used for sorting tiles according to height.
@@ -502,29 +500,27 @@ export class Geography {
     const open: Tile[] = [];
     let next_down_wind: Tile[] = [];
     const closed = new Set();
+
+    // Get an up-wind starting point to start generating waves from.
     let x, y;
     switch (wind_direction_int) {
       case 0:
       case 1:
-        console.log("NE");
         x = 0;
         y = 0;
         break;
       case 2:
       case 3:
-        console.log("SE");
         x = 0;
         y = this.tile_count - 1;
         break;
       case 4:
       case 5:
-        console.log("SW");
         x = this.tile_count - 1;
         y = this.tile_count - 1;
         break;
       case 6:
       case 7:
-        console.log("NW");
         x = this.tile_count - 1;
         y = 0;
         break;

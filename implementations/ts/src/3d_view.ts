@@ -136,24 +136,6 @@ export class Display3d extends DisplayBase {
     this.seabed_material.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
     //this.seabed_material.freeze();
 
-    //this.set_sea_material();
-    this.sea_material = new SeaMaterial(
-      "sea_material", this.mapsize * this.horizon_ratio, this.mapsize, this.scene);
-    this.sea_material.alpha = config.get("display.sea_transparency");
-
-    this.sea_material.diffuseColor.r = this.scene.clearColor.r;
-    this.sea_material.diffuseColor.g = this.scene.clearColor.g;
-    this.sea_material.diffuseColor.b = this.scene.clearColor.b;
-
-    this.sea_material.waveHeight = this.summarise_waves();
-    this.sea_material.windDir = this.geography.enviroment.wind_direction;
-
-    let time = 0.0;
-    const that = this;
-    this.scene.registerBeforeRender(() => {
-      time += 0.003;
-      that.sea_material.time = time;
-    });
 
     // FPS meter.
     //const instrumentation = new BABYLON.EngineInstrumentation(this.engine);
@@ -264,6 +246,37 @@ export class Display3d extends DisplayBase {
     return result;
   }
 
+  set_sea_material(): void {
+    if (this.sea_material) {
+      this.sea_material.dispose();
+    }
+    this.sea_material = new SeaMaterial(
+      "sea_material",
+      this.tile_size,
+      this.mapsize * this.horizon_ratio,
+      this.mapsize,
+      this.scene);
+    this.sea_material.alpha = this.config.get("display.sea_transparency");
+
+    this.sea_material.diffuseColor.r = this.scene.clearColor.r;
+    this.sea_material.diffuseColor.g = this.scene.clearColor.g;
+    this.sea_material.diffuseColor.b = this.scene.clearColor.b;
+
+    this.sea_material.waveHeight = this.summarise_waves();
+    this.sea_material.windDir = this.geography.enviroment.wind_direction;
+
+    if(this.sea_mesh) {
+      this.sea_mesh.material = this.sea_material;
+    }
+
+    let time = 0.0;
+    const that = this;
+    this.scene.registerBeforeRender(() => {
+      time += 0.003;
+      that.sea_material.time = time;
+    });
+  }
+
   set_land_material(): void {
     if (this.land_material) {
       this.land_material.dispose();
@@ -288,6 +301,8 @@ export class Display3d extends DisplayBase {
     const riverLikelihood = this.config.get("geography.riverLikelihood");
     this.land_material.riverLikelihood = riverLikelihood * riverLikelihood;
     this.land_material.drainage = this.summarise_drainage();
+
+    this.land_material.waveHeight = this.summarise_waves();
 
     if(this.land_mesh) {
       this.land_mesh.material = this.land_material;
@@ -620,9 +635,9 @@ export class Display3d extends DisplayBase {
       {width: this.mapsize * this.horizon_ratio,
        height: this.mapsize * this.horizon_ratio}
     );
+    this.set_sealevel(this.config.get("geography.sealevel"));
     this.sea_mesh.material = this.sea_material;
     this.sea_mesh.checkCollisions = false;
-    this.set_sealevel(this.config.get("geography.sealevel"));
 
     //this.sea_mesh.freezeWorldMatrix();
 
@@ -635,8 +650,11 @@ export class Display3d extends DisplayBase {
     this.sea_mesh.position = new BABYLON.Vector3(
       this.mapsize / 2, (sealevel + 0.02) * this.tile_size, this.mapsize / 2);
 
+    // Generate waves for the new heights.
+    this.geography.blow_wind();
     // Re-texture everything so beaches are at the right height.
     this.set_land_material();
+    this.set_sea_material();
   }
 
   /* Given a vector populated with the x and z coordinates, calculate the

@@ -5,6 +5,7 @@ precision highp usampler2D;
 
 uniform vec4 vEyePosition;
 uniform vec4 vDiffuseColor;
+uniform float scale;
 uniform float size;
 uniform float offset;
 uniform float time;
@@ -41,10 +42,13 @@ uvec4 getWaveSummary(vec2 point) {
     return texture2D(waveHeight, (point + vec2(0.5, 0.5)) / 100.);
 }
 
+//float waveHeight(vec2 pos) {
+//}
+
 void setColor(inout vec3 diffuseColor) {
     float angle = windDir * PI * 2.;
 
-    vec2 offsets = vPositionW.xz - vec2(offset / 2., offset / 2.);
+    vec2 offsets = vPositionW.xz - vec2(offset / scale, offset / scale);
 
     mat2 transform = mat2(
                           cos(angle), sin(angle)
@@ -78,7 +82,7 @@ void setColor(inout vec3 diffuseColor) {
 
     val /= 30.0;
 
-    uvec4 waveSummary = getWaveSummary(vPositionW.xz / 2.);
+    uvec4 waveSummary = getWaveSummary(vPositionW.xz / scale);
     val *= float(waveSummary[0]) / 10.;
 
     if(float(waveSummary[1]) * val > 0.01 &&
@@ -90,8 +94,8 @@ void setColor(inout vec3 diffuseColor) {
 }
 
 bool checkHorizon() {
-    float x = vPositionW.x - offset / 2.;
-    float z = vPositionW.z - offset / 2.;
+    float x = vPositionW.x - offset / scale;
+    float z = vPositionW.z - offset / scale;
 
     return (x * x + z * z < size * size / 4.);
 }

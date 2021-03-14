@@ -43,6 +43,7 @@ export class LandMaterial extends BaseMaterial {
     public riverWidth: number = 20.0;
     public riverLikelihood: number = 25.0;
     public drainage: BABYLON.RawTexture;
+    public waveHeight: BABYLON.RawTexture;
 
     protected shaderName: string = "land";
 
@@ -65,6 +66,7 @@ export class LandMaterial extends BaseMaterial {
             "scale"
         ]);
         this.samplers = this.samplers.concat([ "drainage" ]);
+        this.samplers = this.samplers.concat([ "waveHeight" ]);
     }
 
     public clone(name: string): BaseMaterial {
@@ -95,6 +97,7 @@ export class LandMaterial extends BaseMaterial {
         this._activeEffect.setFloat("riverWidth", this.riverWidth);
         this._activeEffect.setFloat("riverLikelihood", this.riverLikelihood);
         this._activeEffect.setTexture("drainage", this.drainage);
+        this._activeEffect.setTexture("waveHeight", this.waveHeight);
     }
 
     public getClassName(): string {
