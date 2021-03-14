@@ -492,12 +492,12 @@ window.onload = () => {
   // Button to run SceneOptimizer again.
   const menu_reoprimize = document.getElementById("display_reoptimize") as HTMLInputElement;
   menu_reoprimize.addEventListener("click", (event) => {
-    display.optimize();
+    onResize_task();
   });
 
   // Run Babylon's SceneOptimizer again.
   function reoptimize_3d(keys: string, fps: number): void {
-    display.optimize();
+    onResize_task();
   }
 
 
@@ -615,7 +615,7 @@ window.onload = () => {
       }
     });
   }
-  
+
   function draw_2d_vegetation_map_task(): void {
     taskList.push({
       label: "draw_2d_vegetation_map",
@@ -662,7 +662,7 @@ window.onload = () => {
   function onResize_task(): void {
     taskList.push({
       label: "onResize",
-      description: "Optimise for scrren size",
+      description: "Optimise for screen size",
       priority: 10,
       getter: () => {
         return onResize();

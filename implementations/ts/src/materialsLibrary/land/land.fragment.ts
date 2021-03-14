@@ -10,7 +10,6 @@ const vec3 grass = vec3(0.24, 0.5, 0.16);
 const vec3 scrub = vec3(0.24, 0.2, 0.16);
 const vec3 rock = vec3(0.25, 0.3, 0.3);
 const vec3 sand = vec3(0.78, 0.78, 0.27);
-const vec3 wave = vec3(0.80, 0.90, 0.90);
 
 uniform vec4 vEyePosition;
 uniform vec4 vDiffuseColor;
@@ -28,7 +27,6 @@ uniform float rockLikelihood;
 uniform float riverWidth;
 uniform float riverLikelihood;
 uniform usampler2D drainage;
-uniform usampler2D waveHeight;
 
 varying vec3 vPositionW;
 #ifdef NORMAL
@@ -52,11 +50,6 @@ uniform vec2 vDiffuseInfos;
 #include<clipPlaneFragmentDeclaration>
 
 #include<fogFragmentDeclaration>
-
-// Get summary of a point's wave data from the waveHeight texture.
-uvec4 getWaveSummary(vec2 point) {
-    return texture2D(waveHeight, (point + vec2(0.5, 0.5)) / 100.);
-}
 
 // Helper function for repeatable noise value unique to a set of map coordinates.
 float get_octave_value(float[40] coefficients, float x, float y) {
@@ -208,11 +201,8 @@ void setColor(inout vec3 diffuseColor) {
     float noiseVal = get_noise(x, z);
     float clampedNoiseVal = clamp(noiseVal, 0.001, 10.0);
     float shoreHeight = max(shoreline + sealevel + clampedNoiseVal / 4.0, sealevel);
-    uvec4 waveSummary = getWaveSummary(vPositionW.xz / scale);
 
-    if (float(waveSummary[0]) * 0.01 > abs((y / scale) - sealevel)) {
-        diffuseColor.rgb = wave;
-    } else if (y / scale > sealevel && drawRiver(vPositionW.xz)) {
+    if (y / scale > sealevel && drawRiver(vPositionW.xz)) {
       diffuseColor.rgb = river;
     } else if (y / scale >= snowline - (snowline * clampedNoiseVal / 2.0)) {
       // Snow
@@ -227,7 +217,6 @@ void setColor(inout vec3 diffuseColor) {
     } else {
       // Below shoreline
       float multiplier = clamp(y / scale / (sealevel + shoreline), 0.0, 1.0);
-
       if (noiseVal > rockLikelihood - 1.) {
         diffuseColor.rgb = rock * multiplier;
       } else {

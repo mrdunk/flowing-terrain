@@ -268,13 +268,6 @@ export class Display3d extends DisplayBase {
     if(this.sea_mesh) {
       this.sea_mesh.material = this.sea_material;
     }
-
-    let time = 0.0;
-    const that = this;
-    this.scene.registerBeforeRender(() => {
-      time += 0.003;
-      that.sea_material.time = time;
-    });
   }
 
   set_land_material(): void {
@@ -301,8 +294,6 @@ export class Display3d extends DisplayBase {
     const riverLikelihood = this.config.get("geography.riverLikelihood");
     this.land_material.riverLikelihood = riverLikelihood * riverLikelihood;
     this.land_material.drainage = this.summarise_drainage();
-
-    this.land_material.waveHeight = this.summarise_waves();
 
     if(this.land_mesh) {
       this.land_mesh.material = this.land_material;
@@ -361,7 +352,7 @@ export class Display3d extends DisplayBase {
 
         data[iterator] = tile.wave_height;
         data[iterator + 1] = tile.shore_gradient;
-        data[iterator + 2] = 0;
+        data[iterator + 2] = tile.height * 100;
         data[iterator + 3] = 0;
         iterator += 4;
       }
@@ -638,6 +629,17 @@ export class Display3d extends DisplayBase {
     this.set_sealevel(this.config.get("geography.sealevel"));
     this.sea_mesh.material = this.sea_material;
     this.sea_mesh.checkCollisions = false;
+
+    // Wave movement.
+    let time = 0.0;
+    const that = this;
+    this.scene.registerBeforeRender(() => {
+      time += 0.003;
+
+      if(that.sea_material) {
+        that.sea_material.time = time;
+      }
+    });
 
     //this.sea_mesh.freezeWorldMatrix();
 
