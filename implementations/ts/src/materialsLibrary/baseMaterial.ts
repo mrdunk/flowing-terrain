@@ -99,7 +99,7 @@ export abstract class BaseMaterial extends BABYLON.PushMaterial {
         }
 
         if (!subMesh._materialDefines) {
-            subMesh._materialDefines = new BaseMaterialDefines();
+            subMesh.materialDefines = new BaseMaterialDefines();
         }
 
         var defines = <BaseMaterialDefines>subMesh._materialDefines;

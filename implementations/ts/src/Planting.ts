@@ -57,7 +57,7 @@ export class Plant {
 }
 
 export class Planting {
-  readonly treesPerTile: number = 10;
+  readonly treesPerTile: number = 7;
   locations: Map<number, Map<number, Plant[]>>;
   countByType: [number, number, number, number];
   count: number;

@@ -1,12 +1,16 @@
 let name = 'seaPixelShader';
 let shader = `precision highp float;
 precision highp int;
+precision highp usampler2D;
 
 uniform vec4 vEyePosition;
 uniform vec4 vDiffuseColor;
+uniform float scale;
 uniform float size;
 uniform float offset;
 uniform float time;
+uniform float windDir;
+uniform usampler2D waveHeight;
 
 varying vec3 vPositionW;
 #ifdef NORMAL
@@ -31,9 +35,64 @@ uniform vec2 vDiffuseInfos;
 
 #include<fogFragmentDeclaration>
 
+#define PI 3.1415926538
+
+// Get summary of a point's wave data from the waveHeight texture.
+uvec4 getWaveSummary(vec2 point) {
+    return texture2D(waveHeight, (point + vec2(0.5, 0.5)) / 100.);
+}
+
+float wavePattern(vec2 xz) {
+    float angle = windDir * PI * 2.;
+    mat2 transform = mat2(
+                          cos(angle), sin(angle)
+                          ,
+                          -sin(angle), cos(angle)
+                          );
+
+    vec2 pos = transform * vPositionW.xz;
+    float x = pos[0];
+    float z = pos[1] - time;
+  
+    float jitter = 0.0;
+    jitter += 0.2 * sin(1.0 * z) * sin(0.75 * x + 0.65 * z);
+    jitter += 2.0 * sin(0.015 * z) * sin(0.07 * x + 0.07 * z);
+    jitter += 20.0 * sin(0.01 * x + 0.009 * z) * sin(0.0071 * x + 0.0069 * z);
+
+    x += jitter;
+    z += jitter;
+
+    float val = 0.0;
+
+    val += sin(30. * z);
+    val += sin(20. * z + 5. * x) / 4.;
+    val += sin(40. * z - 6. * x) / 4.;
+
+    val /= 30.0;
+
+    uvec4 waveSummary = getWaveSummary(vPositionW.xz / scale);
+    val *= float(waveSummary[0]) / 10.;
+
+    return val;
+}
+
 void setColor(inout vec3 diffuseColor) {
-    float x = vPositionW.x - offset / 2. + time;
-    float z = vPositionW.z - offset / 2. + time;
+    float angle = windDir * PI * 2.;
+    mat2 transform = mat2(
+                          cos(angle), sin(angle)
+                          ,
+                          -sin(angle), cos(angle)
+                          );
+
+    vec2 pos = transform * vPositionW.xz;
+    float x = pos[0];
+    float z = pos[1] - time;
+
+    /*if(abs(fract(x / 10.)) <= 0.01 || abs(fract(z / 10.)) <= 0.01) {
+        // Draw grid.
+        diffuseColor = vec3(0., 0., 0.);
+        return;
+    }*/
 
     float jitter = 0.0;
     jitter += 0.2 * sin(1.0 * z) * sin(0.75 * x + 0.65 * z);
@@ -45,29 +104,29 @@ void setColor(inout vec3 diffuseColor) {
 
     float val = 0.0;
 
-    val += sin(30. * x + 30. * z);
-    val += sin(20. * x + 7. * z);
+    val += sin(30. * z);
+    val += sin(20. * z + 5. * x) / 4.;
+    val += sin(40. * z - 6. * x) / 4.;
 
-    val *= 1.0 + 0.3 * sin(17.1 * x + 23.4 * z);
-    val *= 1.0 + 0.3 * sin(33.4 * x + 16.1 * z);
+    val /= 30.0;
 
-    val *= 1.0 + 0.3 * sin(7.2 * x + 6.8 * z);
-    val *= 1.0 + 0.3 * sin(10.0 * x + 6.3 * z);
+    uvec4 waveSummary = getWaveSummary(vPositionW.xz / scale);
+    val *= float(waveSummary[0]) / 10.;
 
-    val *= 1.0 + 0.25 * sin(1.0 * z);
-    val *= 1.0 + 0.25 * sin(0.7 * x + 0.7 * z);
+    //if(float(waveSummary[1]) * val > 0.01 &&
+    //   vPositionW.x >= 0. && vPositionW.z >= 0. && vPositionW.x < 200. && vPositionW.z < 200.) {
 
-    val *= 1.0 + 0.5 * sin(0.1 * x);
-    val *= 1.0 + 0.5 * sin(0.07 * x + 0.07 * z);
-
-    val /= 50.0;
-
-    diffuseColor = vec3(0.1, 0.5 + val / 2.0, 0.9 + val);
+    float depth = (vPositionW.y / scale) - (float(waveSummary[2]) / 100.);
+    if (false && depth < 0.01) {
+        diffuseColor = vec3(1., 1., 1.);
+    } else {
+        diffuseColor = vec3(0.1, 0.5 + val / 2.0, 0.8 + val);
+    }
 }
 
 bool checkHorizon() {
-    float x = vPositionW.x - offset / 2.;
-    float z = vPositionW.z - offset / 2.;
+    float x = vPositionW.x - offset / scale;
+    float z = vPositionW.z - offset / scale;
 
     return (x * x + z * z < size * size / 4.);
 }

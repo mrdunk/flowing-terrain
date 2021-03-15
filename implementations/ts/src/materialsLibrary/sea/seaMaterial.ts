@@ -30,34 +30,49 @@ import "./sea.vertex";
 
 export class SeaMaterial extends BaseMaterial {
     public time: number = 0;
+    public windDir: number = 0;
+    public waveHeight: BABYLON.RawTexture;
     protected shaderName: string = "sea";
 
     // Methods
-    constructor(name: string, public size: number, public offset: number, scene: BABYLON.Scene) {
+    constructor(
+        name: string,
+        public scale: number,
+        public size: number,
+        public offset: number,
+        scene: BABYLON.Scene
+    ) {
         super(name, scene);
         this.uniforms = this.uniforms.concat([
             "size",    // Circle size to draw before changing to background colour.
+            "scale",   // Tile size.
             "offset",  // How much the horizon circle is offset from center.
-            "time"     // Wave movement.
+            "time",    // Wave movement.
+            "windDir"  // Wind direction (0.0 = Northerly. 0.5 = Southerly).
         ]);
+        this.samplers = this.samplers.concat([ "waveHeight" ]);
     }
 
     public clone(name: string): BaseMaterial {
         return BABYLON.SerializationHelper.Clone<BaseMaterial>(
-            () => new SeaMaterial(name, this.size, this.offset, this.getScene()), this);
+            () => new SeaMaterial(
+                name, this.scale, this.size, this.offset, this.getScene()), this);
     }
 
     // Statics
     public static Parse(source: any, scene: BABYLON.Scene, rootUrl: string): BaseMaterial {
         return BABYLON.SerializationHelper.Parse(
-            () => new SeaMaterial(source.name, source.size, source.offset, scene),
+            () => new SeaMaterial(source.name, source.scale, source.size, source.offset, scene),
             source, scene, rootUrl);
     }
 
     protected _bindForSubMeshSubclassed(): void {
+        this._activeEffect.setFloat("scale", this.scale);
         this._activeEffect.setFloat("size", this.size);
         this._activeEffect.setFloat("offset", this.offset);
         this._activeEffect.setFloat("time", this.time);
+        this._activeEffect.setFloat("windDir", this.windDir);
+        this._activeEffect.setTexture("waveHeight", this.waveHeight);
     }
 
     public getClassName(): string {

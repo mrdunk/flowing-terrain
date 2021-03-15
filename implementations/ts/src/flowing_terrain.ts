@@ -39,8 +39,12 @@ export interface Coordinate {
 // State to be shared between all classes.
 export class Enviroment {
   highest_point: number = 0;
-  sealevel: number = 1;
+  //sealevel: number = 1;
   dampest: number = 0;
+  //wind_direction: number = 5 / 8;  // South Westerly.
+  //wind_direction: number = 7 / 8;  // North Westerly.
+  wind_direction: number = 1 / 8;
+  wind_strength: number = 10;
 }
 
 // A single point on the map.
@@ -50,6 +54,7 @@ export class Tile {
   dampness: number = 1;
   lowest_neighbour: Tile = null;
   enviroment: Enviroment;
+  wave_height: number = 0;
 
   constructor(pos: Coordinate, enviroment: Enviroment) {
     this.pos = pos;
@@ -286,7 +291,7 @@ export class Geography {
       const dy = (a.y - b.y);
       return Math.sqrt(dx * dx + dy * dy);
     }
-    
+
     function dot(a: Coordinate, b: Coordinate): number {
       return a.x * b.x + a.y * b.y;
     }
@@ -362,6 +367,234 @@ export class Geography {
 
     return closest - river_width;
   }
+
+  set_wave_height(
+    tile: Tile, to_windward: Tile[], wind_direction_int: number, sealevel: number
+  ): void {
+    if (to_windward[0] === null) {
+      // Upwind edge of map.
+      tile.wave_height = this.enviroment.wind_strength;
+      return;
+    }
+
+    tile.wave_height = 0;
+    for(let more of to_windward) {
+      if(more === null) {
+        tile.wave_height += this.enviroment.wind_strength;
+      } else if(more.height <= sealevel) {
+        tile.wave_height += more.wave_height;
+      }
+    }
+    tile.wave_height /= to_windward.length;
+
+    // Gain more waves the further down wind from land.
+    tile.wave_height += (this.enviroment.wind_strength - tile.wave_height) / 32;
+  }
+
+  get_tiles_windward(wind_direction_int: number, tile: Tile) {
+    const neighbours = this.get_neighbours(tile, false);
+    let more: Tile[];
+    let less: Tile;
+    const same: Tile[] = [];
+    switch (wind_direction_int) {
+      case 0:  // N
+        less = neighbours[4];
+        more = [neighbours[3], neighbours[0], neighbours[5]];
+        if(neighbours[1]) {
+          same.push(neighbours[1]);
+        }
+        if(neighbours[6]) {
+          same.push(neighbours[6]);
+        }
+        break;
+      case 1:  // NE
+        less = neighbours[7];
+        more = [neighbours[0], neighbours[1], neighbours[3]];
+        if(neighbours[2]) {
+          same.push(neighbours[2]);
+        }
+        if(neighbours[5]) {
+          same.push(neighbours[5]);
+        }
+        break;
+      case 2:  // E
+        less = neighbours[6];
+        more = [neighbours[1], neighbours[0], neighbours[2]];
+        if(neighbours[3]) {
+          same.push(neighbours[3]);
+        }
+        if(neighbours[4]) {
+          same.push(neighbours[4]);
+        }
+        break;
+      case 3:  // SE
+        less = neighbours[5];
+        more = [neighbours[2], neighbours[1], neighbours[4]];
+        if(neighbours[0]) {
+          same.push(neighbours[0]);
+        }
+        if(neighbours[7]) {
+          same.push(neighbours[7]);
+        }
+        break;
+      case 4:  // S
+        less = neighbours[3];
+        more = [neighbours[4], neighbours[2], neighbours[7]];
+        if(neighbours[1]) {
+          same.push(neighbours[1]);
+        }
+        if(neighbours[6]) {
+          same.push(neighbours[6]);
+        }
+        break;
+      case 5:  // SW
+        less = neighbours[0];
+        more = [neighbours[7], neighbours[4], neighbours[6]];
+        if(neighbours[2]) {
+          same.push(neighbours[2]);
+        }
+        if(neighbours[5]) {
+          same.push(neighbours[5]);
+        }
+        break;
+      case 6:  // W
+        less = neighbours[1];
+        more = [neighbours[6], neighbours[5], neighbours[7]];
+        if(neighbours[3]) {
+          same.push(neighbours[3]);
+        }
+        if(neighbours[4]) {
+          same.push(neighbours[4]);
+        }
+        break;
+      case 7:  // NW
+        less = neighbours[2];
+        more = [neighbours[5], neighbours[3], neighbours[6]];
+        if(neighbours[7]) {
+          same.push(neighbours[7]);
+        }
+        if(neighbours[0]) {
+          same.push(neighbours[0]);
+        }
+        break;
+      default:
+        console.assert(false, "Invalid wind direction");
+    }
+    return {same, more, less};
+  }
+
+  blow_wind(): void {
+    const sealevel = this.config.get("geography.sealevel");
+    const wind_direction_int = Math.round(this.enviroment.wind_direction * 8 - 0.5);
+    console.log(wind_direction_int);
+    const open: Tile[] = [];
+    let next_down_wind: Tile[] = [];
+    const closed = new Set();
+
+    // Get an up-wind starting point to start generating waves from.
+    let x, y;
+    switch (wind_direction_int) {
+      case 0:
+      case 1:
+        x = 0;
+        y = 0;
+        break;
+      case 2:
+      case 3:
+        x = 0;
+        y = this.tile_count - 1;
+        break;
+      case 4:
+      case 5:
+        x = this.tile_count - 1;
+        y = this.tile_count - 1;
+        break;
+      case 6:
+      case 7:
+        x = this.tile_count - 1;
+        y = 0;
+        break;
+      default:
+        console.assert(false, "Invalid wind direction");
+    }
+
+    open.push(this.get_tile({x, y}));
+    let tile: Tile;
+    while(open.length > 0) {
+      // Calculate tiles at same distance down wind.
+      while(open.length > 0) {
+        tile = open.pop();
+        const windward = this.get_tiles_windward(wind_direction_int, tile);
+        this.set_wave_height(tile, windward.more, wind_direction_int, sealevel);
+        closed.add(tile);
+        for(let same of windward.same) {
+          if(!closed.has(same)) {
+            open.push(same);
+          }
+        }
+        if(windward.less !== null) {
+          console.assert(!closed.has(windward.less));
+          next_down_wind.push(windward.less);
+        }
+      }
+
+      // Get any tile further down wind.
+      while(next_down_wind.length > 0) {
+        let t = next_down_wind.pop();
+        const windward = this.get_tiles_windward(wind_direction_int, t);
+        if(windward.more[1] !== null && !closed.has(windward.more[1])) {
+          open.push(windward.more[1]);
+        }
+        if(windward.more[2] !== null && !closed.has(windward.more[2])) {
+          open.push(windward.more[2]);
+        }
+        if(open.length > 0) {
+          break;
+        }
+        if(!closed.has(t)) {
+          open.push(t);
+          break;
+        }
+      }
+    }
+
+    console.assert(open.length === 0);
+    closed.clear();
+
+
+    if(false) {
+      // Debug to console
+      let line;
+      for(let y = 0; y < 25; y++) {
+        line = `${y} `.padStart(3, " ");
+        //for(let x = this.tile_count - 1; x >= this.tile_count - 26; x--) {
+        for(let x = 26; x >= 0; x--) {
+          if(this.get_tile({x, y}).height >= sealevel) {
+            line += "  #";
+          } else {
+            line += "   ";
+          }
+        }
+        console.log(line);
+      }
+
+      console.log("");
+
+      for(let y = 0; y < 25; y++) {
+        line = `${y} `.padStart(3, " ");
+        //for(let x = this.tile_count - 1; x >= this.tile_count - 26; x--) {
+        for(let x = 26; x >= 0; x--) {
+          const height = Math.round(this.get_tile({x, y}).wave_height);
+          if(height > 0) {
+            line += `${height}`.padStart(3, " ");
+          } else {
+            line += "   ";
+          }
+        }
+        console.log(line);
+      }
+    }
+  }
 }
 
 // Example to iterate over a Geography object.
@@ -396,7 +629,7 @@ export class DisplayBase {
         this.draw_tile(tile);
       }
     }
-    
+
     yield;
     this.generator_start_time = window.performance.now()
 
