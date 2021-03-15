@@ -351,8 +351,8 @@ export class Display3d extends DisplayBase {
         const tile = this.geography.get_tile({x, y});
 
         data[iterator] = tile.wave_height;
-        data[iterator + 1] = tile.shore_gradient;
-        data[iterator + 2] = tile.height * 100;
+        data[iterator + 1] = 0;
+        data[iterator + 2] = 0;
         data[iterator + 3] = 0;
         iterator += 4;
       }
