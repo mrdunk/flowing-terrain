@@ -38,15 +38,15 @@ export class SeaMaterial extends BaseMaterial {
     constructor(
         name: string,
         public scale: number,
-        public size: number,
-        public offset: number,
+        public waterSize: number,
+        public mapSize: number,
         scene: BABYLON.Scene
     ) {
         super(name, scene);
         this.uniforms = this.uniforms.concat([
-            "size",    // Circle size to draw before changing to background colour.
-            "scale",   // Tile size.
-            "offset",  // How much the horizon circle is offset from center.
+            "waterSize",    // Circle waterSize to draw before changing to background colour.
+            "scale",   // Tile waterSize.
+            "mapSize",  // How much the horizon circle is mapSize from center.
             "time",    // Wave movement.
             "windDir"  // Wind direction (0.0 = Northerly. 0.5 = Southerly).
         ]);
@@ -56,20 +56,20 @@ export class SeaMaterial extends BaseMaterial {
     public clone(name: string): BaseMaterial {
         return BABYLON.SerializationHelper.Clone<BaseMaterial>(
             () => new SeaMaterial(
-                name, this.scale, this.size, this.offset, this.getScene()), this);
+                name, this.scale, this.waterSize, this.mapSize, this.getScene()), this);
     }
 
     // Statics
     public static Parse(source: any, scene: BABYLON.Scene, rootUrl: string): BaseMaterial {
         return BABYLON.SerializationHelper.Parse(
-            () => new SeaMaterial(source.name, source.scale, source.size, source.offset, scene),
+            () => new SeaMaterial(source.name, source.scale, source.waterSize, source.mapSize, scene),
             source, scene, rootUrl);
     }
 
     protected _bindForSubMeshSubclassed(): void {
         this._activeEffect.setFloat("scale", this.scale);
-        this._activeEffect.setFloat("size", this.size);
-        this._activeEffect.setFloat("offset", this.offset);
+        this._activeEffect.setFloat("waterSize", this.waterSize);
+        this._activeEffect.setFloat("mapSize", this.mapSize);
         this._activeEffect.setFloat("time", this.time);
         this._activeEffect.setFloat("windDir", this.windDir);
         this._activeEffect.setTexture("waveHeight", this.waveHeight);
