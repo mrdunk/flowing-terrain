@@ -324,6 +324,20 @@ window.onload = () => {
     }
   });
 
+  config.set_if_null("geography.windDirection", 5);
+  config.set_callback("geography.windDirection", (key: string, value: any) => {
+    if (display && display.sea_material) {
+      display.set_sea_material();
+    }
+  });
+
+  config.set_if_null("geography.windStrength", 10);
+  config.set_callback("geography.windStrength", (key: string, value: any) => {
+    if (display && display.sea_material) {
+      display.set_sea_material();
+    }
+  });
+
 
   // UI components below this point.
 

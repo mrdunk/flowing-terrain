@@ -41,10 +41,8 @@ export class Enviroment {
   highest_point: number = 0;
   //sealevel: number = 1;
   dampest: number = 0;
-  //wind_direction: number = 5 / 8;  // South Westerly.
-  //wind_direction: number = 7 / 8;  // North Westerly.
-  wind_direction: number = 1 / 8;
   wind_strength: number = 10;
+  wind_direction: number = 5;
 }
 
 // A single point on the map.
@@ -369,7 +367,7 @@ export class Geography {
   }
 
   set_wave_height(
-    tile: Tile, to_windward: Tile[], wind_direction_int: number, sealevel: number
+    tile: Tile, to_windward: Tile[], wind_direction: number, sealevel: number
   ): void {
     if (to_windward[0] === null) {
       // Upwind edge of map.
@@ -391,12 +389,12 @@ export class Geography {
     tile.wave_height += (this.enviroment.wind_strength - tile.wave_height) / 32;
   }
 
-  get_tiles_windward(wind_direction_int: number, tile: Tile) {
+  get_tiles_windward(wind_direction: number, tile: Tile) {
     const neighbours = this.get_neighbours(tile, false);
     let more: Tile[];
     let less: Tile;
     const same: Tile[] = [];
-    switch (wind_direction_int) {
+    switch (wind_direction) {
       case 0:  // N
         less = neighbours[4];
         more = [neighbours[3], neighbours[0], neighbours[5]];
@@ -485,15 +483,14 @@ export class Geography {
 
   blow_wind(): void {
     const sealevel = this.config.get("geography.sealevel");
-    const wind_direction_int = Math.round(this.enviroment.wind_direction * 8 - 0.5);
-    console.log(wind_direction_int);
+    console.log(this.enviroment.wind_direction);
     const open: Tile[] = [];
     let next_down_wind: Tile[] = [];
     const closed = new Set();
 
     // Get an up-wind starting point to start generating waves from.
     let x, y;
-    switch (wind_direction_int) {
+    switch (this.enviroment.wind_direction) {
       case 0:
       case 1:
         x = 0;
@@ -524,8 +521,8 @@ export class Geography {
       // Calculate tiles at same distance down wind.
       while(open.length > 0) {
         tile = open.pop();
-        const windward = this.get_tiles_windward(wind_direction_int, tile);
-        this.set_wave_height(tile, windward.more, wind_direction_int, sealevel);
+        const windward = this.get_tiles_windward(this.enviroment.wind_direction, tile);
+        this.set_wave_height(tile, windward.more, this.enviroment.wind_direction, sealevel);
         closed.add(tile);
         for(let same of windward.same) {
           if(!closed.has(same)) {
@@ -541,7 +538,7 @@ export class Geography {
       // Get any tile further down wind.
       while(next_down_wind.length > 0) {
         let t = next_down_wind.pop();
-        const windward = this.get_tiles_windward(wind_direction_int, t);
+        const windward = this.get_tiles_windward(this.enviroment.wind_direction, t);
         if(windward.more[1] !== null && !closed.has(windward.more[1])) {
           open.push(windward.more[1]);
         }

@@ -257,13 +257,16 @@ export class Display3d extends DisplayBase {
       this.mapsize,
       this.scene);
     this.sea_material.alpha = this.config.get("display.sea_transparency");
+    this.geography.enviroment.wind_direction = this.config.get("geography.windDirection");
+    this.geography.enviroment.wind_strength = this.config.get("geography.windStrength");
+
+    this.sea_material.windDir = this.geography.enviroment.wind_direction;
 
     this.sea_material.diffuseColor.r = this.scene.clearColor.r;
     this.sea_material.diffuseColor.g = this.scene.clearColor.g;
     this.sea_material.diffuseColor.b = this.scene.clearColor.b;
-
+    
     this.sea_material.waveHeight = this.summarise_waves();
-    this.sea_material.windDir = this.geography.enviroment.wind_direction;
 
     if(this.sea_mesh) {
       this.sea_mesh.material = this.sea_material;
@@ -344,6 +347,7 @@ export class Display3d extends DisplayBase {
   }
 
   summarise_waves(): BABYLON.RawTexture {
+    this.geography.blow_wind();
     const data = new Uint32Array(this.tile_count * this.tile_count * 4);
     let iterator = 0;
     for(let y = 0; y < this.tile_count; y++) {
@@ -652,8 +656,6 @@ export class Display3d extends DisplayBase {
     this.sea_mesh.position = new BABYLON.Vector3(
       this.mapsize / 2, (sealevel + 0.02) * this.tile_size, this.mapsize / 2);
 
-    // Generate waves for the new heights.
-    this.geography.blow_wind();
     // Re-texture everything so beaches are at the right height.
     this.set_land_material();
     this.set_sea_material();

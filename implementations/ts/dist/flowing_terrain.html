@@ -82,6 +82,12 @@
                         <feedback-slider id="rockLikelihood" title="Set the rockLikelihood" name="geography.rockLikelihood" min="0" max="2" step="0.001" value="1">
                           Rock outcrops
                         </feedback-slider>
+                        <feedback-slider id="windDirection" title="Affects waves" name="geography.windDirection" min="0" max="7" value="5">
+                          Wind direction
+                        </feedback-slider>
+                        <feedback-slider id="windStrength" title="Affects waves" name="geography.windStrength" min="0" max="30" value="10">
+                          Wind strength
+                        </feedback-slider>
                       </div>
                     </div>
 
@@ -89,7 +95,7 @@
                       <div class="border higher-vis">
                         <input type="checkbox" id="vegetation_enabled" name="vegetation.enabled">
                         <label for="vegetation_enabled">Show trees</label>
-                        
+
                         <input type="checkbox" id="vegetation_shasow_enabled" name="vegetation.shadow_enabled">
                         <label for="vegetation_shadow_enabled">Show tree shadows</label>
 
