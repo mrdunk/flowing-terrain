@@ -67,12 +67,15 @@ export class Planting {
   noise_effect: number;
   dampness_effect: number;
   noise: Noise;
+  random: seedrandom.prng;
 
   constructor(private geography: Geography,
               private config: Config
   ) {
     console.assert(this.geography !== null);
     console.assert(this.config !== null);
+
+    this.random = seedrandom(`Planting`);
 
     this.noise_update(true);
   }
@@ -202,9 +205,7 @@ export class Planting {
   }
 
   createPlant(x: number, y: number, altitude: number): BABYLON.Nullable<Plant> {
-
-    const random: seedrandom.prng = seedrandom(`${x} ${y} ${this.count}`);
-    const plant = new Plant(new BABYLON.Vector3(x, altitude, y), random);
+    const plant = new Plant(new BABYLON.Vector3(x, altitude, y), this.random);
 
     this.countByType[plant.type_]++;
     this.count++;
