@@ -283,17 +283,9 @@
                     <div class="col-sm border">
                       <div class="border higher-vis">
 
-                        <div class="form-group">
-                          <label for="display.reoptimize">Re-optimize scene</label>
-                          <button type="button" class="btn btn-primary" id="display_reoptimize" name="display.reoptimize" value="display.reoptimize"
-                           title="Increase display settings until lower than the specified FPS">
-                            <img src="./assets/arrow-clockwise.svg" alt="" width="16" height="16" title="Increase display settings until lower than the specified FPS">
-                          </button>
-                        </div>
-
-                        <feedback-slider title="Apply optimizations until lower than this number of FPS." id="display_target_fps"
+                        <feedback-slider title="Apply or remove display optimizations until close." id="display_target_fps"
                             name="display.target_fps" min="10" max="60" value="30" step="1">
-                          Maximum FPS
+                          Set target FPS.
                         </feedback-slider>
                       </div>
                     </div>

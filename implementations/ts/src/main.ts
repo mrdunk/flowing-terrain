@@ -385,12 +385,6 @@ window.onload = () => {
         menu.setAttribute("active", "false");
       }
     }
-
-    const generator = display.optimize();
-    while(!generator.next().done) {
-      // If the callback is actually a yielding generator, yield here.
-      yield;
-    }
   }
   window.addEventListener("resize", onResize_task);
 
@@ -503,15 +497,9 @@ window.onload = () => {
   button.addEventListener("click", menu_link_button_handler, false);
 
 
-  // Button to run SceneOptimizer again.
-  const menu_reoprimize = document.getElementById("display_reoptimize") as HTMLInputElement;
-  menu_reoprimize.addEventListener("click", (event) => {
-    onResize_task();
-  });
-
-  // Run Babylon's SceneOptimizer again.
+  // Set target FPS via slider.
   function reoptimize_3d(keys: string, fps: number): void {
-    onResize_task();
+    display.target_fps = fps;
   }
 
 
@@ -782,6 +770,7 @@ window.onload = () => {
   draw_2d_vegetation_map_task();
   draw_3d_terrain_task();
   start_3d_task();
+  draw_vegetation_3d_task();
   onResize_task();
   final_3d_setup_task();
 

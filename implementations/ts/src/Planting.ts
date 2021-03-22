@@ -67,12 +67,15 @@ export class Planting {
   noise_effect: number;
   dampness_effect: number;
   noise: Noise;
+  random: seedrandom.prng;
 
   constructor(private geography: Geography,
               private config: Config
   ) {
     console.assert(this.geography !== null);
     console.assert(this.config !== null);
+
+    this.random = seedrandom(`Planting`);
 
     this.noise_update(true);
   }
@@ -142,10 +145,11 @@ export class Planting {
         }
 
         // Have both noise-map and drainage affect likelihood of trees growing.
-        const noiseVal = (this.noise.get_value(x, y) * this.noise_effect) +
-          Math.max(0, (Math.sqrt(dampness) * (this.dampness_effect + 1) / 100 - 0.2));
+        const dampnessVal = this.dampness_effect *
+          Math.min(10, Math.sqrt(dampness) - 10) / 20;
+        const noiseVal = (this.noise.get_value(x, y) * this.noise_effect);
 
-        for(let i = 0; i < Math.floor(this.treesPerTile * noiseVal); i++) {
+        for(let i = 0; i < Math.floor(this.treesPerTile * (1 + noiseVal + dampnessVal)); i++) {
           const plant = this.createPlant(x, y, altitude);
 
           const d = this.geography.distance_to_river(
@@ -201,9 +205,7 @@ export class Planting {
   }
 
   createPlant(x: number, y: number, altitude: number): BABYLON.Nullable<Plant> {
-
-    const random: seedrandom.prng = seedrandom(`${x} ${y} ${this.count}`);
-    const plant = new Plant(new BABYLON.Vector3(x, altitude, y), random);
+    const plant = new Plant(new BABYLON.Vector3(x, altitude, y), this.random);
 
     this.countByType[plant.type_]++;
     this.count++;
