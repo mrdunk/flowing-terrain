@@ -174,10 +174,8 @@ export class Display3d extends DisplayBase {
       // Set color for FPS display.
       if (detail_offset < -0.1) {
         color = "firebrick";
-        this.doOptimization(-1);
       } else if(detail_offset > 0.1) {
         color = "darkgreen";
-        this.doOptimization(1);
       } else {
         color = "black";
       }
@@ -186,10 +184,10 @@ export class Display3d extends DisplayBase {
       detail_offset_total += detail_offset;
       if (detail_offset_total < -1) {
         detail_offset_total += 1;
-        this.doOptimization(-1);
+        this.doOptimization(-1, fpsTotal / sampleCount);
       } else if(detail_offset_total > 1) {
         detail_offset_total -= 1;
-        this.doOptimization(1);
+        this.doOptimization(1, fpsTotal / sampleCount);
       }
 
       fpsDiv.innerHTML = `<span style="background-color:${color};">${normalized}fps<\span>`;
@@ -208,10 +206,10 @@ export class Display3d extends DisplayBase {
     this.engine.setHardwareScalingLevel(2);
     this.treeShadowMapSize = 512;
 
-    this.doOptimization(0);
+    this.doOptimization(0, 30);
   }
 
-  doOptimization(direction: number): void {
+  doOptimization(direction: number, fps: number): void {
     if(this.fps_cooldown + 5 * 1000 > Date.now()) {
       // Wait 5 seconds between runs.
       // console.log("Cooldown: ", Math.floor((Date.now() - this.fps_cooldown) / 1000));
@@ -227,7 +225,6 @@ export class Display3d extends DisplayBase {
     switch(this.detail_level) {
       case -1:
         this.detail_level = 0;
-        return;
       case 0:
         this.engine.setHardwareScalingLevel(4);
         this.scene.shadowsEnabled = false;
@@ -283,6 +280,14 @@ export class Display3d extends DisplayBase {
         this.scene.shadowsEnabled = true;
         this.treeShadowMapSize = 4096;
     }
+
+    if (this.scene.shadowsEnabled === false) {
+      // Only actually switch off shadows completely if things are really bad.
+      if (this.target_fps / 2 < fps) {
+        this.scene.shadowsEnabled = true;
+      }
+    }
+
     if(this.treeShadowGenerator) {
       this.treeShadowGenerator.mapSize = this.treeShadowMapSize;
     }
