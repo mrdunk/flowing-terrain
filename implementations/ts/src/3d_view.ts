@@ -62,8 +62,10 @@ export class Display3d extends DisplayBase {
 
   light_1:BABYLON.DirectionalLight;
 
-  optimizer: BABYLON.SceneOptimizer;
   deoptimizer: BABYLON.SceneOptimizer;
+  detail_level: number = 5;
+  target_fps: number;
+  fps_cooldown: number = 0;
 
   constructor(protected geography: Geography,
               public vegetation: Planting,
@@ -145,9 +147,14 @@ export class Display3d extends DisplayBase {
     const fpsDiv = document.getElementById("fps");
     let fps = 0;
     let fpsCount = 0;
-    const fpsSamples = Array(sampleCount).fill(0);
-    let fpsTotal = 0;
+    const fpsSamples = Array(sampleCount).fill(30);
+    let fpsTotal = 30 * sampleCount;
     let fpsIndex = 0;
+    let normalized = "";
+    let detail_offset = 0;
+    let detail_offset_total = 0;
+    let color = "black";
+    //let cooldown = 0;
     this.scene.registerBeforeRender(() => {
       if(!((fpsCount++) % updateEvery === 0)) {
         return;
@@ -160,90 +167,131 @@ export class Display3d extends DisplayBase {
       fpsTotal -= fpsSamples[fpsIndex];
       fpsTotal += fps;
       fpsSamples[fpsIndex] = fps;
-      fpsDiv.innerHTML = (fpsTotal / sampleCount).toFixed() + "fps<br>";
+      normalized = (fpsTotal / sampleCount).toFixed();
+
+      detail_offset = ((fpsTotal / sampleCount) - this.target_fps) / 50;
+
+      // Set color for FPS display.
+      if (detail_offset < -0.1) {
+        color = "firebrick";
+        this.doOptimization(-1);
+      } else if(detail_offset > 0.1) {
+        color = "darkgreen";
+        this.doOptimization(1);
+      } else {
+        color = "black";
+      }
+
+      // Update the level of detail displayed.
+      detail_offset_total += detail_offset;
+      if (detail_offset_total < -1) {
+        detail_offset_total += 1;
+        this.doOptimization(-1);
+      } else if(detail_offset_total > 1) {
+        detail_offset_total -= 1;
+        this.doOptimization(1);
+      }
+
+      fpsDiv.innerHTML = `<span style="background-color:${color};">${normalized}fps<\span>`;
+
       //fpsDiv.innerHTML += "GPU average time: ";
       //fpsDiv.innerHTML +=
       //  (instrumentation.gpuFrameTimeCounter.average * 0.000001).toFixed(2) + "ms";
     });
 
-    // Optimizers
-    this.deoptimizer =
-      new BABYLON.SceneOptimizer(
-        this.scene,
-        this.optimizer_options(),
-        true,
-        true);
-    this.deoptimizer.onNewOptimizationAppliedObservable.add((optim) => {
-      console.info(optim.getDescription());
-    });
-    this.deoptimizer.onSuccessObservable.add((optim) => {
-      const requestedFps = this.config.get("display.target_fps");
-      console.info(`Successfully enhanced display until lower than ${requestedFps} fps.`);
-    });
-    this.deoptimizer.onFailureObservable.add((optim) => {
-      const requestedFps = this.config.get("display.target_fps");
-      console.info(`Ran out of display enhancements before going below ${requestedFps} fps.`);
-    });
+    // Optimize scene.
+    this.target_fps = this.config.get("display.target_fps");
+    this.scene.lensFlaresEnabled = false;
+    this.scene.postProcessesEnabled = false;
+    this.scene.particlesEnabled = false;
+    //this.scene.shadowsEnabled = false;
+    this.engine.setHardwareScalingLevel(2);
+    this.treeShadowMapSize = 512;
+
+    this.doOptimization(0);
+  }
+
+  doOptimization(direction: number): void {
+    if(this.fps_cooldown + 5 * 1000 > Date.now()) {
+      // Wait 5 seconds between runs.
+      // console.log("Cooldown: ", Math.floor((Date.now() - this.fps_cooldown) / 1000));
+      return;
+    }
+    this.fps_cooldown = Date.now();
+    this.detail_level += direction;
+    if (direction >= 0) {
+      console.info("Increasing display detail.", this.detail_level);
+    } else {
+      console.info("Decreasing display detail.", this.detail_level);
+    }
+    switch(this.detail_level) {
+      case -1:
+        this.detail_level = 0;
+        return;
+      case 0:
+        this.engine.setHardwareScalingLevel(4);
+        this.scene.shadowsEnabled = false;
+        break;
+      case 1:
+        this.engine.setHardwareScalingLevel(4);
+        this.scene.shadowsEnabled = true;
+        this.treeShadowMapSize = 512;
+        break;
+      case 2:
+        this.engine.setHardwareScalingLevel(3);
+        this.scene.shadowsEnabled = true;
+        this.treeShadowMapSize = 512;
+        break;
+      case 3:
+        this.engine.setHardwareScalingLevel(2.5);
+        this.scene.shadowsEnabled = true;
+        this.treeShadowMapSize = 512;
+        break;
+      case 4:
+        this.engine.setHardwareScalingLevel(2);
+        this.scene.shadowsEnabled = true;
+        this.treeShadowMapSize = 512;
+        break;
+      case 5:
+        this.engine.setHardwareScalingLevel(2);
+        this.scene.shadowsEnabled = true;
+        this.treeShadowMapSize = 1024;
+        break;
+      case 6:
+        this.engine.setHardwareScalingLevel(1.5);
+        this.scene.shadowsEnabled = true;
+        this.treeShadowMapSize = 1024;
+        break;
+      case 7:
+        this.engine.setHardwareScalingLevel(1.5);
+        this.scene.shadowsEnabled = true;
+        this.treeShadowMapSize = 2048;
+        break;
+      case 8:
+        this.engine.setHardwareScalingLevel(1);
+        this.scene.shadowsEnabled = true;
+        this.treeShadowMapSize = 2048;
+        break;
+      case 9:
+        this.engine.setHardwareScalingLevel(1);
+        this.scene.shadowsEnabled = true;
+        this.treeShadowMapSize = 4096;
+        break;
+      default:
+        this.detail_level = 9;
+        this.engine.setHardwareScalingLevel(1);
+        this.scene.shadowsEnabled = true;
+        this.treeShadowMapSize = 4096;
+    }
+    if(this.treeShadowGenerator) {
+      this.treeShadowGenerator.mapSize = this.treeShadowMapSize;
+    }
   }
 
   startRender(): void {
     this.engine.runRenderLoop(() => {
       this.scene.render();
     });
-  }
-
-  * optimize(): Generator<null, void, boolean> {
-    console.info(`Optimizing for ${this.config.get("display.target_fps")} fps.`);
-
-    this.scene.lensFlaresEnabled = false;
-    this.scene.postProcessesEnabled = false;
-    this.scene.particlesEnabled = false;
-    this.scene.shadowsEnabled = false;
-    this.engine.setHardwareScalingLevel(4);
-    this.treeShadowMapSize = 512;
-
-    let generator = this.plant();
-    while(!generator.next().done) {
-      // If the callback is actually a yielding generator, yield here.
-      yield;
-    }
-
-    this.deoptimizer.targetFrameRate = this.config.get("display.target_fps") - 1;
-    this.deoptimizer.reset();
-    const that = this;
-    setTimeout(() => {that.deoptimizer.start();}, 0);
-  }
-
-  optimizer_options(target_fps: number = 30): BABYLON.SceneOptimizerOptions {
-    const result = new BABYLON.SceneOptimizerOptions(target_fps, 1000);
-    let priority = 0;
-
-    result.optimizations.push(new BABYLON.MergeMeshesOptimization(0));
-
-    // Next priority
-    priority++;
-    result.optimizations.push(new BABYLON.ShadowsOptimization(priority));
-    result.optimizations.push(new HardwareScalingOptimization(priority, 3));
-
-    // Next priority
-    priority++;
-    result.optimizations.push(new ShadowMapOptimization(priority, this, 1024));
-    result.optimizations.push(new HardwareScalingOptimization(priority, 2));
-
-    // Next priority
-    priority++;
-    result.optimizations.push(new ShadowMapOptimization(priority, this, 2048));
-    result.optimizations.push(new HardwareScalingOptimization(priority, 1.5));
-
-    // Next priority
-    priority++;
-    result.optimizations.push(new HardwareScalingOptimization(priority, 1));
-
-    // Next priority
-    priority++;
-    result.optimizations.push(new ShadowMapOptimization(priority, this, 4096));
-
-    return result;
   }
 
   set_sea_material(): void {
@@ -876,10 +924,18 @@ export class Display3d extends DisplayBase {
       this.treeShadowGenerator =
         new BABYLON.ShadowGenerator(this.treeShadowMapSize, this.light_1);
       //this.treeShadowGenerator.usePoissonSampling = true;
-      this.treeShadowGenerator.addShadowCaster(this.treesPine.trunk, true);
-      this.treeShadowGenerator.addShadowCaster(this.treesPine.leaves, true);
-      this.treeShadowGenerator.addShadowCaster(this.treesDeciduous.trunk, true);
-      this.treeShadowGenerator.addShadowCaster(this.treesDeciduous.leaves, true);
+      if (this.treesPine) {
+        this.treeShadowGenerator.addShadowCaster(this.treesPine.trunk, true);
+        this.treeShadowGenerator.addShadowCaster(this.treesPine.leaves, true);
+      } else {
+        console.log("No pine trees.");
+      }
+      if (this.treesDeciduous) {
+        this.treeShadowGenerator.addShadowCaster(this.treesDeciduous.trunk, true);
+        this.treeShadowGenerator.addShadowCaster(this.treesDeciduous.leaves, true);
+      } else {
+        console.log("No deciduous trees.");
+      }
       this.land_mesh.receiveShadows = true;
     }
   }
@@ -1062,47 +1118,3 @@ class TreePine {
   }
 }
 
-/**
- * Defines an optimization used to set the size of the trees shadow map.
- */
-class ShadowMapOptimization extends BABYLON.SceneOptimization {
-
-  public getDescription(): string {
-    return "Setting shadowMap size to " + this.requestedSize;
-  }
-
-  constructor(
-    public priority: number = 0,
-    public display: Display3d,
-    public requestedSize: number = 1024) {
-    super(priority);
-  }
-
-  public apply(scene: BABYLON.Scene, optimizer: BABYLON.SceneOptimizer): boolean {
-    this.display.treeShadowMapSize = this.requestedSize;
-    this.display.treeShadows();
-
-    return true;
-  }
-}
-
-/**
- * Defines an optimization used to set the hardware scaling;
- */
-class HardwareScalingOptimization extends BABYLON.SceneOptimization {
-
-  public getDescription(): string {
-    return "Setting HW scaling to " + this.requestedSize;
-  }
-
-  constructor(
-    public priority: number = 0,
-    public requestedSize: number = 1024) {
-    super(priority);
-  }
-
-  public apply(scene: BABYLON.Scene, optimizer: BABYLON.SceneOptimizer): boolean {
-    scene.getEngine().setHardwareScalingLevel(this.requestedSize);
-    return true;
-  }
-}
