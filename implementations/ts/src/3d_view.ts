@@ -519,13 +519,7 @@ export class Display3d extends DisplayBase {
 
       const mesh = this.scene.meshes.pop();
       if(mesh) {
-        try {
-          mesh.dispose();
-        } catch(error) {
-          // This error occurs inside Babylon after the optimizer reduces the
-          // render target texture size.
-          // It seems to be not harmful.
-        }
+        mesh.dispose();
       }
     }
 
@@ -793,26 +787,14 @@ export class Display3d extends DisplayBase {
 
     // Scrap any existing trees so we can regenerate.
     if(this.treesPine) {
-      try {
-        this.treesPine.trunkMaterial.dispose();
-        this.treesPine.leafMaterial.dispose();
-        this.treesPine.root.dispose();
-      } catch(error) {
-        // This error occurs inside Babylon after the optimizer reduces the
-        // render target texture size.
-        // It seems to be not harmful.
-      }
+      this.treesPine.trunkMaterial.dispose();
+      this.treesPine.leafMaterial.dispose();
+      this.treesPine.root.dispose();
     }
     if(this.treesDeciduous) {
-      try {
-        this.treesDeciduous.trunkMaterial.dispose();
-        this.treesDeciduous.leafMaterial.dispose();
-        this.treesDeciduous.root.dispose();
-      } catch(error) {
-        // This error occurs inside Babylon after the optimizer reduces the
-        // render target texture size.
-        // It seems to be not harmful.
-      }
+      this.treesDeciduous.trunkMaterial.dispose();
+      this.treesDeciduous.leafMaterial.dispose();
+      this.treesDeciduous.root.dispose();
     }
 
     if(! this.config.get("vegetation.enabled")) {
