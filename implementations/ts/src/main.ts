@@ -51,6 +51,35 @@ interface Task {
   generator?: any;
 }
 
+class Console {
+  private output_div: HTMLElement;
+
+  constructor() {
+    this.output_div = document.getElementById("user_console");
+  }
+
+  clear(): void {
+    this.output_div.innerHTML = "";
+  }
+
+  append(text: string, style?: string): void {
+    this.show();
+    if (style) {
+      this.output_div.innerHTML += `<p style="${style}">${text}</p>`;
+    } else {
+      this.output_div.innerHTML += `<p>${text}</p>`;
+    }
+  }
+
+  show(): void {
+    this.output_div.classList.remove("close");
+  }
+
+  hide(): void {
+    this.output_div.classList.add("close");
+  }
+}
+
 /* A simple task scheduler.
  * Tasks are wrappers around functions or generators.
  * The task `label` field is a unique identifier.
@@ -65,8 +94,7 @@ class TaskList {
   private tasklist_div: HTMLElement;
   length: number = 0;
 
-  constructor() {
-    this.tasklist_div = document.getElementById("tasklist");
+  constructor(private user_console: Console) {
   }
 
   push(task: Task): void {
@@ -182,29 +210,38 @@ class TaskList {
   }
 
   update_div(): void {
-    let html = "";
+    this.user_console.clear();
+
     let count = 0;
-    
     for(let task_list of this.task_lists) {
       if (task_list.length === 0) {
         continue;
       }
       for(let task of task_list) {
         count++;
-        html += `${task.description}<br>`;
       }
     }
 
-    if(count > 0) {
-      this.tasklist_div.innerHTML = `<b>Updating. ${count} tasks to do.</b><br>` + html;
-      this.tasklist_div.classList.remove("close");
+    if (count === 0) {
+      this.user_console.hide();
       return;
     }
-    this.tasklist_div.classList.add("close");
+
+    this.user_console.append(`Updating. ${count} tasks to do.`, "font-weight: bold;");
+
+    for(let task_list of this.task_lists) {
+      if (task_list.length === 0) {
+        continue;
+      }
+      for(let task of task_list) {
+        this.user_console.append(`${task.description}`);
+      }
+    }
   }
 }
 
-const taskList = new TaskList();
+const user_console = new Console();
+const taskList = new TaskList(user_console);
 
 window.onload = () => {
   console.time("window.onload");

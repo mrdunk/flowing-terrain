@@ -23,7 +23,7 @@ img.logo{
   height: fit-content;
 }
 
-#tasklist {
+#user_console {
   -webkit-transition-property: 
   height;
   -webkit-transition-duration: 0.5s;
@@ -45,7 +45,12 @@ img.logo{
   overflow-y: hidden;
 }
 
-#tasklist.close {
+#user_console p {
+  line-height: 1.4em;
+  margin-bottom: 0;
+}
+
+#user_console.close {
   height: 0em;
   visibility: hidden;
 }
