@@ -32,7 +32,7 @@ import "regenerator-runtime/runtime";
 import {Enviroment, Geography, Tile} from "./flowing_terrain";
 import {gen_seed_points, seed_point_get_value, Noise} from "./genesis";
 import {draw_2d} from "./2d_view";
-import {Display3d} from "./3d_view";
+import {Display3d, Console} from "./3d_view";
 import {Config} from "./config";
 import '@webcomponents/webcomponentsjs/custom-elements-es5-adapter.js';
 import {CollapsibleMenu} from "./custom_html_elements";
@@ -65,8 +65,7 @@ class TaskList {
   private tasklist_div: HTMLElement;
   length: number = 0;
 
-  constructor() {
-    this.tasklist_div = document.getElementById("tasklist");
+  constructor(private user_console: Console) {
   }
 
   push(task: Task): void {
@@ -182,29 +181,39 @@ class TaskList {
   }
 
   update_div(): void {
-    let html = "";
+    this.user_console.delay_length = 20000;  // Display console for 20 seconds after update.
+    this.user_console.clear();
+
     let count = 0;
-    
     for(let task_list of this.task_lists) {
       if (task_list.length === 0) {
         continue;
       }
       for(let task of task_list) {
         count++;
-        html += `${task.description}<br>`;
       }
     }
 
-    if(count > 0) {
-      this.tasklist_div.innerHTML = `<b>Updating. ${count} tasks to do.</b><br>` + html;
-      this.tasklist_div.classList.remove("close");
+    if (count === 0) {
+      this.user_console.hide();
       return;
     }
-    this.tasklist_div.classList.add("close");
+
+    this.user_console.append(`Updating. ${count} tasks to do.`, "font-weight: bold;");
+
+    for(let task_list of this.task_lists) {
+      if (task_list.length === 0) {
+        continue;
+      }
+      for(let task of task_list) {
+        this.user_console.append(`${task.description}`);
+      }
+    }
   }
 }
 
-const taskList = new TaskList();
+const user_console = new Console();
+const taskList = new TaskList(user_console);
 
 window.onload = () => {
   console.time("window.onload");
@@ -642,7 +651,7 @@ window.onload = () => {
       priority: 6,
       getter: () => {
         if (display === null) {
-          display = new Display3d(geography, vegetation, config);
+          display = new Display3d(geography, vegetation, config, user_console);
         }
         return display.draw();
       }
@@ -679,6 +688,7 @@ window.onload = () => {
       priority: 11,
       getter: () => {
         display.set_view("up");
+        display.startOptimizing();
       }
     });
   }
