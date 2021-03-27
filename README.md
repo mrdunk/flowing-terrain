@@ -9,8 +9,8 @@ dimensional terrain maps and their likely watercourses.
 
 In the screenshots darker tiles indicate higher elevation.
 Red highlights show the drainage value; Areas with more red are where rivers will form.
-![islands](https://github.com/mrdunk/flowing-terrain/blob/master/assets/watershed.png)
-![web_demo_with_trees](https://github.com/mrdunk/flowing-terrain/blob/master/assets/web_demo_with_trees.png)
+![islands](assets/watershed.png)
+![web_demo_with_trees](assets/web_demo_trees_mountain.png)
 
 ## The problem:
 My previous experiments in creating maps for computer software models using
@@ -149,19 +149,27 @@ with a higher value.
 
 ## Making terrain look less uniform:
 On it's own the algorithm described here tends to fall into the trap of may procedurally generated landscape algorithms: Although generally irregular in shape, high ground ends up being roughly equidistant from the shore. This leads to "cone" shaped islands. (Fine for a volcanic landscape maybe?)  
-The solution (demonstrated in the TypeScript version of the source code) is to use perlin noise when picking a "random" value to add to the height in the Heights algorithm. This gives the best of both worlds: Pelin noise chooses where mountains are but landscape still always slopes downwards until it reaches the sea.  
+The solution is to use additional inputs when picking the "random" value to add to the height in the Heights algorithm.  
+The TypeScript implementation achieves this with perlin noise which gives a purely procedural solution: Pelin noise chooses where mountains are but landscape still always slopes downwards until it reaches the sea.  
 To see this in action, play with the sliders in the Tools menu of the online demo: 
 https://mrdunk.github.io/flowing-terrain/implementations/ts/dist/flowing_terrain.html  
+
+A nice mix of procedural generation and designer input would be to use input images instead of noise to both seed the starting points of the algorithm and the order of height increase used by the algorithm for any given position.  
+This would allow a designer to draw a map and have this algorithm do the hard work of getting the heights right.
+
+Although the demo code works on grids with square tiles, there is no reason this algorithm could not work on any network of interconnected points. Obvious examples are triangular or hexagonal tiles.  
+To achieve less regular looking terrain, irregularly sized tiles as produced by Delaunay triangulation or a Voronoi diagram would produce aesthetically pleasing maps.
 
 ## Limitations:
 1. Since the heights algorithm requires seeding with the lowest points on the desired map and floods outwards from there, this method only lends it's self to generating whole maps. It is not possible to use this algorithm recursively.
 
 ## Future work:
 1. Experiment with ways of generating recursive layers of detail so a low resolution map can be generated with the heights algorithm then more detail can be added to a particular section as required.
+1. Create a demo which uses user provided data instead of noise maps to seed the starting points of the algorithm and the order of height increase used by the algorithm for any given position.
 
 ## Some more screenshots:
-![lizard](https://github.com/mrdunk/flowing-terrain/blob/master/assets/lizard.png)
-![lagoon](https://github.com/mrdunk/flowing-terrain/blob/master/assets/lagoon.png)
-![web_demo_perspective](https://github.com/mrdunk/flowing-terrain/blob/master/assets/web_demo_perspective.png)
-![web_demo_overhead](https://github.com/mrdunk/flowing-terrain/blob/master/assets/web_demo_overhead.png)
-![web_demo_with_trees](https://github.com/mrdunk/flowing-terrain/blob/master/assets/web_demo_with_trees.png)
+![lizard](assets/lizard.png)
+![lagoon](assets/lagoon.png)
+![web_demo_perspective](assets/web_demo_perspective.png)
+![web_demo_overhead](assets/web_demo_overhead.png)
+![web_demo_with_trees](assets/web_demo_trees_mountain.png)
