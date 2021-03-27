@@ -557,7 +557,14 @@ export class Display3d extends DisplayBase {
 
       const mesh = this.scene.meshes.pop();
       if(mesh) {
-        mesh.dispose();
+        try {
+          mesh.dispose();
+        } catch (error) {
+          if (error instanceof TypeError) {
+          } else {
+            throw error;
+          }
+        }
       }
     }
 
