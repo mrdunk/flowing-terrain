@@ -32,7 +32,7 @@ import "regenerator-runtime/runtime";
 import {Enviroment, Geography, Tile} from "./flowing_terrain";
 import {gen_seed_points, seed_point_get_value, Noise} from "./genesis";
 import {draw_2d} from "./2d_view";
-import {Display3d} from "./3d_view";
+import {Display3d, Console} from "./3d_view";
 import {Config} from "./config";
 import '@webcomponents/webcomponentsjs/custom-elements-es5-adapter.js';
 import {CollapsibleMenu} from "./custom_html_elements";
@@ -49,35 +49,6 @@ interface Task {
   time_spent?: number;
   setter?: (value: any) => void;
   generator?: any;
-}
-
-class Console {
-  private output_div: HTMLElement;
-
-  constructor() {
-    this.output_div = document.getElementById("user_console");
-  }
-
-  clear(): void {
-    this.output_div.innerHTML = "";
-  }
-
-  append(text: string, style?: string): void {
-    this.show();
-    if (style) {
-      this.output_div.innerHTML += `<p style="${style}">${text}</p>`;
-    } else {
-      this.output_div.innerHTML += `<p>${text}</p>`;
-    }
-  }
-
-  show(): void {
-    this.output_div.classList.remove("close");
-  }
-
-  hide(): void {
-    this.output_div.classList.add("close");
-  }
 }
 
 /* A simple task scheduler.
@@ -210,6 +181,7 @@ class TaskList {
   }
 
   update_div(): void {
+    this.user_console.delay_length = 20000;  // Display console for 20 seconds after update.
     this.user_console.clear();
 
     let count = 0;
@@ -679,7 +651,7 @@ window.onload = () => {
       priority: 6,
       getter: () => {
         if (display === null) {
-          display = new Display3d(geography, vegetation, config);
+          display = new Display3d(geography, vegetation, config, user_console);
         }
         return display.draw();
       }
@@ -716,6 +688,7 @@ window.onload = () => {
       priority: 11,
       getter: () => {
         display.set_view("up");
+        display.startOptimizing();
       }
     });
   }

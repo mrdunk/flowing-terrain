@@ -62,14 +62,16 @@ export class Display3d extends DisplayBase {
 
   light_1:BABYLON.DirectionalLight;
 
-  deoptimizer: BABYLON.SceneOptimizer;
   detail_level: number = 5;
+  last_detail_level: number = 5;
   target_fps: number;
   fps_cooldown: number = 0;
+  optimizer_enabled: boolean = false;
 
   constructor(protected geography: Geography,
               public vegetation: Planting,
-              protected config: Config
+              protected config: Config,
+              private user_console: Console
   ) {
     super(geography);
     this.mapsize = this.tile_size * this.tile_count;
@@ -182,7 +184,9 @@ export class Display3d extends DisplayBase {
 
       // Update the level of detail displayed.
       detail_offset_total += detail_offset;
-      if (detail_offset_total < -1) {
+      if (!this.optimizer_enabled) {
+        detail_offset_total = 0;
+      } else if (detail_offset_total < -1) {
         detail_offset_total += 1;
         this.doOptimization(-1, fpsTotal / sampleCount);
       } else if(detail_offset_total > 1) {
@@ -209,83 +213,117 @@ export class Display3d extends DisplayBase {
     this.doOptimization(0, 30);
   }
 
+  startOptimizing(): void {
+    this.optimizer_enabled = true;
+  }
+
   doOptimization(direction: number, fps: number): void {
     if(this.fps_cooldown + 5 * 1000 > Date.now()) {
       // Wait 5 seconds between runs.
       // console.log("Cooldown: ", Math.floor((Date.now() - this.fps_cooldown) / 1000));
       return;
     }
+
     this.fps_cooldown = Date.now();
     this.detail_level += direction;
+
+    if (this.detail_level <= 0) {
+      this.detail_level = 0;
+      if (this.target_fps / 2 < fps) {
+        // Only actually switch off shadows completely if things are really bad.
+        this.detail_level = 1;
+      }
+    } else if (this.detail_level > 9) {
+      this.detail_level = 9;
+    }
+
+    if (this.detail_level === this.last_detail_level) {
+      return;
+    }
+    this.last_detail_level = this.detail_level;
+
+    this.user_console.clear();
+    this.user_console.delay_length = 5000;  // Display console for 5 seconds after update.
     if (direction >= 0) {
       console.info("Increasing display detail.", this.detail_level);
+      this.user_console.append("Increasing display detail.", "font-weight: bold;");
     } else {
       console.info("Decreasing display detail.", this.detail_level);
+      this.user_console.append("Decreasing display detail.", "font-weight: bold;");
     }
+    this.user_console.append(`Target FPS: ${this.target_fps}`);
+    this.user_console.append(`Actual FPS: ${fps.toFixed()}`);
+
     switch(this.detail_level) {
-      case -1:
-        this.detail_level = 0;
       case 0:
         this.engine.setHardwareScalingLevel(4);
         this.scene.shadowsEnabled = false;
+        this.user_console.append("  Pixel size: 4");
+        this.user_console.append("  Shadows disabled");
         break;
       case 1:
         this.engine.setHardwareScalingLevel(4);
         this.scene.shadowsEnabled = true;
         this.treeShadowMapSize = 512;
+        this.user_console.append("  Pixel size: 4");
+        this.user_console.append("  Shadow detail: worst");
         break;
       case 2:
         this.engine.setHardwareScalingLevel(3);
         this.scene.shadowsEnabled = true;
         this.treeShadowMapSize = 512;
+        this.user_console.append("  Pixel size: 3");
+        this.user_console.append("  Shadow detail: worst");
         break;
       case 3:
         this.engine.setHardwareScalingLevel(2.5);
         this.scene.shadowsEnabled = true;
         this.treeShadowMapSize = 512;
+        this.user_console.append("  Pixel size: 2.5");
+        this.user_console.append("  Shadow detail: worst");
         break;
       case 4:
         this.engine.setHardwareScalingLevel(2);
         this.scene.shadowsEnabled = true;
         this.treeShadowMapSize = 512;
+        this.user_console.append("  Pixel size: 2");
+        this.user_console.append("  Shadow detail: worst");
         break;
       case 5:
         this.engine.setHardwareScalingLevel(2);
         this.scene.shadowsEnabled = true;
         this.treeShadowMapSize = 1024;
+        this.user_console.append("  Pixel size: 2");
+        this.user_console.append("  Shadow detail: medeium");
         break;
       case 6:
         this.engine.setHardwareScalingLevel(1.5);
         this.scene.shadowsEnabled = true;
         this.treeShadowMapSize = 1024;
+        this.user_console.append("  Pixel size: 1.5");
+        this.user_console.append("  Shadow detail: medeium");
         break;
       case 7:
         this.engine.setHardwareScalingLevel(1.5);
         this.scene.shadowsEnabled = true;
         this.treeShadowMapSize = 2048;
+        this.user_console.append("  Pixel size: 1.5");
+        this.user_console.append("  Shadow detail: good");
         break;
       case 8:
         this.engine.setHardwareScalingLevel(1);
         this.scene.shadowsEnabled = true;
         this.treeShadowMapSize = 2048;
+        this.user_console.append("  Pixel size: 1");
+        this.user_console.append("  Shadow detail: good");
         break;
       case 9:
         this.engine.setHardwareScalingLevel(1);
         this.scene.shadowsEnabled = true;
         this.treeShadowMapSize = 4096;
+        this.user_console.append("  Pixel size: 1");
+        this.user_console.append("  Shadow detail: best");
         break;
-      default:
-        this.detail_level = 9;
-        this.engine.setHardwareScalingLevel(1);
-        this.scene.shadowsEnabled = true;
-        this.treeShadowMapSize = 4096;
-    }
-
-    if (this.scene.shadowsEnabled === false) {
-      // Only actually switch off shadows completely if things are really bad.
-      if (this.target_fps / 2 < fps) {
-        this.scene.shadowsEnabled = true;
-      }
     }
 
     if(this.treeShadowGenerator) {
@@ -1104,4 +1142,38 @@ class TreePine {
     this.trunk.freezeWorldMatrix();
   }
 }
+
+export class Console {
+  private output_div: HTMLElement;
+  private delay: number = 0;
+  public delay_length: number = 5000;
+
+  constructor() {
+    this.output_div = document.getElementById("user_console");
+  }
+
+  clear(): void {
+    this.output_div.innerHTML = "";
+  }
+
+  append(text: string, style?: string): void {
+    this.show();
+    if (style) {
+      this.output_div.innerHTML += `<p style="${style}">${text}</p>`;
+    } else {
+      this.output_div.innerHTML += `<p>${text}</p>`;
+    }
+  }
+
+  show(): void {
+    this.output_div.classList.remove("close");
+    clearTimeout(this.delay);
+    this.delay = setTimeout(this.hide.bind(this), this.delay_length);
+  }
+
+  hide(): void {
+    this.output_div.classList.add("close");
+  }
+}
+
 
