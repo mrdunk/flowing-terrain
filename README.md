@@ -9,7 +9,7 @@ dimensional terrain maps and their likely watercourses.
 
 In the screenshots darker tiles indicate higher elevation.
 Red highlights show the drainage value; Areas with more red are where rivers will form.
-![islands](https://github.com/mrdunk/flowing-terrain/blob/master/assets/watershed.png)
+![islands](assets/watershed.png)
 ![web_demo_with_trees](assets/web_demo_trees_mountain.png)
 
 ## The problem:
@@ -168,8 +168,8 @@ To achieve less regular looking terrain, irregularly sized tiles as produced by 
 1. Create a demo which uses user provided data instead of noise maps to seed the starting points of the algorithm and the order of height increase used by the algorithm for any given position.
 
 ## Some more screenshots:
-![lizard](https://github.com/mrdunk/flowing-terrain/blob/master/assets/lizard.png)
-![lagoon](https://github.com/mrdunk/flowing-terrain/blob/master/assets/lagoon.png)
-![web_demo_perspective](https://github.com/mrdunk/flowing-terrain/blob/master/assets/web_demo_perspective.png)
-![web_demo_overhead](https://github.com/mrdunk/flowing-terrain/blob/master/assets/web_demo_overhead.png)
+![lizard](assets/lizard.png)
+![lagoon](assets/lagoon.png)
+![web_demo_perspective](assets/web_demo_perspective.png)
+![web_demo_overhead](assets/web_demo_overhead.png)
 ![web_demo_with_trees](assets/web_demo_trees_mountain.png)
