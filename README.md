@@ -1,11 +1,13 @@
 # TLDR
-Web version:  
+Web demo:  
 https://mrdunk.github.io/flowing-terrain/implementations/ts/dist/flowing_terrain.html  
 Mouse and cursor keys to move around.
 
 # flowing-terrain
 This project is intended to document a simple algorithm for creating 3
-dimensional terrain maps and their likely watercourses.
+dimensional terrain maps and their likely watercourses.  
+It aims to solve the problem of creating believable rivers in procedurally generated
+terrain in a computationally inexpensive manner.
 
 In the screenshots darker tiles indicate higher elevation.
 Red highlights show the drainage value; Areas with more red are where rivers will form.
