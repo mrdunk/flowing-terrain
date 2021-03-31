@@ -175,3 +175,19 @@ To achieve less regular looking terrain, irregularly sized tiles as produced by 
 ![web_demo_perspective](assets/web_demo_perspective.png)
 ![web_demo_overhead](assets/web_demo_overhead.png)
 ![web_demo_with_trees](assets/web_demo_trees_mountain.png)
+
+## Other approaches:
+The simplest approach is to use 2D Simplex or Perlin noise and use the value at a given coordinate as the elevation.  
+You can see this in action (and play with Amit's cool web demos) here: https://www.redblobgames.com/maps/terrain-from-noise/  
+The main problem with this approach (in my eyes) is that it is not possible to recreate realistic water courses. You always get lots of low points which in the real world would form lakes. Lots of lakes.  
+Computing where on the map is a lake is computationally as expensive as the algorithm descried here.
+
+At the other end of the spectrum, there are many examples online of Hydrology Models where simulated water erodes terrain over many iterations.  
+eg: https://weigert.vsos.ethz.ch/2020/04/15/procedural-hydrology/  
+While this approach gives better final results than the algorithm discussed here, it is much more computationally expensive.  
+
+Another approach is to start with river paths and build terrain upward from there. This is the most similar approach to the algorithm discussed here that i have seen.  
+eg: https://link.springer.com/chapter/10.1007%2F978-3-642-10331-5_44  
+and: https://www.reddit.com/r/proceduralgeneration/comments/cuav8d/an_approach_to_river_based_terrain_generation/  
+I beleive this approach takes careful implementation to make sure river basins meet at the same height but i think you could borrow from my algorthm here and store all cells that you are expanding from in a sorted set and always work through them in oder of height: lowest to highest.  
+Amit Patel discusses the pitfalls of this sort of approach here: https://www.redblobgames.com/x/1725-procedural-elevation/
